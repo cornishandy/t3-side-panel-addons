@@ -12,9 +12,17 @@ import vm from "node:vm";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+// T3 updates its headless Chrome in place (154 → 156 …); use the newest installed version.
+function newestHeadlessChrome() {
+  const root = path.join(os.homedir(), ".t3/tools/chrome-headless-shell/mac-arm64");
+  const versions = fs.existsSync(root) ? fs.readdirSync(root).filter((v) => /^\d+(\.\d+)+$/.test(v)) : [];
+  versions.sort((a, b) => b.localeCompare(a, "en", { numeric: true }));
+  return path.join(root, versions[0] ?? "missing", "chrome-headless-shell");
+}
+
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const SRC = fileURLToPath(new URL("..", import.meta.url));
-const CHROME = path.join(os.homedir(), ".t3/tools/chrome-headless-shell/mac-arm64/154.0.8037.92/chrome-headless-shell");
+const CHROME = newestHeadlessChrome();
 const PLAIN = fileURLToPath(new URL("./fixtures/plain-baseline/", import.meta.url));
 const RECORDING = process.env.T3X_VISUAL_RECORDING || "";
 const CLASSES = ["t3x-g-title", "t3x-g-meta", "t3x-g-project", "t3x-g-age", "t3x-g-state-text", "t3x-g-badges", "t3x-g-badge", "t3x-g-status", "t3x-g-note", "t3x-g-scope", "t3x-g-counts", "t3x-g-cue", "t3x-g-method"];

@@ -9,8 +9,16 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+// T3 updates its headless Chrome in place (154 → 156 …); use the newest installed version.
+function newestHeadlessChrome() {
+  const root = path.join(os.homedir(), ".t3/tools/chrome-headless-shell/mac-arm64");
+  const versions = fs.existsSync(root) ? fs.readdirSync(root).filter((v) => /^\d+(\.\d+)+$/.test(v)) : [];
+  versions.sort((a, b) => b.localeCompare(a, "en", { numeric: true }));
+  return path.join(root, versions[0] ?? "missing", "chrome-headless-shell");
+}
+
 const SRC = fileURLToPath(new URL("..", import.meta.url));
-const CHROME = path.join(os.homedir(), ".t3/tools/chrome-headless-shell/mac-arm64/154.0.8037.92/chrome-headless-shell");
+const CHROME = newestHeadlessChrome();
 const OUT_ROOT = process.env.T3X_GROUPING_OUT || path.join(SRC, "task-output");
 const OUT = path.join(OUT_ROOT, "screenshots");
 const ENV = "localenv01";

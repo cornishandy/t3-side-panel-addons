@@ -7,6 +7,14 @@ import { spawn } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 
+// T3 updates its headless Chrome in place (154 → 156 …); use the newest installed version.
+function newestHeadlessChrome() {
+  const root = path.join(os.homedir(), ".t3/tools/chrome-headless-shell/mac-arm64");
+  const versions = fs.existsSync(root) ? fs.readdirSync(root).filter((v) => /^\d+(\.\d+)+$/.test(v)) : [];
+  versions.sort((a, b) => b.localeCompare(a, "en", { numeric: true }));
+  return path.join(root, versions[0] ?? "missing", "chrome-headless-shell");
+}
+
 const root = new URL("..", import.meta.url);
 const source = fs.readFileSync(new URL("../public/extras.js", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../public/extras.css", import.meta.url), "utf8");
@@ -272,7 +280,7 @@ test("effective picks drive role loads, body stays stored, and a late face canno
 });
 
 test("rendered families follow the leaf contract and an unpainted leaf follows the host variable", async () => {
-  const chrome = path.join(os.homedir(), ".t3/tools/chrome-headless-shell/mac-arm64/154.0.8037.92/chrome-headless-shell");
+  const chrome = newestHeadlessChrome();
   assert.equal(fs.existsSync(chrome), true);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3x-font-core-"));
   const htmlPath = path.join(dir, "fixture.html");
