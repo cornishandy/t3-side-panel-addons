@@ -10,3 +10,4 @@
 - **25 Oct — only T3's native thread list:** the Group / Sort / Native views bar was removed (code kept, not installed). Compact threads added, on by default, with a switch.
 - **25 Oct — geminiQuota unit:** T3's Antigravity limits probe sends a User-Agent version for which Google omits the Gemini buckets; the unit sends `2.24.0`. Upstream: pingdotgg/t3code#22876.
 - **25 Oct — published as its own public repo** after a privacy pass: home paths and the Mac's tailnet name replaced, iCloud conflict copies and test screenshots left out, gitleaks clean.
+- **25 Oct — compact sidebar usage in a short window:** the four-lab block took too much room when the window was squished vertically. Under 800 px tall it becomes one line per lab (on by default, with its own switch).

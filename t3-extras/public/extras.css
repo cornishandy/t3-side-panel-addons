@@ -112,6 +112,10 @@ header[data-chat-header]:has([data-t3x="hdr"]) > div:not([data-workspace-titleba
 .t3x-bar-label { color: var(--sidebar-foreground, var(--foreground)); }
 .t3x-bar-val { overflow: hidden; color: var(--sidebar-muted-foreground, var(--muted-foreground)); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .t3x-bar-glyph { grid-column: 1 / -1; }
+/* short window: one line per lab, name | small glyph | "63% · 5h 70%" */
+.t3x-bars.t3x-bars-c { gap: 3px; padding: 4px 8px 3px; }
+.t3x-bars-c .t3x-bar { grid-template-columns: 3.6em auto minmax(0, 1fr); column-gap: 6px; row-gap: 0; align-items: center; }
+.t3x-bars-c .t3x-bar-glyph { grid-column: auto; display: flex; }
 /* Running low, the refill time joins the label on one line; narrow drops the word "refills" first. */
 .t3x-bars { container: t3x-bars / inline-size; }
 @container t3x-bars (max-width: 250px) { .t3x-rw { display: none; } }

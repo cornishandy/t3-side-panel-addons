@@ -53,6 +53,7 @@
     usageHeader: true,
     usageComposer: true,
     usageSidebar: true,
+    usageSidebarShort: true, // one line per lab while the window is under SHORT_WINDOW px tall
     burnTells: true,
     handoverButton: true,
     chainPill: true,
@@ -89,7 +90,7 @@
     footerTeam: "start-open", // the reply footer's team list: always-show | start-open | start-folded | always-hide
     fontTargets: Object.freeze({ composer: true, quotes: true, projects: true, pills: true, headings: true, replies: true, mine: true, ...Object.fromEntries(INTERFACE_TARGETS.map(([key]) => [key, false])) }),
   });
-  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "printOnly", "showPartly", "interfaceFontsOpen"];
+  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "printOnly", "showPartly", "interfaceFontsOpen"];
   const MARKERS = ["bar", "outline", "off"];
   const FOOTER_TEAM = [
     ["always-show", "Always show"],
@@ -702,6 +703,12 @@
     const low = lowRefills(v).find((r) => (tight ? r.which === "short" : r.which === "long"));
     const sameDay = low && new Date(low.at).toDateString() === new Date(now).toDateString();
     return { main: `${v.name} ${tight ? `${v.shortTag} ` : ""}${fmtPct(v.minLeft)}`, refill: low ? (sameDay ? fmtTime(low.at) : fmtWhen(low.at)) : null };
+  }
+  /** The short-window sidebar line: "63% · 5h 70%", plus the refill clock when one runs low. */
+  function shortBarText(v, now) {
+    if (!v?.hasData) return v?.showUnknown ? "—" : "";
+    const low = lowRefills(v)[0];
+    return `${fmtPct(v.lp.left)}${v.short ? ` · ${v.shortTag} ${v.blocked ? "blocked" : fmtPct(v.sp?.left)}` : ""}${low ? ` · ${fmtClock(low.at, now)}` : ""}`;
   }
   /** "63% left · 5h 70%" (+ refill times when low); narrow drops the "refills" words. */
   function compactLabel(v, now = Date.now(), narrow = false) {
@@ -1932,6 +1939,9 @@
   };
 
   // Sidebar footer: one row per lab with data, "Claude 63% left · 5h 70%" over its B glyph.
+  // In a short window (switch on), one line per lab instead: name, a small glyph, "63% · 5h 70%".
+  const SHORT_WINDOW = 800;
+  const barsCompact = () => settings.usageSidebarShort && (W.innerHeight || 1000) < SHORT_WINDOW;
   features.bars = {
     on: () => settings.usageSidebar,
     node: null,
@@ -1945,15 +1955,26 @@
         ro.observe(node);
         cleanups.push(() => ro.disconnect());
       }
+      const onResize = guarded("resize", () => {
+        if (!disposed && node.isConnected && barsCompact() !== node.classList.contains("t3x-bars-c")) render();
+      });
+      W.addEventListener("resize", onResize);
+      cleanups.push(() => W.removeEventListener("resize", onResize));
       return node;
     },
     mount: (anchor, node) => anchor.prepend(node),
     update(node, vs, now) {
       const labs = visibleLabs(vs);
       const width = Math.max(80, Math.round((node.clientWidth || 226) - 16));
-      if (sig(node, `${width}#${labs.map((v) => `${viewKey(v)}|${compactLabel(v, now)}`).join(";")}`)) {
+      const compact = barsCompact();
+      node.classList.toggle("t3x-bars-c", compact);
+      if (sig(node, `${compact ? "c" : ""}${width}#${labs.map((v) => `${viewKey(v)}|${compactLabel(v, now)}`).join(";")}`)) {
         node.replaceChildren(...(labs.length
-          ? labs.map((v) => h("span", { class: `t3x-bar${v.stale ? " t3x-dim" : ""}`, title: bTooltip(v, now) },
+          ? compact ? labs.map((v) => h("span", { class: `t3x-bar${v.stale ? " t3x-dim" : ""}`, title: bTooltip(v, now) },
+            h("span", { class: "t3x-bar-label" }, h("span", { class: "t3x-lab-name", text: v.name })),
+            h("span", { class: "t3x-bar-glyph" }, bSvg(v, Math.max(28, width - 136), 12, "sm")),
+            h("span", { class: "t3x-bar-val", text: shortBarText(v, now) })))
+          : labs.map((v) => h("span", { class: `t3x-bar${v.stale ? " t3x-dim" : ""}`, title: bTooltip(v, now) },
             h("span", { class: "t3x-bar-label" }, h("span", { class: "t3x-lab-name", text: v.name })),
             h("span", { class: "t3x-bar-val" }, compactParts(v, now).map((p) => (p.rw ? h("span", { class: "t3x-rw", text: p.t }) : p.t))),
             h("span", { class: "t3x-bar-glyph" }, bSvg(v, width, 17, "md"))))
@@ -2766,6 +2787,7 @@
         sw("Header glyphs (one per lab)", "usageHeader", where("header")),
         sw("Composer: the tightest lab", "usageComposer", where("composer")),
         sw("Sidebar: one row per lab", "usageSidebar", where("bars")),
+        settings.usageSidebar ? sw("Sidebar: compact in a short window", "usageSidebarShort", `One line per lab while the window is under ${SHORT_WINDOW} px tall.`) : null,
         sw("Thread burn tells", "burnTells", "Gemini threads aren't measured. Estimated API cost equivalent; not your subscription charge.")),
       h("section", {}, h("h3", { text: "Handover" }),
         sw("Prepare handover button", "handoverButton", "Adds a request to your message; you send it."),
