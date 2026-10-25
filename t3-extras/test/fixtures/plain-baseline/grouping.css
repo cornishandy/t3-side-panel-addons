@@ -1,0 +1,93 @@
+/* Sidebar index. Hides native rows only while this index is ready and still in the sidebar.
+   Text uses the theme foreground so it stays with the sidebar's own contrast. */
+
+[data-t3x="grouping-root"] {
+  container-type: inline-size;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px 10px;
+  color: var(--foreground, CanvasText);
+  background: transparent;
+  font: 12px/1.35 var(--font-sans, system-ui, sans-serif);
+}
+[data-t3x="grouping-root"] * { box-sizing: border-box; }
+.t3x-g-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: end;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-bottom: 4px;
+  background: var(--sidebar, var(--background, Canvas));
+}
+.t3x-g-bar button { white-space: normal; }
+.t3x-g-bar label { position: relative; display: flex; flex-direction: column; gap: 2px; flex: 1 1 88px; min-height: 24px; }
+.t3x-g-bar select,
+.t3x-g-bar button,
+.t3x-g-groups button {
+  min-height: 24px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border, ButtonBorder);
+  border-radius: 6px;
+  font: inherit;
+}
+.t3x-g-bar select { width: 100%; padding: 2px 4px; }
+.t3x-g-bar button { flex: 1 1 100%; padding: 4px 6px; text-align: left; }
+.t3x-g-scope,
+.t3x-g-note,
+.t3x-g-status,
+.t3x-g-empty { margin: 0; overflow-wrap: anywhere; }
+.t3x-g-groups button {
+  width: 100%;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 4px 6px;
+  text-align: left;
+  font-weight: 650;
+}
+.t3x-g-count { margin-left: auto; font-variant-numeric: tabular-nums; }
+.t3x-g-short { display: none; white-space: normal; overflow-wrap: anywhere; }
+.t3x-g-long { white-space: normal; overflow-wrap: anywhere; }
+.t3x-g-groups a {
+  display: block;
+  min-height: 24px;
+  padding: 4px 2px 6px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 4px;
+}
+.t3x-g-title { display: block; font-weight: 650; white-space: normal; overflow-wrap: anywhere; }
+.t3x-g-meta,
+.t3x-g-badges { display: block; margin-top: 2px; overflow-wrap: anywhere; }
+.t3x-g-groups a[aria-current="page"] { outline: 2px solid var(--foreground, CanvasText); outline-offset: 1px; }
+[data-t3x="grouping-root"] :focus-visible { outline: 2px solid var(--foreground, CanvasText); outline-offset: 1px; }
+
+@container (max-width: 180px) {
+  .t3x-g-bar { flex-direction: column; align-items: stretch; }
+  .t3x-g-bar label { flex: 1 1 auto; width: 100%; }
+  .t3x-g-bar select { font-size: 11px; }
+  .t3x-g-long { display: none; }
+  .t3x-g-short { display: inline; }
+  .t3x-g-note, .t3x-g-scope, .t3x-g-status, .t3x-g-meta, .t3x-g-empty, .t3x-g-badges { font-size: 11px; line-height: 1.25; }
+  .t3x-g-word {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+}
+
+[data-t3x="grouping-root"]:not([data-ready="1"]) .t3x-g-note {
+  display: none;
+}
+
+html[data-t3x-grouping="active"] [data-slot="sidebar-content"]:has(> [data-t3x="grouping-root"][data-ready="1"]) > :not([data-t3x="grouping-root"]) {
+  display: none !important;
+}

@@ -1,0 +1,5 @@
+.DS_Store
+node_modules/
+task-output/
+* 2.*
+*.log

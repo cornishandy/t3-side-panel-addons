@@ -1,0 +1,1296 @@
+{
+ "note": "Fonts for the Heading and Body pickers: one place for the list, each family's style verdict and its measurements. Google families are fetched once by install.sh from the pinned fonts.gstatic.com URLs below (latin subset, one weight) with their licence from github.com/google/fonts at a pinned commit; each file must match its sha256. macOS families need nothing. Rebuild with tools/fonts.mjs.",
+ "styleSource": "Gemini 4 Argon by eye, 19 Oct 2026 (coordinator: Noteworthy is print). star = Argon's top 8 for Andy's taste; hard = hard to read at 14-16 px.",
+ "families": [
+  {
+   "name": "Amatic SC",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "amatic-sc-latin-400.woff2",
+   "licence": "LICENSE-amatic-sc.txt",
+   "licenceType": "OFL-1.1",
+   "width": 566.4,
+   "tallness": 2.57,
+   "narrow": true,
+   "tall": true,
+   "size": 80
+  },
+  {
+   "name": "Just Another Hand",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": true,
+   "hard": false,
+   "file": "just-another-hand-latin-400.woff2",
+   "licence": "LICENSE-just-another-hand.txt",
+   "licenceType": "Apache-2.0",
+   "width": 427.1,
+   "tallness": 3.16,
+   "narrow": true,
+   "tall": true,
+   "size": 125
+  },
+  {
+   "name": "Sue Ellen Francisco",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": true,
+   "hard": false,
+   "file": "sue-ellen-francisco-latin-400.woff2",
+   "licence": "LICENSE-sue-ellen-francisco.txt",
+   "licenceType": "OFL-1.1",
+   "width": 546.3,
+   "tallness": 3.21,
+   "narrow": true,
+   "tall": true,
+   "size": 135
+  },
+  {
+   "name": "Covered By Your Grace",
+   "source": "google",
+   "group": "hand",
+   "style": "partly",
+   "star": false,
+   "hard": false,
+   "file": "covered-by-your-grace-latin-400.woff2",
+   "licence": "LICENSE-covered-by-your-grace.txt",
+   "licenceType": "OFL-1.1",
+   "width": 731.3,
+   "tallness": 2.04,
+   "narrow": false,
+   "tall": true,
+   "size": 105
+  },
+  {
+   "name": "Nanum Pen Script",
+   "source": "google",
+   "group": "hand",
+   "style": "partly",
+   "star": false,
+   "hard": false,
+   "file": "nanum-pen-script-latin-400.woff2",
+   "licence": "LICENSE-nanum-pen-script.txt",
+   "licenceType": "OFL-1.1",
+   "width": 709.1,
+   "tallness": 1.51,
+   "narrow": false,
+   "tall": false,
+   "size": 100
+  },
+  {
+   "name": "Reenie Beanie",
+   "source": "google",
+   "group": "hand",
+   "style": "partly",
+   "star": false,
+   "hard": true,
+   "file": "reenie-beanie-latin-400.woff2",
+   "licence": "LICENSE-reenie-beanie.txt",
+   "licenceType": "OFL-1.1",
+   "width": 670.5,
+   "tallness": 1.66,
+   "narrow": true,
+   "tall": false,
+   "size": 135
+  },
+  {
+   "name": "Shadows Into Light",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "shadows-into-light-latin-400.woff2",
+   "licence": "LICENSE-shadows-into-light.txt",
+   "licenceType": "OFL-1.1",
+   "width": 772.3,
+   "tallness": 1.65,
+   "narrow": false,
+   "tall": false,
+   "size": 95
+  },
+  {
+   "name": "Shadows Into Light Two",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": true,
+   "hard": false,
+   "file": "shadows-into-light-two-latin-400.woff2",
+   "licence": "LICENSE-shadows-into-light-two.txt",
+   "licenceType": "OFL-1.1",
+   "width": 809.5,
+   "tallness": 1.96,
+   "narrow": false,
+   "tall": true,
+   "size": 85
+  },
+  {
+   "name": "Loved by the King",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "loved-by-the-king-latin-400.woff2",
+   "licence": "LICENSE-loved-by-the-king.txt",
+   "licenceType": "OFL-1.1",
+   "width": 641.7,
+   "tallness": 2.48,
+   "narrow": true,
+   "tall": true,
+   "size": 90
+  },
+  {
+   "name": "Annie Use Your Telescope",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": true,
+   "hard": false,
+   "file": "annie-use-your-telescope-latin-400.woff2",
+   "licence": "LICENSE-annie-use-your-telescope.txt",
+   "licenceType": "OFL-1.1",
+   "width": 691.4,
+   "tallness": 2.09,
+   "narrow": true,
+   "tall": true,
+   "size": 105
+  },
+  {
+   "name": "Just Me Again Down Here",
+   "source": "google",
+   "group": "hand",
+   "style": "partly",
+   "star": false,
+   "hard": true,
+   "file": "just-me-again-down-here-latin-400.woff2",
+   "licence": "LICENSE-just-me-again-down-here.txt",
+   "licenceType": "OFL-1.1",
+   "width": 634,
+   "tallness": 1.69,
+   "narrow": true,
+   "tall": false,
+   "size": 150
+  },
+  {
+   "name": "The Girl Next Door",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": true,
+   "file": "the-girl-next-door-latin-400.woff2",
+   "licence": "LICENSE-the-girl-next-door.txt",
+   "licenceType": "OFL-1.1",
+   "width": 929.8,
+   "tallness": 1.32,
+   "narrow": false,
+   "tall": false,
+   "size": 100
+  },
+  {
+   "name": "Waiting for the Sunrise",
+   "source": "google",
+   "group": "hand",
+   "style": "partly",
+   "star": false,
+   "hard": false,
+   "file": "waiting-for-the-sunrise-latin-400.woff2",
+   "licence": "LICENSE-waiting-for-the-sunrise.txt",
+   "licenceType": "OFL-1.1",
+   "width": 780.4,
+   "tallness": 1.6,
+   "narrow": false,
+   "tall": false,
+   "size": 105
+  },
+  {
+   "name": "Sedgwick Ave",
+   "source": "google",
+   "group": "hand",
+   "style": "partly",
+   "star": false,
+   "hard": true,
+   "file": "sedgwick-ave-latin-400.woff2",
+   "licence": "LICENSE-sedgwick-ave.txt",
+   "licenceType": "OFL-1.1",
+   "width": 821.4,
+   "tallness": 2.01,
+   "narrow": false,
+   "tall": true,
+   "size": 80
+  },
+  {
+   "name": "Neucha",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": true,
+   "hard": false,
+   "file": "neucha-latin-400.woff2",
+   "licence": "LICENSE-neucha.txt",
+   "licenceType": "OFL-1.1",
+   "width": 723.6,
+   "tallness": 1.89,
+   "narrow": false,
+   "tall": true,
+   "size": 100
+  },
+  {
+   "name": "Dekko",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "dekko-latin-400.woff2",
+   "licence": "LICENSE-dekko.txt",
+   "licenceType": "OFL-1.1",
+   "width": 746.2,
+   "tallness": 1.44,
+   "narrow": false,
+   "tall": false,
+   "size": 115
+  },
+  {
+   "name": "Kalam",
+   "source": "google",
+   "group": "hand",
+   "style": "partly",
+   "star": false,
+   "hard": false,
+   "file": "kalam-latin-400.woff2",
+   "licence": "LICENSE-kalam.txt",
+   "licenceType": "OFL-1.1",
+   "width": 855,
+   "tallness": 1.62,
+   "narrow": false,
+   "tall": false,
+   "size": 100
+  },
+  {
+   "name": "Gaegu",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "gaegu-latin-400.woff2",
+   "licence": "LICENSE-gaegu.txt",
+   "licenceType": "OFL-1.1",
+   "width": 846.6,
+   "tallness": 1.24,
+   "narrow": false,
+   "tall": false,
+   "size": 135
+  },
+  {
+   "name": "Gamja Flower",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "gamja-flower-latin-400.woff2",
+   "licence": "LICENSE-gamja-flower.txt",
+   "licenceType": "OFL-1.1",
+   "width": 744.2,
+   "tallness": 1.46,
+   "narrow": false,
+   "tall": false,
+   "size": 145
+  },
+  {
+   "name": "Hi Melody",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "hi-melody-latin-400.woff2",
+   "licence": "LICENSE-hi-melody.txt",
+   "licenceType": "OFL-1.1",
+   "width": 666.3,
+   "tallness": 1.45,
+   "narrow": true,
+   "tall": false,
+   "size": 150
+  },
+  {
+   "name": "Caveat",
+   "source": "google",
+   "group": "hand",
+   "style": "partly",
+   "star": true,
+   "hard": false,
+   "file": "caveat-latin-400.woff2",
+   "licence": "LICENSE-caveat.txt",
+   "licenceType": "OFL-1.1",
+   "width": 677.9,
+   "tallness": 1.99,
+   "narrow": true,
+   "tall": true,
+   "size": 140
+  },
+  {
+   "name": "Caveat Brush",
+   "source": "google",
+   "group": "hand",
+   "style": "partly",
+   "star": false,
+   "hard": false,
+   "file": "caveat-brush-latin-400.woff2",
+   "licence": "LICENSE-caveat-brush.txt",
+   "licenceType": "OFL-1.1",
+   "width": 697.4,
+   "tallness": 1.82,
+   "narrow": true,
+   "tall": false,
+   "size": 120
+  },
+  {
+   "name": "Patrick Hand",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": true,
+   "hard": false,
+   "file": "patrick-hand-latin-400.woff2",
+   "licence": "LICENSE-patrick-hand.txt",
+   "licenceType": "OFL-1.1",
+   "width": 706.9,
+   "tallness": 1.8,
+   "narrow": false,
+   "tall": false,
+   "size": 110
+  },
+  {
+   "name": "Patrick Hand SC",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": true,
+   "hard": false,
+   "file": "patrick-hand-sc-latin-400.woff2",
+   "licence": "LICENSE-patrick-hand-sc.txt",
+   "licenceType": "OFL-1.1",
+   "width": 729.4,
+   "tallness": 1.74,
+   "narrow": false,
+   "tall": false,
+   "size": 110
+  },
+  {
+   "name": "Handlee",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "handlee-latin-400.woff2",
+   "licence": "LICENSE-handlee.txt",
+   "licenceType": "OFL-1.1",
+   "width": 798.4,
+   "tallness": 1.7,
+   "narrow": false,
+   "tall": false,
+   "size": 100
+  },
+  {
+   "name": "Indie Flower",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "indie-flower-latin-400.woff2",
+   "licence": "LICENSE-indie-flower.txt",
+   "licenceType": "OFL-1.1",
+   "width": 830.1,
+   "tallness": 1.56,
+   "narrow": false,
+   "tall": false,
+   "size": 115
+  },
+  {
+   "name": "Architects Daughter",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "architects-daughter-latin-400.woff2",
+   "licence": "LICENSE-architects-daughter.txt",
+   "licenceType": "OFL-1.1",
+   "width": 962.1,
+   "tallness": 1.42,
+   "narrow": false,
+   "tall": false,
+   "size": 110
+  },
+  {
+   "name": "Gloria Hallelujah",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "gloria-hallelujah-latin-400.woff2",
+   "licence": "LICENSE-gloria-hallelujah.txt",
+   "licenceType": "OFL-1.1",
+   "width": 991.6,
+   "tallness": 1.42,
+   "narrow": false,
+   "tall": false,
+   "size": 95
+  },
+  {
+   "name": "Coming Soon",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "coming-soon-latin-400.woff2",
+   "licence": "LICENSE-coming-soon.txt",
+   "licenceType": "Apache-2.0",
+   "width": 907.2,
+   "tallness": 1.58,
+   "narrow": false,
+   "tall": false,
+   "size": 90
+  },
+  {
+   "name": "Schoolbell",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "schoolbell-latin-400.woff2",
+   "licence": "LICENSE-schoolbell.txt",
+   "licenceType": "Apache-2.0",
+   "width": 806.6,
+   "tallness": 1.76,
+   "narrow": false,
+   "tall": false,
+   "size": 115
+  },
+  {
+   "name": "Mynerve",
+   "source": "google",
+   "group": "hand",
+   "style": "partly",
+   "star": false,
+   "hard": false,
+   "file": "mynerve-latin-400.woff2",
+   "licence": "LICENSE-mynerve.txt",
+   "licenceType": "OFL-1.1",
+   "width": 819.2,
+   "tallness": 1.65,
+   "narrow": false,
+   "tall": false,
+   "size": 115
+  },
+  {
+   "name": "Playpen Sans",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "playpen-sans-latin-400.woff2",
+   "licence": "LICENSE-playpen-sans.txt",
+   "licenceType": "OFL-1.1",
+   "width": 969,
+   "tallness": 1.55,
+   "narrow": false,
+   "tall": false,
+   "size": 95
+  },
+  {
+   "name": "Shantell Sans",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "shantell-sans-latin-400.woff2",
+   "licence": "LICENSE-shantell-sans.txt",
+   "licenceType": "OFL-1.1",
+   "width": 987.1,
+   "tallness": 1.38,
+   "narrow": false,
+   "tall": false,
+   "size": 100
+  },
+  {
+   "name": "Klee One",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "klee-one-latin-400.woff2",
+   "licence": "LICENSE-klee-one.txt",
+   "licenceType": "OFL-1.1",
+   "width": 953,
+   "tallness": 1.42,
+   "narrow": false,
+   "tall": false,
+   "size": 105
+  },
+  {
+   "name": "Zen Kurenaido",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "zen-kurenaido-latin-400.woff2",
+   "licence": "LICENSE-zen-kurenaido.txt",
+   "licenceType": "OFL-1.1",
+   "width": 778.5,
+   "tallness": 1.76,
+   "narrow": false,
+   "tall": false,
+   "size": 120
+  },
+  {
+   "name": "Permanent Marker",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": true,
+   "file": "permanent-marker-latin-400.woff2",
+   "licence": "LICENSE-permanent-marker.txt",
+   "licenceType": "Apache-2.0",
+   "width": 999.1,
+   "tallness": 1.42,
+   "narrow": false,
+   "tall": false,
+   "size": 85
+  },
+  {
+   "name": "Rock Salt",
+   "source": "google",
+   "group": "hand",
+   "style": "partly",
+   "star": false,
+   "hard": true,
+   "file": "rock-salt-latin-400.woff2",
+   "licence": "LICENSE-rock-salt.txt",
+   "licenceType": "Apache-2.0",
+   "width": 1226.1,
+   "tallness": 1.63,
+   "narrow": false,
+   "tall": false,
+   "size": 80
+  },
+  {
+   "name": "Over the Rainbow",
+   "source": "google",
+   "group": "hand",
+   "style": "joined",
+   "star": false,
+   "hard": true,
+   "file": "over-the-rainbow-latin-400.woff2",
+   "licence": "LICENSE-over-the-rainbow.txt",
+   "licenceType": "OFL-1.1",
+   "width": 882.1,
+   "tallness": 1.9,
+   "narrow": false,
+   "tall": true,
+   "size": 80
+  },
+  {
+   "name": "Give You Glory",
+   "source": "google",
+   "group": "hand",
+   "style": "partly",
+   "star": false,
+   "hard": true,
+   "file": "give-you-glory-latin-400.woff2",
+   "licence": "LICENSE-give-you-glory.txt",
+   "licenceType": "OFL-1.1",
+   "width": 904.3,
+   "tallness": 1.64,
+   "narrow": false,
+   "tall": false,
+   "size": 90
+  },
+  {
+   "name": "Noteworthy",
+   "source": "mac",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "local": [
+    "Noteworthy-Light",
+    "Noteworthy Light"
+   ],
+   "width": 767.8,
+   "tallness": 2.17,
+   "narrow": false,
+   "tall": true,
+   "size": 95
+  },
+  {
+   "name": "Marker Felt",
+   "source": "mac",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "local": [
+    "MarkerFelt-Thin",
+    "Marker Felt Thin"
+   ],
+   "width": 814.7,
+   "tallness": 1.96,
+   "narrow": false,
+   "tall": true,
+   "size": 90
+  },
+  {
+   "name": "Chalkboard SE",
+   "source": "mac",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "local": [
+    "ChalkboardSE-Regular",
+    "Chalkboard SE Regular"
+   ],
+   "width": 911.3,
+   "tallness": 1.43,
+   "narrow": false,
+   "tall": false,
+   "size": 105
+  },
+  {
+   "name": "Bradley Hand",
+   "source": "mac",
+   "group": "hand",
+   "style": "partly",
+   "star": false,
+   "hard": false,
+   "local": [
+    "BradleyHandITCTT-Bold",
+    "Bradley Hand Bold"
+   ],
+   "width": 871.2,
+   "tallness": 1.2,
+   "narrow": false,
+   "tall": false,
+   "size": 120
+  },
+  {
+   "name": "SignPainter",
+   "source": "mac",
+   "group": "hand",
+   "style": "joined",
+   "star": false,
+   "hard": false,
+   "local": [
+    "SignPainter-HouseScript",
+    "SignPainter HouseScript"
+   ],
+   "width": 620.8,
+   "tallness": 1.95,
+   "narrow": true,
+   "tall": true,
+   "size": 125
+  },
+  {
+   "name": "Yanone Kaffeesatz",
+   "source": "google",
+   "group": "cond",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "yanone-kaffeesatz-latin-400.woff2",
+   "licence": "LICENSE-yanone-kaffeesatz.txt",
+   "licenceType": "OFL-1.1",
+   "width": 607,
+   "tallness": 2.21,
+   "narrow": true,
+   "tall": true,
+   "size": 100
+  },
+  {
+   "name": "Oswald",
+   "source": "google",
+   "group": "cond",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "oswald-latin-400.woff2",
+   "licence": "LICENSE-oswald.txt",
+   "licenceType": "OFL-1.1",
+   "width": 717.4,
+   "tallness": 2.17,
+   "narrow": false,
+   "tall": true,
+   "size": 90
+  },
+  {
+   "name": "Pathway Gothic One",
+   "source": "google",
+   "group": "cond",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "pathway-gothic-one-latin-400.woff2",
+   "licence": "LICENSE-pathway-gothic-one.txt",
+   "licenceType": "OFL-1.1",
+   "width": 609.4,
+   "tallness": 2.21,
+   "narrow": true,
+   "tall": true,
+   "size": 95
+  },
+  {
+   "name": "Sofia Sans Extra Condensed",
+   "source": "google",
+   "group": "cond",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "sofia-sans-extra-condensed-latin-400.woff2",
+   "licence": "LICENSE-sofia-sans-extra-condensed.txt",
+   "licenceType": "OFL-1.1",
+   "width": 534.8,
+   "tallness": 2.35,
+   "narrow": true,
+   "tall": true,
+   "size": 105
+  },
+  {
+   "name": "Barlow Condensed",
+   "source": "google",
+   "group": "cond",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "barlow-condensed-latin-400.woff2",
+   "licence": "LICENSE-barlow-condensed.txt",
+   "licenceType": "OFL-1.1",
+   "width": 675.2,
+   "tallness": 1.99,
+   "narrow": true,
+   "tall": true,
+   "size": 100
+  },
+  {
+   "name": "Roboto Condensed",
+   "source": "google",
+   "group": "cond",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "roboto-condensed-latin-400.woff2",
+   "licence": "LICENSE-roboto-condensed.txt",
+   "licenceType": "OFL-1.1",
+   "width": 782.2,
+   "tallness": 1.75,
+   "narrow": false,
+   "tall": false,
+   "size": 95
+  },
+  {
+   "name": "Fira Sans Condensed",
+   "source": "google",
+   "group": "cond",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "fira-sans-condensed-latin-400.woff2",
+   "licence": "LICENSE-fira-sans-condensed.txt",
+   "licenceType": "OFL-1.1",
+   "width": 810,
+   "tallness": 1.63,
+   "narrow": false,
+   "tall": false,
+   "size": 95
+  }
+ ],
+ "files": [
+  {
+   "file": "amatic-sc-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/amaticsc/v28/TUZyzwprpvBS1izr_vOECuSfU5cP1Q.woff2",
+   "sha256": "1e70c7a210bb4237203578da9653fe49f74232fe59c22c3c4ec1ed6647b2bacc"
+  },
+  {
+   "file": "LICENSE-amatic-sc.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/amaticsc/OFL.txt",
+   "sha256": "301f77908df2b00141b4dcea50cc1a586c3afcee78843bd811088e8263623f9d"
+  },
+  {
+   "file": "just-another-hand-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/justanotherhand/v21/845CNN4-AJyIGvIou-6yJKyptyOpOfr4DGiHSIax.woff2",
+   "sha256": "306505b5334bc790ab1aac3489707c82ecf626dc5e06c658baaa5ee1d9166543"
+  },
+  {
+   "file": "LICENSE-just-another-hand.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/apache/justanotherhand/LICENSE.txt",
+   "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+   "file": "sue-ellen-francisco-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/sueellenfrancisco/v22/wXK3E20CsoJ9j1DDkjHcQ5ZL8xRaxru9no1P23in5H8.woff2",
+   "sha256": "a62f2620901d1a65ad8eadc67eed9aa9088d547d76aa3109a3cac48d3a1a718a"
+  },
+  {
+   "file": "LICENSE-sue-ellen-francisco.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/sueellenfrancisco/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "covered-by-your-grace-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/coveredbyyourgrace/v17/QGYwz-AZahWOJJI9kykWW9mD6opopoqXSOSEEQgsiaXVIw.woff2",
+   "sha256": "32de560386ab92ccaf8b89af4c80fab592ce5ed5c8234532d78febe97d790845"
+  },
+  {
+   "file": "LICENSE-covered-by-your-grace.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/coveredbyyourgrace/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "nanum-pen-script-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/nanumpenscript/v25/daaDSSYiLGqEal3MvdA_FOL_3FkN6zn0aeNBYTQ.woff2",
+   "sha256": "9ac2103519f0b7b2f7a1872905356faa57177970ef85a2ea1805546ad5247e0b"
+  },
+  {
+   "file": "LICENSE-nanum-pen-script.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/nanumpenscript/OFL.txt",
+   "sha256": "eeacf16032901d0ed0456876ec77b8f0fda6b3fecec7d972f8543eb602e6c30f"
+  },
+  {
+   "file": "reenie-beanie-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/reeniebeanie/v22/z7NSdR76eDkaJKZJFkkjuvWxXPq1q6Gjb_0.woff2",
+   "sha256": "aa3901be682af0f1faac8436a1f25438b0cc541b6ad2ece5668ae4c0ea70594a"
+  },
+  {
+   "file": "LICENSE-reenie-beanie.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/reeniebeanie/OFL.txt",
+   "sha256": "fbb941b371c6348ee2572ce8c78fb66128a61885f960dec1906c4e44ca4b4d3c"
+  },
+  {
+   "file": "shadows-into-light-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/shadowsintolight/v22/UqyNK9UOIntux_czAvDQx_ZcHqZXBNQzdcD55TecYQ.woff2",
+   "sha256": "61cb1fd4967e283a8934136558ba07abbc2e228a52a5904de18d1c37529b0b69"
+  },
+  {
+   "file": "LICENSE-shadows-into-light.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/shadowsintolight/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "shadows-into-light-two-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/shadowsintolighttwo/v19/4iC86LVlZsRSjQhpWGedwyOoW-0A6_kpsyNmpAzHGZFkMFw.woff2",
+   "sha256": "bfc2f877e1a93fedf41fbaa9edc45b58c6e3d5d45299eb08b09cba87dda98544"
+  },
+  {
+   "file": "LICENSE-shadows-into-light-two.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/shadowsintolighttwo/OFL.txt",
+   "sha256": "6a28d4d5d8b4d1ea89ace5a047ac6e0de182acdb8bfa22897bf7702102094f69"
+  },
+  {
+   "file": "loved-by-the-king-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/lovedbytheking/v24/Gw6gwdP76VDVJNXerebZxUMeRXUF2MiKn3BM2g65.woff2",
+   "sha256": "6cae86567f518ab1cc50996136b517cced41a0fab08f39df3a11478a35f1c945"
+  },
+  {
+   "file": "LICENSE-loved-by-the-king.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/lovedbytheking/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "annie-use-your-telescope-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/annieuseyourtelescope/v20/daaLSS4tI2qYYl3Jq9s_Hu74xwktnlKxH6osGVGTkz3A_0YFZQ.woff2",
+   "sha256": "bb8567d3d9ec1ab4d0cf0c629e27a018d4762640c56fe121871297c681a6d172"
+  },
+  {
+   "file": "LICENSE-annie-use-your-telescope.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/annieuseyourtelescope/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "just-me-again-down-here-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/justmeagaindownhere/v25/MwQmbgXtz-Wc6RUEGNMc0QpRrfUh2hSdBBMoAtwAtKHScOfh.woff2",
+   "sha256": "2e80f01d1ada9e57c895a4b8502bdef7aeb8c4927295ff02d6c1f86bbeb26d5f"
+  },
+  {
+   "file": "LICENSE-just-me-again-down-here.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/justmeagaindownhere/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "the-girl-next-door-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/thegirlnextdoor/v25/pe0zMJCIMIsBjFxqYBIcZ6_OI5oFHCY4ULF64aXU2Q.woff2",
+   "sha256": "64acc2e12e1693c0f41b3cdeeafd099d1a94b1169ddcc505e3c85ee259e315c6"
+  },
+  {
+   "file": "LICENSE-the-girl-next-door.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/thegirlnextdoor/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "waiting-for-the-sunrise-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/waitingforthesunrise/v23/WBL1rFvOYl9CEv2i1mO6KUW8RKWJ2zoXoz5JsbZX_B77YV5I.woff2",
+   "sha256": "bec9bc4795b756b327615d071f3e5e014feda4d3abf08aee4567d93d2a509224"
+  },
+  {
+   "file": "LICENSE-waiting-for-the-sunrise.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/waitingforthesunrise/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "sedgwick-ave-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/sedgwickave/v13/uK_04rKEYuguzAcSYRdWTJqMWWI0d8TpJQ.woff2",
+   "sha256": "b10446b5b2e7512681c7a27f1521a3cc653c0a9413f6ea74b185c3d6b834b245"
+  },
+  {
+   "file": "LICENSE-sedgwick-ave.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/sedgwickave/OFL.txt",
+   "sha256": "f323edc1e5a6d8fa16120aa15367cdfb15468474cc621f9bda1a2f73c5d08d73"
+  },
+  {
+   "file": "neucha-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/neucha/v18/q5uGsou0JOdh94bfvQltKRZUgQ.woff2",
+   "sha256": "02a1dbb6327c2600459b1769bac979d5644300645746b9021a2fcfb361cba577"
+  },
+  {
+   "file": "LICENSE-neucha.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/neucha/OFL.txt",
+   "sha256": "656a20870fbcb8f559f1c6308c1df90ac93d7cd0279aab49b43a43b5e58534e6"
+  },
+  {
+   "file": "dekko-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/dekko/v23/46khlb_wWjfSrutCTUrOfU1A.woff2",
+   "sha256": "1fea275844e07a897a4bba7ec1832e7a2be59883cbdee0467a731c2c5da194e5"
+  },
+  {
+   "file": "LICENSE-dekko.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/dekko/OFL.txt",
+   "sha256": "f139d6f43d2a63a8fb3ded48b8ec747d9d59a7fbb13d077d9b96ac88580bc1ad"
+  },
+  {
+   "file": "kalam-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/kalam/v18/YA9dr0Wd4kDdMthROCfhsCkA.woff2",
+   "sha256": "257f0129d54c60cda0f8856ad1de05e760a219c9365fb19cd50b0cc8fdb2c9d1"
+  },
+  {
+   "file": "LICENSE-kalam.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/kalam/OFL.txt",
+   "sha256": "f62ef357d3a1c3d27edd35a6e1ba350e8a8d13499797964eeadefbf0b3b15d1f"
+  },
+  {
+   "file": "gaegu-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/gaegu/v23/TuGfUVB6Up9NU5ZMq9kRystl.woff2",
+   "sha256": "0018559bcc238838d31e02dc77c1efa80647f30d7ed8a131edb06b30381974ed"
+  },
+  {
+   "file": "LICENSE-gaegu.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/gaegu/OFL.txt",
+   "sha256": "53a9ce47085d9fef613c7ecb3730dc80d25962510bbea231b89564f58240f251"
+  },
+  {
+   "file": "gamja-flower-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/gamjaflower/v26/6NUR8FiKJg-Pa0rM6uN40Z4UzvVEVN-meg.woff2",
+   "sha256": "c741f1d9128581639afa235bae3bdb8d4e30aa40913ffdeeb17254e940d9f000"
+  },
+  {
+   "file": "LICENSE-gamja-flower.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/gamjaflower/OFL.txt",
+   "sha256": "39de3de5f1873f89bca4af37823ab22e28e88d0d8f7fe2f07e82e9e6e9bf7b70"
+  },
+  {
+   "file": "hi-melody-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/himelody/v19/46ktlbP8Vnz0pJcqCTb0eGVF_VNRGQ.woff2",
+   "sha256": "3ed2aa579369058ff3e54d8695d760e74cea80598dfd1ad88150d89f15ac8da2"
+  },
+  {
+   "file": "LICENSE-hi-melody.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/himelody/OFL.txt",
+   "sha256": "39de3de5f1873f89bca4af37823ab22e28e88d0d8f7fe2f07e82e9e6e9bf7b70"
+  },
+  {
+   "file": "caveat-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/caveat/v23/WnznHAc5bAfYB2QRah7pcpNvOx-pjfJ9eIWpYT5Kmgq3sw.woff2",
+   "sha256": "7bd727afb3d294b5be1f3df1e47f875144e35d2ec9ba8f4c2484b885722dadb9"
+  },
+  {
+   "file": "LICENSE-caveat.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/caveat/OFL.txt",
+   "sha256": "1f9d81d094273d82f3898a1ee8b598a717d050ecbf5ff7bede105b704880157b"
+  },
+  {
+   "file": "caveat-brush-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/caveatbrush/v12/EYq0maZfwr9S9-ETZc3fKXt8XLOS8XlNQg.woff2",
+   "sha256": "3c6b6a7906b582061d6bf6ad3a4d86a73b25534dae27fdeb06d4a790d7625aaf"
+  },
+  {
+   "file": "LICENSE-caveat-brush.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/caveatbrush/OFL.txt",
+   "sha256": "21b54eb0d7513524798a00dfbaf99a02c003a0012a728cc5f0e02d24c50482fb"
+  },
+  {
+   "file": "patrick-hand-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/patrickhand/v25/LDI1apSQOAYtSuYWp8ZhfYe8XsLLubg58w.woff2",
+   "sha256": "42156e008dd5fc3000679ff4e9ba9cbd3f417b6317c6dcbe11a12e9c87a09b28"
+  },
+  {
+   "file": "LICENSE-patrick-hand.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/patrickhand/OFL.txt",
+   "sha256": "377f4f9c19e935228552478eb68cc2ed82910988a60ba60e2ac73b09f32d02d1"
+  },
+  {
+   "file": "patrick-hand-sc-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/patrickhandsc/v17/0nkwC9f7MfsBiWcLtY65AWDK873ljiK7BwQrVw.woff2",
+   "sha256": "b72359aef528cf42f0c1822617549d79308e60b0b3dd8a330590237ea7676429"
+  },
+  {
+   "file": "LICENSE-patrick-hand-sc.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/patrickhandsc/OFL.txt",
+   "sha256": "b554a7f57d54db7857d4d9b8dc56ebd347dc4f857fb4f1ce1a25c332dfbf484c"
+  },
+  {
+   "file": "handlee-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/handlee/v20/-F6xfjBsISg9aMakPm3wowtKzig.woff2",
+   "sha256": "20aa0157bbf75c62bf2d864969e2632f87eb4630651ac8d720e8bc723019be63"
+  },
+  {
+   "file": "LICENSE-handlee.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/handlee/OFL.txt",
+   "sha256": "5f1f5510eff7922864bf326ffa1d4a62f01add5193e9367b542378e5a808b500"
+  },
+  {
+   "file": "indie-flower-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/indieflower/v24/m8JVjfNVeKWVnh3QMuKkFcZVaUuH99GUDg.woff2",
+   "sha256": "7b7dd13c9e06c4873246b4b2eab52bb98b1a269022b11946b88cc746d61f7403"
+  },
+  {
+   "file": "LICENSE-indie-flower.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/indieflower/OFL.txt",
+   "sha256": "d9cdb075679d15a99bab2a8541b9c4fdc71347502111fbe9affd1d462219d96b"
+  },
+  {
+   "file": "architects-daughter-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/architectsdaughter/v20/KtkxAKiDZI_td1Lkx62xHZHDtgO_Y-bvTYlg4-7jA-U.woff2",
+   "sha256": "6f925fb5efb364273edaac21c54c387b71e3a1e3d275f2fb20709a7f225e6fb1"
+  },
+  {
+   "file": "LICENSE-architects-daughter.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/architectsdaughter/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "gloria-hallelujah-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/gloriahallelujah/v24/LYjYdHv3kUk9BMV96EIswT9DIbW-MIS11zOmvVCE.woff2",
+   "sha256": "6c897a01ee2ee703f1c3458953c6202f1316678882fc2f2b3d531188c0db35f3"
+  },
+  {
+   "file": "LICENSE-gloria-hallelujah.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/gloriahallelujah/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "coming-soon-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/comingsoon/v20/qWcuB6mzpYL7AJ2VfdQR1t-VWDnRsDkg.woff2",
+   "sha256": "170c0061db67e5c5303258e5f84ad0e74c46c916f22180ab833d4f740afec963"
+  },
+  {
+   "file": "LICENSE-coming-soon.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/apache/comingsoon/LICENSE.txt",
+   "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+   "file": "schoolbell-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/schoolbell/v18/92zQtBZWOrcgoe-fgnJIZxUa60ZpbiU.woff2",
+   "sha256": "c4a743cd00d159d3138a0a63fcda6ba5e564cf1021190fc3710300cbf6c22ca9"
+  },
+  {
+   "file": "LICENSE-schoolbell.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/apache/schoolbell/LICENSE.txt",
+   "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+   "file": "mynerve-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/mynerve/v8/P5sCzZKPdNjb4jt79CNkiL2t2dk.woff2",
+   "sha256": "9787af0394b8e4064286f15abd4e2af2a221d36f6d02a0264e6c0eda3fa12350"
+  },
+  {
+   "file": "LICENSE-mynerve.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/mynerve/OFL.txt",
+   "sha256": "b4f46a426751128d9415c0b36a3a652dd21a116039e5926ac1890762a223713d"
+  },
+  {
+   "file": "playpen-sans-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/playpensans/v22/dg43_pj1p6gXP0gzAZgm4c8XQArSU7ACQSn4IvRhinM3FNuja01fTw.woff2",
+   "sha256": "162bfe26217b104216b9d5c9a0619c4f1f67a2cabe2d11048fd5baa1896fc157"
+  },
+  {
+   "file": "LICENSE-playpen-sans.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/playpensans/OFL.txt",
+   "sha256": "59440310cc2c539b53c835306f74ac8c01f1ece58bf4c65e556fca275b80a730"
+  },
+  {
+   "file": "shantell-sans-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/shantellsans/v13/FeUaS0pCoLIo-lcdY7kjvNoQqWVWB0qWpl29ajppTuUTu_kJKmHesPOL-maYi4xZeHCNQ09eBlmv2QcUzJ39-rAISYR8S1ixwv0TijRMagQ.woff2",
+   "sha256": "bf1f9c3d68c8d7addcefb392e6d629d78f92b7e3bb0892a17fb8e8f5572db41a"
+  },
+  {
+   "file": "LICENSE-shantell-sans.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/shantellsans/OFL.txt",
+   "sha256": "ebfce7d104d597c385b71e9fbf8f0e2034e73320f857086105dc265b82c05caa"
+  },
+  {
+   "file": "klee-one-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/kleeone/v14/LDIxapCLNRc6A8oT4p4HM-aGW-rO.woff2",
+   "sha256": "6d98e2b5545e18ec83437289b9d72a704c854743277fc8a68eb8f0cc3c8b506f"
+  },
+  {
+   "file": "LICENSE-klee-one.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/kleeone/OFL.txt",
+   "sha256": "e376b0df8e8a2345a9533db6f0a5333a1107975569ad9d1973a7ee557161ca38"
+  },
+  {
+   "file": "zen-kurenaido-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/zenkurenaido/v20/3XFsEr0515BK2u6UUptu_gWJVfv82dZIZ0Q.woff2",
+   "sha256": "8f6d05dfd2ac95edf905676a2b2edf5d797aa7d1a365974475c84b781fe6ef8c"
+  },
+  {
+   "file": "LICENSE-zen-kurenaido.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/zenkurenaido/OFL.txt",
+   "sha256": "fdfcb596ac910b447e482f42d4d1e5df3cfcb71c681a9f10e7f2d0126b274111"
+  },
+  {
+   "file": "permanent-marker-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/permanentmarker/v16/Fh4uPib9Iyv2ucM6pGQMWimMp004La2Cf5b6jlg.woff2",
+   "sha256": "37202f2915830dbf5ca57d32ee0a2a9e8dc876e92720214ddef1e0c4bfe8bb98"
+  },
+  {
+   "file": "LICENSE-permanent-marker.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/apache/permanentmarker/LICENSE.txt",
+   "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+   "file": "rock-salt-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/rocksalt/v24/MwQ0bhv11fWD6QsAVOZrt0M6p7NGrQ.woff2",
+   "sha256": "4db33f33d887ad22d9bc8069cebe80986f26d8fbef533aa7d96c19466746a498"
+  },
+  {
+   "file": "LICENSE-rock-salt.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/apache/rocksalt/LICENSE.txt",
+   "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+   "file": "over-the-rainbow-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/overtherainbow/v23/11haGoXG1k_HKhMLUWz7Mc7vvW5ulvSs9fI1TGw.woff2",
+   "sha256": "16698378249912c93b74edc741c68d7212516908263c14ece9022ca0ef8f2b71"
+  },
+  {
+   "file": "LICENSE-over-the-rainbow.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/overtherainbow/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "give-you-glory-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/giveyouglory/v17/8QIQdiHOgt3vv4LR7ahjw9-XYf10DYdh6awb.woff2",
+   "sha256": "561847e14d41e70c3333b0638bd7f20633a10eeb9d56014d875f6ac87b7d766b"
+  },
+  {
+   "file": "LICENSE-give-you-glory.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/giveyouglory/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "yanone-kaffeesatz-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/yanonekaffeesatz/v34/3y9I6aknfjLm_3lMKjiMgmUUYBs04aUXNxt9gW2LIfto9tWZd2GKKHD0VTtI.woff2",
+   "sha256": "c982159da7783eb7c0592977467846d7ac462e9a999168b197716120dba6d1b9"
+  },
+  {
+   "file": "LICENSE-yanone-kaffeesatz.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/yanonekaffeesatz/OFL.txt",
+   "sha256": "9efbe6f8570e8c3d8b000914bd1da07ff4977d1325cc2d046180e05f40677f01"
+  },
+  {
+   "file": "oswald-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/oswald/v57/TK3_WkUHHAIjg75cFRf3bXL8LICs1_FvsUZiZSSUhiCXAA.woff2",
+   "sha256": "093d83e32a9a866c91943ef373c72d6121095cfca29303f9fe665748c0d28753"
+  },
+  {
+   "file": "LICENSE-oswald.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/oswald/OFL.txt",
+   "sha256": "0fd731a904b729a4e02eaf5e8ebd06783edd9abe400e8882760160230675b652"
+  },
+  {
+   "file": "pathway-gothic-one-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/pathwaygothicone/v16/MwQrbgD32-KAvjkYGNUUxAtW7pEBwx-tS1ZfTc4PlA.woff2",
+   "sha256": "199fc05379b4aea53c0b56cfc507f045bbae5a9dd33dc98795488e4455ef4133"
+  },
+  {
+   "file": "LICENSE-pathway-gothic-one.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/pathwaygothicone/OFL.txt",
+   "sha256": "ad4275c6aa3ddcf5ed3f0a788732e13ba57799b1d8deb00de3fc2a928ea70ea2"
+  },
+  {
+   "file": "sofia-sans-extra-condensed-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/sofiasansextracondensed/v6/raxdHjafvdAIOju4GcIfJH0i7zi50X3zRtuLNiMS0d6iDr-MD5Si9NGLmmi0eDON_ZuWxV3e.woff2",
+   "sha256": "1757b54dbc0107a59fef8bb9a6cc652cb39396538aa9a6cceea799c2ac507765"
+  },
+  {
+   "file": "LICENSE-sofia-sans-extra-condensed.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/sofiasansextracondensed/OFL.txt",
+   "sha256": "3e824d5099202de2c98cbd8e5ecba54da7d220c1ad851330726e65f3e60842d1"
+  },
+  {
+   "file": "barlow-condensed-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/barlowcondensed/v13/HTx3L3I-JCGChYJ8VI-L6OO_au7B6xHT2lv0tKk.woff2",
+   "sha256": "0e2a408159b32d8105bcd1a0a4d6222fcee375a84fb62703c614ce34d8bb68bb"
+  },
+  {
+   "file": "LICENSE-barlow-condensed.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/barlowcondensed/OFL.txt",
+   "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f"
+  },
+  {
+   "file": "roboto-condensed-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/robotocondensed/v31/ieVo2ZhZI2eCN5jzbjEETS9weq8-_d6T_POl0fRJeyWyosBO5XxjLdSL17o.woff2",
+   "sha256": "53de16055c095f8c38869619042c1897d319650282399c27296908bf6a1e96ba"
+  },
+  {
+   "file": "LICENSE-roboto-condensed.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/robotocondensed/OFL.txt",
+   "sha256": "0e4cc6ece88573545be2ed25835363662a6182ba4a4c1b5c8feda52add30e8a6"
+  },
+  {
+   "file": "fira-sans-condensed-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/firasanscondensed/v11/wEOhEADFm8hSaQTFG18FErVhsC9x-tarUfbtrelWfx4.woff2",
+   "sha256": "42a051aa41d31e76ccd277b82a142668e983534302f43a8e7cac9991ace1e0c0"
+  },
+  {
+   "file": "LICENSE-fira-sans-condensed.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/firasanscondensed/OFL.txt",
+   "sha256": "8f24842e9174beda18a556c2ae7d54f5dc444340c19a3a9ef77e23bca366adbd"
+  }
+ ],
+ "googleFontsCommit": "47d54ca1ebb14fd864695f1d39dc734f39017c33",
+ "measuredWith": {
+  "sample": "The quick handover kept 42 notes in narrow rows.",
+  "px": 40,
+  "uiXHeight": 0.508,
+  "browser": "T3's chrome-headless-shell"
+ }
+}

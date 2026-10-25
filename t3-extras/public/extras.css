@@ -1,0 +1,1086 @@
+/*
+ * t3-extras styles. Unlayered (beats T3's Tailwind @layer utilities without !important).
+ * Colours come from T3's own theme variables, so light, dark and custom themes all work.
+ * Sidebar polish and fonts apply only while their <html data-t3x-…> switch is set.
+ */
+
+/* ---------- shared pieces ---------- */
+
+[data-t3x] { box-sizing: border-box; }
+[data-t3x] [hidden], [data-t3x][hidden] { display: none !important; }
+
+.t3x-pill,
+.t3x-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: 500 12px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+.t3x-pill:hover,
+.t3x-chip:hover { background: var(--accent); color: var(--accent-foreground, var(--foreground)); }
+.t3x-pill:focus-visible,
+.t3x-chip:focus-visible,
+.t3x-bars:focus-visible,
+.t3x-star:focus-visible,
+.t3x-pop button:focus-visible {
+  outline: 2px solid var(--ring, var(--primary));
+  outline-offset: 1px;
+}
+.t3x-dim { opacity: .55; }
+.t3x-muted { color: var(--muted-foreground); font-size: 12px; }
+
+/* ---------- usage, one item per lab: B "pace needle with a 5-hour tank" ----------
+ * Track = currentColor at 14% (T3's --muted is invisible on dark themes); fill = the lab's colour
+ * (set on the element); the even-pace line or tank outline in currentColor; amber = --warning. */
+
+.t3x-b { display: block; overflow: visible; }
+.t3x-b-track { fill: currentColor; fill-opacity: .14; }
+.t3x-b-needle { stroke: currentColor; stroke-opacity: .75; stroke-width: 1.2; }
+.t3x-b-tank { fill: var(--t3x-surface, var(--background)); stroke: currentColor; stroke-opacity: .8; stroke-width: 1.1; }
+.t3x-b-level.t3x-amber { fill: var(--warning); }
+.t3x-b-blocked { stroke: var(--destructive); stroke-width: 1.2; }
+
+/* header: the chain pill, then one compact glyph per lab */
+.t3x-hdr {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 6px;
+  -webkit-app-region: no-drag;
+}
+.t3x-hdr .t3x-pill { height: 26px; }
+.t3x-hdr-usage { gap: 7px; padding: 0 9px; color: var(--foreground); --t3x-surface: var(--background); }
+.t3x-glyph { display: inline-flex; align-items: center; }
+.t3x-chain { color: var(--foreground); }
+/* Keep the thread title clear of the add-ons (T3 reserves 6rem for its own controls). */
+header[data-chat-header]:has([data-t3x="hdr"]) > div:not([data-workspace-titlebar-controls]) {
+  padding-right: calc(6rem + var(--t3x-hdr-w, 0px));
+}
+
+/* composer: handover button + the most constrained lab */
+.t3x-composer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+}
+.t3x-composer .t3x-chip { height: 26px; padding: 0 9px; }
+.t3x-handover { color: var(--foreground); }
+.t3x-handover[aria-disabled="true"] { opacity: .45; cursor: default; }
+.t3x-ho-icon { font-size: 13px; line-height: 1; }
+.t3x-meters { gap: 6px; color: var(--foreground); --t3x-surface: var(--background); }
+.t3x-meter-text { color: var(--muted-foreground); }
+/* When the composer gets narrow: first the button drops its words (the icon stays, with its
+ * tooltip), then the usage chip hides. Andy's usual window gives the composer about 590px. */
+@container composer-surface (max-width: 700px) { .t3x-ho-label { display: none; } .t3x-handover { padding: 0 8px; } }
+@container composer-surface (max-width: 500px) { .t3x-meters { display: none !important; } }
+
+/* sidebar footer: one row per lab, "Claude 63% left · 5h 70%" over its glyph */
+.t3x-bars {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 8px 5px;
+  border: 0;
+  border-radius: var(--control-radius, 8px);
+  background: transparent;
+  color: var(--sidebar-foreground, var(--foreground));
+  font: 500 11px/1.1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+  --t3x-surface: var(--sidebar, var(--background));
+}
+.t3x-bars:hover { background: var(--sidebar-row-hover, var(--accent)); --t3x-surface: var(--sidebar-row-hover, var(--sidebar, var(--background))); }
+.t3x-bar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 3px;
+  align-items: baseline;
+}
+.t3x-bar-label { color: var(--sidebar-foreground, var(--foreground)); }
+.t3x-bar-val { overflow: hidden; color: var(--sidebar-muted-foreground, var(--muted-foreground)); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.t3x-bar-glyph { grid-column: 1 / -1; }
+/* Running low, the refill time joins the label on one line; narrow drops the word "refills" first. */
+.t3x-bars { container: t3x-bars / inline-size; }
+@container t3x-bars (max-width: 250px) { .t3x-rw { display: none; } }
+@container composer-surface (max-width: 640px) { .t3x-meters .t3x-rw { display: none; } }
+
+/* detail popover: D, the run-out strip */
+.t3x-pop { --t3x-surface: var(--popover, var(--background)); }
+.t3x-b-big { margin: 2px 0 6px; }
+.t3x-d { display: block; margin: 2px 0 4px; overflow: visible; }
+.t3x-d-bg { fill: currentColor; fill-opacity: .06; }
+.t3x-d-pace { fill: none; stroke: currentColor; stroke-opacity: .5; stroke-width: 1; stroke-dasharray: 2 3; }
+.t3x-d-now { stroke: currentColor; stroke-opacity: .22; stroke-width: 1; }
+.t3x-d-est { fill: none; stroke-width: 1.2; stroke-opacity: .45; stroke-dasharray: 3 3; }
+.t3x-d-run { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.t3x-d-proj { fill: none; stroke-width: 1.6; stroke-dasharray: 1.5 2.5; stroke-linecap: round; }
+.t3x-d-cur { stroke: var(--t3x-surface); stroke-width: 1; }
+.t3x-d-cross { fill: none; stroke: var(--warning); stroke-width: 1.8; }
+.t3x-d-lane { fill: currentColor; fill-opacity: .06; }
+.t3x-d-slot { fill: none; stroke: currentColor; stroke-opacity: .55; stroke-width: .8; }
+.t3x-d-slot-fill.t3x-amber { fill: var(--warning); }
+.t3x-d-slot-fill.t3x-blocked { fill: var(--destructive); }
+.t3x-d-hit { fill: transparent; }
+.t3x-d-lanelabel { fill: currentColor; fill-opacity: .6; font: 600 7.5px var(--font-sans); }
+.t3x-fc { margin: 0 0 4px; font-weight: 600; }
+.t3x-fc-out { color: var(--warning-foreground, var(--warning)); }
+.t3x-fc-limit { color: var(--destructive); }
+.t3x-fc-stale, .t3x-fc-unavailable, .t3x-fc-none { color: var(--muted-foreground); font-weight: 500; }
+.t3x-legend { margin: 6px 0 2px; color: var(--muted-foreground); font-size: 11.5px; line-height: 1.4; }
+.t3x-legend div + div { margin-top: 3px; }
+.t3x-swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
+
+/* ---------- ✦ button in the sidebar footer row ---------- */
+
+.t3x-star-li { position: relative; flex-shrink: 0; list-style: none; }
+.t3x-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--control-radius, 8px);
+  background: transparent;
+  color: var(--sidebar-icon-color, var(--sidebar-muted-foreground, var(--muted-foreground)));
+  font-size: 15px;
+  cursor: pointer;
+}
+.t3x-star:hover, .t3x-star[aria-expanded="true"] { background: var(--sidebar-row-hover, var(--accent)); color: var(--sidebar-foreground, var(--foreground)); }
+
+/* ---------- popovers (usage detail, chain history, add-ons panel) ---------- */
+
+.t3x-pop {
+  position: fixed;
+  z-index: 2147483000;
+  max-width: calc(100vw - 16px);
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--popover, var(--background));
+  color: var(--popover-foreground, var(--foreground));
+  box-shadow: 0 12px 32px rgb(0 0 0 / 18%), 0 2px 6px rgb(0 0 0 / 8%);
+  font: 400 13px/1.45 var(--font-sans);
+  outline: none;
+}
+.t3x-pop h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 4px;
+  color: var(--muted-foreground);
+  font: 600 11px/1.2 var(--font-sans);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.t3x-pop p { margin: 6px 0; }
+.t3x-pop-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.t3x-pop-head strong { font-size: 14px; }
+.t3x-pop-foot .t3x-btn { flex: none; white-space: nowrap; }
+.t3x-pop-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); }
+.t3x-lab { margin-top: 4px; }
+.t3x-line { margin: 2px 0 4px; }
+.t3x-row { display: grid; grid-template-columns: 64px 1fr; gap: 8px; padding: 2px 0; font-variant-numeric: tabular-nums; }
+.t3x-row-name { color: var(--muted-foreground); }
+.t3x-tag {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--warning) 22%, transparent);
+  color: var(--foreground);
+  font-size: 10px;
+  letter-spacing: .02em;
+  text-transform: none;
+}
+.t3x-warn {
+  margin: 8px 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--warning) 16%, transparent);
+}
+.t3x-foot { margin-top: 10px; }
+.t3x-btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--foreground);
+  font: 500 12px/1 var(--font-sans);
+  cursor: pointer;
+}
+.t3x-btn:hover { background: var(--accent); }
+.t3x-quote { margin: 8px 0; padding: 6px 10px; border-left: 3px solid var(--border); color: var(--foreground); }
+.t3x-path {
+  display: block;
+  margin: 8px 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--foreground) 6%, transparent);
+  font: 12px/1.4 var(--font-mono, ui-monospace, monospace);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.t3x-history { margin: 6px 0; padding-left: 18px; font-variant-numeric: tabular-nums; }
+
+/* panel controls */
+.t3x-set { margin: 6px 0; }
+.t3x-set-label { flex: 1; }
+.t3x-note { margin: 2px 0 0 38px; color: var(--muted-foreground); font-size: 12px; }
+.t3x-switch, .t3x-radio, .t3x-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.t3x-check[disabled] { opacity: .45; cursor: default; }
+.t3x-knob {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--foreground) 22%, transparent);
+  transition: background .15s;
+}
+.t3x-knob::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--background);
+  transition: transform .15s;
+}
+.t3x-switch[aria-checked="true"] .t3x-knob { background: var(--primary); }
+.t3x-switch[aria-checked="true"] .t3x-knob::after { transform: translateX(12px); }
+.t3x-dot, .t3x-box {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid color-mix(in oklab, var(--foreground) 45%, transparent);
+  border-radius: 50%;
+}
+.t3x-box { border-radius: 4px; }
+.t3x-radio[aria-checked="true"] .t3x-dot { border: 4.5px solid var(--primary); }
+.t3x-check[aria-checked="true"] .t3x-box { border-color: var(--primary); background: var(--primary); box-shadow: inset 0 0 0 2px var(--background); }
+.t3x-radios { display: flex; flex-wrap: wrap; gap: 0 14px; margin-left: 38px; }
+.t3x-radios .t3x-radio { width: auto; }
+.t3x-radios.t3x-col { display: block; margin-left: 0; }
+.t3x-radios.t3x-col .t3x-radio { width: 100%; }
+.t3x-radios.t3x-col.t3x-indent { margin-left: 0; padding-left: 2px; }
+.t3x-targets { display: grid; grid-template-columns: 1fr 1fr; margin: 6px 0 2px; }
+@media (prefers-reduced-motion: reduce) { .t3x-knob, .t3x-knob::after { transition: none; } }
+
+/* toast */
+.t3x-toast {
+  position: fixed;
+  z-index: 2147483001;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--popover, var(--background));
+  color: var(--popover-foreground, var(--foreground));
+  box-shadow: 0 6px 18px rgb(0 0 0 / 14%);
+  font: 500 12px/1.3 var(--font-sans);
+  pointer-events: none;
+}
+
+/* ---------- sidebar polish: selected thread marker ---------- */
+
+html[data-t3x-marker] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"], [data-testid="sidebar-draft-row"])[aria-current="page"],
+html[data-t3x-marker] [data-slot="sidebar-menu-sub-button"][data-active="true"] {
+  position: relative;
+}
+html[data-t3x-marker="bar"] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"], [data-testid="sidebar-draft-row"])[aria-current="page"]::after,
+html[data-t3x-marker="bar"] [data-slot="sidebar-menu-sub-button"][data-active="true"]::after {
+  content: "";
+  position: absolute;
+  z-index: 20;
+  top: 5px;
+  bottom: 5px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--t3x-mark, var(--sidebar-foreground, currentColor));
+  pointer-events: none;
+}
+html[data-t3x-marker="bar"] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"])[aria-current="page"] span[aria-hidden].flex-1,
+html[data-t3x-marker="bar"] [data-testid="sidebar-draft-row"][aria-current="page"] .mt-0\.5.truncate,
+html[data-t3x-marker="bar"] [data-slot="sidebar-menu-sub-button"][data-active="true"] [data-testid^="thread-title-"] {
+  font-weight: 600;
+  color: var(--sidebar-foreground, var(--foreground));
+}
+html[data-t3x-marker="outline"] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"], [data-testid="sidebar-draft-row"])[aria-current="page"],
+html[data-t3x-marker="outline"] [data-slot="sidebar-menu-sub-button"][data-active="true"] {
+  outline: 2px solid var(--t3x-mark, var(--sidebar-foreground, currentColor));
+  outline-offset: -2px;
+}
+
+/* ---------- sidebar polish: tighter rows (works on top of the keeper's wrap CSS) ---------- */
+
+html[data-t3x-tight] li[data-thread-item] { padding-block: 1px; contain-intrinsic-size: auto 60px; }
+html[data-t3x-tight] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-draft-row"]) .h-\[4\.875rem\] {
+  height: auto;
+  min-height: 0;
+  padding-block: .375rem;
+}
+html[data-t3x-tight] [data-testid="sidebar-row-slim"] { height: auto; min-height: 2rem; padding-block: .25rem; }
+html[data-t3x-tight] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) span[aria-hidden].flex-1 { line-height: 1.25; }
+
+/* ---------- sidebar polish: model icon beside the title ----------
+ * Only for card rows whose last line holds nothing but T3's spacer and the icon group
+ * (no branch, PR, diff or terminal). The icon then sits in a column left of the title's
+ * first line, wrapped lines stay aligned with the title, and the empty line goes away.
+ * CSS grid only; T3's nodes are not moved. */
+
+html[data-t3x-inline-icon]:not([data-t3x-compact]) [data-testid="sidebar-row-card"] > div.relative:has(> div:nth-child(3):last-child > span.flex-1:first-child:empty + span[aria-hidden].ml-auto:last-child) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 6px;
+  align-content: start;
+  height: auto;
+  min-height: 0;
+  & > div:nth-child(1) { grid-column: 1 / -1; }
+  & > div:nth-child(2) { grid-column: 2; grid-row: 2; }
+  & > div:nth-child(3) { display: contents; }
+  & > div:nth-child(3) > span.flex-1 { display: none; }
+  & > div:nth-child(3) > span.ml-auto {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+    height: calc(.875rem * 1.3);
+    margin: .25rem 0 0;
+  }
+}
+
+/* ---------- sidebar polish: project name in full ----------
+ * T3 shows the project name on one truncated line between its icon and the status slot
+ * (about 8 characters at a 140 px sidebar). Here the row becomes a block: the icon floats
+ * left, the name wraps across the full width, and the status floats right on the name's
+ * last line. Folders and names are unchanged; CSS only. */
+
+html[data-t3x-project-full]:not([data-t3x-compact]) :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) div:has(> span.min-w-0.flex-1.truncate.text-xs + span.ml-auto) {
+  display: block;
+  height: auto;
+  min-height: 1.25rem;
+  & > :not(span.min-w-0, span.ml-auto) { float: left; margin: .125rem .375rem 0 0; } /* marker and project icon */
+  & > span.min-w-0.flex-1.truncate { display: inline; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.25rem; }
+  & > span.ml-auto { float: right; margin-left: .375rem; }
+  &::after { content: ""; display: block; clear: both; }
+}
+
+/* ---------- sidebar polish: a stronger "Working" divider ----------
+ * T3 draws the Working shelf header in its muted tone: a 60% grey label and a hairline
+ * that almost vanishes. Here it takes T3's own working colour (--info, the colour of each
+ * row's "Working" status): a bold label, a 2px line and a faint tinted band. */
+
+html[data-t3x-working] [data-testid="sidebar-working-shelf-toggle"] {
+  color: var(--info, currentColor);
+  font-weight: 650;
+  letter-spacing: .02em;
+  background: color-mix(in srgb, var(--info, currentColor) 10%, transparent);
+  &:hover { background: color-mix(in srgb, var(--info, currentColor) 16%, transparent); }
+  & > span[aria-hidden] {
+    height: 2px;
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--info, currentColor) 60%, transparent);
+  }
+}
+
+/* ---------- sidebar polish: compact threads ----------
+ * One line per thread: the project icon, the title (two lines at most), then the status.
+ * The project name and the branch line are hidden; hovering the project icon shows them in a
+ * small tooltip (extras.js). A short rule separates neighbouring threads. CSS grid on T3's own
+ * row; T3's nodes are not moved. The hover actions (Settle, snooze) sit over the end of the
+ * title instead of pushing it, so a row never re-wraps under the pointer. */
+
+html[data-t3x-compact] li[data-thread-item] { padding-block: 2px; contain-intrinsic-size: auto 40px; }
+html[data-t3x-compact] li[data-thread-item] + li[data-thread-item] {
+  --t3x-thread-rule: color-mix(in oklab, var(--sidebar-foreground, currentColor) 22%, transparent);
+  background: linear-gradient(var(--t3x-thread-rule), var(--t3x-thread-rule)) no-repeat;
+  background-size: 25% 1px;
+  background-position: var(--sidebar-row-content-inset, .5rem) 0;
+}
+html[data-t3x-compact] [data-testid="sidebar-row-card"] {
+  --t3x-row-bg: var(--sidebar-row-hover, transparent);
+  &[aria-current="page"] { --t3x-row-bg: var(--sidebar-row-active, var(--sidebar-row-hover, transparent)); }
+  & > div.relative.z-10 {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-auto-columns: auto;
+    column-gap: .375rem;
+    align-items: start;
+    height: auto;
+    min-height: 0;
+    padding-block: .3125rem;
+  }
+  & > div.relative.z-10 > div:first-child { display: contents; }
+  & > div.relative.z-10 > div:first-child > * { grid-row: 1; }
+  & > div.relative.z-10 > div:first-child > .size-4 { grid-column: 1; margin-top: .125rem; }
+  & > div.relative.z-10 > div:first-child > span.flex-1 { display: none; } /* the project name */
+  & > div.relative.z-10 > div:nth-child(2) { grid-column: 2; grid-row: 1; margin-top: 0; }
+  & > div.relative.z-10 > div:nth-child(2) > span[aria-hidden] {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    white-space: normal;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    line-height: 1.25rem;
+  }
+  & > div.relative.z-10 > div:nth-child(3) { display: none; } /* branch, machine, diff, model icons */
+  & .group\/sidebar-status-slot > span:first-child { position: static; }
+  & .group\/sidebar-status-slot > span:nth-child(2) {
+    position: absolute;
+    inset-block: 0;
+    right: 0;
+    padding-left: .25rem;
+    border-radius: .25rem;
+    white-space: nowrap;
+    background: linear-gradient(var(--t3x-row-bg), var(--t3x-row-bg)), var(--sidebar, var(--background));
+  }
+}
+
+/* The project tooltip (compact threads): the project name, then the branch or machine. */
+.t3x-ptip {
+  position: fixed;
+  z-index: 2147483000;
+  max-width: 280px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--popover, var(--background));
+  color: var(--popover-foreground, var(--foreground));
+  box-shadow: 0 4px 14px rgb(0 0 0 / .14);
+  font: 600 12px/1.35 var(--font-sans);
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+.t3x-ptip-sub { display: block; font-weight: 400; color: var(--muted-foreground, currentColor); }
+
+/* The ✦ panel's Settings disclosure: closed at first, Fonts stays above it. */
+.t3x-more { margin-top: 2px; }
+.t3x-more > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 0 4px;
+  list-style: none;
+  color: var(--foreground);
+  font: 600 13px/1.4 var(--font-sans);
+  cursor: pointer;
+  &::-webkit-details-marker { display: none; }
+  &::after { content: "Show"; color: var(--muted-foreground); font-weight: 400; font-size: 12px; }
+  &:focus-visible { outline: 2px solid var(--ring, var(--primary)); outline-offset: 2px; border-radius: 3px; }
+}
+.t3x-more[open] > summary::after { content: "Hide"; }
+
+/* Interface font disclosure: a real button, with hidden children out of the tab order. */
+.t3x-interface-fonts { margin: 8px 0; }
+.t3x-interface-toggle { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 0; border: 0; background: transparent; color: var(--foreground); font: 500 12px/1.4 var(--font-sans); text-align: left; cursor: pointer; }
+.t3x-interface-toggle:focus-visible { outline: 2px solid var(--ring, var(--primary)); outline-offset: 2px; border-radius: 3px; }
+.t3x-interface-targets { display: grid; grid-template-columns: 1fr; gap: 0; }
+.t3x-interface-targets .t3x-check { white-space: normal; overflow-wrap: anywhere; }
+
+/* ---------- fonts: a heading face, a body face and a main-text face, each with its own targets ----------
+ * "T3X Heading" / "T3X Body" / "T3X Main" are FontFaces the add-ons make from the chosen family, sized with
+ * size-adjust and without the digits 0-9 (so numbers stay in T3's font). The CSS only names them,
+ * once a face is ready (html[data-t3x-fh] / [data-t3x-fb] / [data-t3x-fm]) and its target is ticked. */
+
+html[data-t3x-fc][data-t3x-ft-composer] [data-testid="composer-editor"] { font-family: "T3X Composer", var(--t3x-base-fc, var(--font-composer, var(--font-sans))); }
+/* Main text + opt-in interface text. Each selector names a verified text leaf. The guard
+ * excludes protected ancestors as well as the element itself; the nested rules stop inheritance
+ * into protected children. Native CSS nesting is supported by T3's Chromium. :where keeps the
+ * selectors below Heading/Body overrides; code restoration follows sans (even links in code). */
+:is(
+  html[data-t3x-fm][data-t3x-ft-replies] :where([data-message-role="assistant"] .chat-markdown) :is(p, li):not(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) *):not(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + p:has(> sub:only-child)):not(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) + p:has(> sub:only-child)):not(blockquote *):not([data-timeline-row-kind="proposed-plan"] *):not([data-t3x-slot="reasoning"] *):not([data-t3x-slot="questions"] *):not(.t3x-question-prose *):not(.chat-markdown-table-container *)
+):not(:where(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview, :is(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview) *)) {
+  font-family: "T3X Main", var(--t3x-base-fm, var(--font-sans));
+  & :where(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-shiki, .font-mono, .t3x-font-preview, :is(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-shiki, .font-mono, .t3x-font-preview) *) { font-family: var(--font-sans); }
+  html:not([data-t3x-flinks]) & :where(a, a *) { font-family: var(--font-sans); }
+  html:not([data-t3x-ftables]) & :where(table, table *) { font-family: var(--font-sans); }
+  html:not([data-t3x-fpaths]) & :where(.chat-markdown-file-link, .chat-markdown-file-link *, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-slot="context-chip"] *, [data-slot="workspace-breadcrumb-text"] *) { font-family: var(--font-sans); }
+  & :where(code, pre, kbd, .font-mono, .chat-markdown-shiki, :is(code, pre, kbd, .font-mono, .chat-markdown-shiki) *) { font-family: var(--font-mono); }
+}
+/* Sent user-message prose has an independent face, without the legacy mine gate. */
+:is(
+  html[data-t3x-fprompts] :where([data-user-message-body] .chat-markdown) :is(p, li):not(blockquote *):not([data-timeline-row-kind="proposed-plan"] *):not([data-t3x-slot="reasoning"] *):not([data-t3x-slot="questions"] *):not(.t3x-question-prose *):not(.chat-markdown-table-container *)
+):not(:where(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview, :is(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview) *)) {
+  font-family: "T3X Prompts", var(--t3x-base-fprompts, var(--font-sans));
+  & :where(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview, :is(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview) *) { font-family: var(--font-sans); }
+  html:not([data-t3x-fpaths]) & :where([data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-slot="context-chip"] *, [data-slot="workspace-breadcrumb-text"] *) { font-family: var(--font-sans); }
+  & :where(code, pre, kbd, .font-mono, .chat-markdown-shiki, :is(code, pre, kbd, .font-mono, .chat-markdown-shiki) *) { font-family: var(--font-mono); }
+}
+:is(
+  html[data-t3x-fi][data-t3x-ft-settingtitles] :where([data-settings-page-scroll] [data-settings-scroll-target] h2),
+  html[data-t3x-fi][data-t3x-ft-settinglabels] :where([data-settings-page-scroll] [data-slot="settings-row"] h3),
+  html[data-t3x-fi][data-t3x-ft-settingdescriptions] :where([data-settings-page-scroll] [data-slot="settings-row"] p),
+  html[data-t3x-fi][data-t3x-ft-menutitles] :where([data-slot="menu-label"]),
+  html[data-t3x-fi][data-t3x-ft-popovertitles] :where([data-slot="popover-title"]),
+  html[data-t3x-fi][data-t3x-ft-dialogtitles] :where([data-slot="dialog-title"]),
+  html[data-t3x-fi][data-t3x-ft-dialogdescriptions] :where([data-slot="dialog-description"]),
+  html[data-t3x-fi][data-t3x-ft-alerttitles] :where([data-slot="alert-dialog-title"]),
+  html[data-t3x-fi][data-t3x-ft-alertdescriptions] :where([data-slot="alert-dialog-description"]),
+  html[data-t3x-fi][data-t3x-ft-sheettitles] :where([data-slot="sheet-title"]),
+  html[data-t3x-fi][data-t3x-ft-sheetdescriptions] :where([data-slot="sheet-description"]),
+  html[data-t3x-fi][data-t3x-ft-toasttitles] :where([data-slot="toast-title"]),
+  html[data-t3x-fi][data-t3x-ft-toastdescriptions] :where([data-slot="toast-description"]),
+  html[data-t3x-fi][data-t3x-ft-addonheadings] :where([data-t3x="pop"][aria-label="Add-ons"] :is(header strong, h3, .t3x-font-title)),
+  html[data-t3x-fi][data-t3x-ft-addonnotes] :where([data-t3x="pop"][aria-label="Add-ons"] :is(.t3x-note, .t3x-muted))
+):not(:where(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview, :is(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview) *)) {
+  font-family: "T3X Interface", var(--t3x-base-fi, var(--font-sans));
+  & :where(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview, :is(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview) *) { font-family: var(--font-sans); }
+  html:not([data-t3x-fpaths]) & :where([data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-slot="context-chip"] *, [data-slot="workspace-breadcrumb-text"] *) { font-family: var(--font-sans); }
+  & :where(code, pre, kbd, .font-mono, .chat-markdown-shiki, :is(code, pre, kbd, .font-mono, .chat-markdown-shiki) *) { font-family: var(--font-mono); }
+}
+
+/* Independent native-marked prose. These marks never occur on collapsed work controls. */
+html[data-t3x-fr] [data-t3x-slot="reasoning"] .chat-markdown :is(p, li, h1, h2, h3, h4, h5, h6):not(:where(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview, :is(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview) *)) { font-family: "T3X Reasoning", var(--t3x-base-fr, var(--font-sans)); }
+html[data-t3x-fquestions] :is(.t3x-question-prose :is(p, li, h1, h2, h3, h4, h5, h6), [data-t3x-slot="questions"] p):not(:where(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview, :is(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview) *)) { font-family: "T3X Questions", var(--t3x-base-fquestions, var(--font-sans)); }
+html[data-t3x-fp] [data-timeline-row-kind="proposed-plan"] .chat-markdown :is(p, li, h1, h2, h3, h4, h5, h6):not(:where(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview, :is(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview) *)) { font-family: "T3X Plans", var(--t3x-base-fp, var(--font-sans)); }
+html[data-t3x-fv] [data-t3x-diagram="1"] { --pele-font: "T3X Viz", var(--font-sans); }
+html[data-t3x-fc][data-t3x-ft-composer] [data-testid="composer-editor"] :is(code, pre, kbd, :is(code, pre, kbd) *) { font-family: var(--font-mono, ui-monospace, monospace); }
+html[data-t3x-fq][data-t3x-ft-quotes] .chat-markdown blockquote :is(p, li, h1, h2, h3, h4, h5, h6):not(:where(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview, :is(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview) *)) { font-family: "T3X Quotes", var(--t3x-base-fq, var(--font-sans)); }
+html[data-t3x-fh][data-t3x-ft-projects] [data-testid="sidebar-row-card"] > div.relative > div:first-child > span.truncate { font-family: "T3X Heading", var(--t3x-base-fh, var(--font-sans)); }
+html[data-t3x-fh][data-t3x-ft-headings] [data-message-role="assistant"] .chat-markdown :is(h1, h2, h3, h4, h5, h6):not(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) *):not(blockquote *):not([data-timeline-row-kind="proposed-plan"] *):not([data-t3x-slot="reasoning"] *):not([data-t3x-slot="questions"] *):not(.t3x-question-prose *):not(.chat-markdown-table-container *):not(:where(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview, :is(button, input, textarea, select, option, summary, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], code, pre, kbd, a, table, sub, svg, [data-slot="table"], [data-slot="table-container"], [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], [data-testid^="thread-title-"], [aria-label="Thread title"], [data-tool-group-scroll], [data-timeline-row-kind="work"], [data-v2-item-type], .chat-markdown-file-link, .chat-markdown-shiki, .font-mono, .t3x-font-preview) *)) { font-family: "T3X Heading", var(--t3x-base-fh, var(--font-sans)); }
+html[data-t3x-fh][data-t3x-ft-pills] :is(.t3x-chain, .t3x-ho-label, .t3x-lab-name, .t3x-meter-text) { font-family: "T3X Heading", var(--t3x-base-fh, var(--font-sans)); }
+/* Never handwritten: code and controls. Links, tables and paths stay restored only while that role is off. */
+html:is([data-t3x-fh], [data-t3x-fb], [data-t3x-fm], [data-t3x-fc], [data-t3x-fq], [data-t3x-fi], [data-t3x-fp], [data-t3x-fquestions], [data-t3x-fr], [data-t3x-fprompts], [data-t3x-ffooter], [data-t3x-ftables], [data-t3x-flinks], [data-t3x-fpaths], [data-t3x-fthreadtitles], [data-t3x-ftooltips], [data-t3x-fusage], [data-t3x-fsidebar]) [data-testid="composer-editor"] :is(code, pre, kbd, [contenteditable="false"]),
+html:is([data-t3x-fh], [data-t3x-fb], [data-t3x-fm], [data-t3x-fc], [data-t3x-fq], [data-t3x-fi], [data-t3x-fp], [data-t3x-fquestions], [data-t3x-fr], [data-t3x-fprompts], [data-t3x-ffooter], [data-t3x-ftables], [data-t3x-flinks], [data-t3x-fpaths], [data-t3x-fthreadtitles], [data-t3x-ftooltips], [data-t3x-fusage], [data-t3x-fsidebar]) .chat-markdown :is(blockquote, h1, h2, h3, h4, h5, h6, p, li) :is(code, pre, kbd, button, input, select, sub) {
+  font-family: var(--font-sans);
+}
+html:is([data-t3x-fh], [data-t3x-fb], [data-t3x-fm], [data-t3x-fc], [data-t3x-fq], [data-t3x-fi], [data-t3x-fp], [data-t3x-fquestions], [data-t3x-fr], [data-t3x-fprompts], [data-t3x-ffooter], [data-t3x-ftables], [data-t3x-flinks], [data-t3x-fpaths], [data-t3x-fthreadtitles], [data-t3x-ftooltips], [data-t3x-fusage], [data-t3x-fsidebar]):not([data-t3x-flinks]) [data-testid="composer-editor"] a,
+html:is([data-t3x-fh], [data-t3x-fb], [data-t3x-fm], [data-t3x-fc], [data-t3x-fq], [data-t3x-fi], [data-t3x-fp], [data-t3x-fquestions], [data-t3x-fr], [data-t3x-fprompts], [data-t3x-ffooter], [data-t3x-ftables], [data-t3x-flinks], [data-t3x-fpaths], [data-t3x-fthreadtitles], [data-t3x-ftooltips], [data-t3x-fusage], [data-t3x-fsidebar]):not([data-t3x-flinks]) .chat-markdown :is(blockquote, h1, h2, h3, h4, h5, h6, p, li) a {
+  font-family: var(--font-sans);
+}
+html:is([data-t3x-fh], [data-t3x-fb], [data-t3x-fm], [data-t3x-fc], [data-t3x-fq], [data-t3x-fi], [data-t3x-fp], [data-t3x-fquestions], [data-t3x-fr], [data-t3x-fprompts], [data-t3x-ffooter], [data-t3x-ftables], [data-t3x-flinks], [data-t3x-fpaths], [data-t3x-fthreadtitles], [data-t3x-ftooltips], [data-t3x-fusage], [data-t3x-fsidebar]):not([data-t3x-ftables]) .chat-markdown :is(blockquote, h1, h2, h3, h4, h5, h6, p, li) table {
+  font-family: var(--font-sans);
+}
+html:is([data-t3x-fh], [data-t3x-fb], [data-t3x-fm], [data-t3x-fc], [data-t3x-fq], [data-t3x-fi], [data-t3x-fp], [data-t3x-fquestions], [data-t3x-fr], [data-t3x-fprompts], [data-t3x-ffooter], [data-t3x-ftables], [data-t3x-flinks], [data-t3x-fpaths], [data-t3x-fthreadtitles], [data-t3x-ftooltips], [data-t3x-fusage], [data-t3x-fsidebar]):not([data-t3x-fpaths]) .chat-markdown :is(blockquote, h1, h2, h3, h4, h5, h6, p, li) :where(.chat-markdown-file-link) {
+  font-family: var(--font-sans);
+}
+html:is([data-t3x-fh], [data-t3x-fb], [data-t3x-fm], [data-t3x-fc], [data-t3x-fq], [data-t3x-fi], [data-t3x-fp], [data-t3x-fquestions], [data-t3x-fr], [data-t3x-fprompts], [data-t3x-ffooter], [data-t3x-ftables], [data-t3x-flinks], [data-t3x-fpaths], [data-t3x-fthreadtitles], [data-t3x-ftooltips], [data-t3x-fusage], [data-t3x-fsidebar]) [data-testid="composer-editor"] :is(code, pre, kbd, :is(code, pre, kbd) *),
+html:is([data-t3x-fh], [data-t3x-fb], [data-t3x-fm], [data-t3x-fc], [data-t3x-fq], [data-t3x-fi], [data-t3x-fp], [data-t3x-fquestions], [data-t3x-fr], [data-t3x-fprompts], [data-t3x-ffooter], [data-t3x-ftables], [data-t3x-flinks], [data-t3x-fpaths], [data-t3x-fthreadtitles], [data-t3x-ftooltips], [data-t3x-fusage], [data-t3x-fsidebar]) .chat-markdown :is(blockquote, h1, h2, h3, h4, h5, h6, p, li) :is(code, pre, kbd, :is(code, pre, kbd) *) {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+/* panel: filter chips, the three pickers, size steppers, live previews */
+.t3x-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+.t3x-chipbtn {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--foreground);
+  font: 500 12px/1 var(--font-sans);
+  cursor: pointer;
+}
+.t3x-chipbtn[aria-pressed="true"] { border-color: var(--foreground); background: var(--foreground); color: var(--background); }
+.t3x-font { margin: 12px 0 4px; }
+.t3x-font-title { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; }
+.t3x-select {
+  width: 100%;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--foreground);
+  font: 400 12.5px var(--font-sans);
+}
+.t3x-font-browse { display: flex; align-items: center; gap: 5px; }
+.t3x-font-browse .t3x-select { flex: 1; min-width: 0; width: 0; }
+.t3x-font-nav { flex: none; width: 28px; height: 28px; padding: 0; font: 500 20px/1 var(--font-sans); }
+.t3x-font-native, .t3x-font-meta { font-family: var(--font-sans); }
+.t3x-font-meta { font-size: 11px; color: var(--muted-foreground); }
+.t3x-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@supports (appearance: base-select) {
+  .t3x-font-select, .t3x-font-select::picker(select) { appearance: base-select; }
+  .t3x-font-select::picker(select) { max-width: min(520px, calc(100vw - 16px)); max-height: 55vh; overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--foreground); font: 400 13px/1.5 var(--font-sans); }
+  .t3x-font-select option { padding: 5px 8px; white-space: normal; overflow-wrap: anywhere; }
+  .t3x-font-select optgroup { font-family: var(--font-sans); }
+  .t3x-font-select option:checked { background: color-mix(in oklab, var(--foreground) 12%, var(--background)); }
+  .t3x-font-select option:focus { outline: 2px solid var(--primary); outline-offset: -2px; }
+}
+.t3x-stepper { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.t3x-step { width: 28px; padding: 0; font-size: 14px; }
+.t3x-btn[disabled] { opacity: .45; cursor: default; }
+.t3x-size { min-width: 40px; font-variant-numeric: tabular-nums; text-align: center; }
+.t3x-step-reset { margin-left: auto; }
+.t3x-font-preview {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--foreground) 5%, transparent);
+  font-size: 14px;
+  line-height: 1.35;
+}
+.t3x-pv-head { font-weight: 600; }
+.t3x-note-flush { margin-left: 0; }
+
+/* Add-ons sheet hierarchy. Usage and handover popovers retain their existing styles. */
+[data-t3x="pop"][aria-label="Add-ons"] { box-sizing: border-box; text-align: left; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-pop-head { flex-wrap: wrap; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-pop-head strong { font-size: 16px; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-pop-head .t3x-muted { font-size: 12px; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-jump { display: block; margin: 8px 0 0; padding: 0; border: 0; background: transparent; color: var(--foreground); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+[data-t3x="pop"][aria-label="Add-ons"] > section { margin-top: 20px; }
+[data-t3x="pop"][aria-label="Add-ons"] h3 { margin: 0 0 8px; color: var(--foreground); font-size: 14px; line-height: 1.3; font-weight: 600; letter-spacing: normal; text-transform: none; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-font { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--border); }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-font-title { margin: 0 0 8px; color: var(--foreground); font-size: 13px; line-height: 1.4; font-weight: 600; letter-spacing: normal; text-transform: none; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-select { min-height: 28px; height: auto; font-size: 12.5px; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-font-preview { margin-top: 8px; overflow-wrap: anywhere; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-font .t3x-note { margin-top: 8px; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-targets { gap: 2px 8px; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-targets > * { min-width: 0; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-note, [data-t3x="pop"][aria-label="Add-ons"] .t3x-muted { overflow-wrap: anywhere; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-pop-foot { flex-wrap: wrap; align-items: baseline; }
+[data-t3x="pop"][aria-label="Add-ons"] .t3x-knob, [data-t3x="pop"][aria-label="Add-ons"] .t3x-knob::after { transition: none; }
+
+/* ---------- burn-rate tells on sidebar rows ----------
+ * Our own <span data-t3x="burn"> inside T3's row <li> (T3's nodes untouched; only the <li> gets
+ * position: relative through :has). Strip on the RIGHT edge (the left is the selected-thread
+ * marker), in the row's padding, outside the status/Settle/Snooze slot, and pointer-transparent.
+ * Only the ember and chip take hover, for their tooltips; clicks go on to the row. */
+
+li[data-thread-item]:has(> [data-t3x="burn"]) { position: relative; }
+.t3x-burn {
+  --t3x-heat: #f59e0b;
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+}
+.t3x-burn[data-t3x-burn="hot"] { --t3x-heat: #f97316; }
+.t3x-burn[data-t3x-burn="blazing"] { --t3x-heat: #ef4444; }
+.t3x-burn-strip {
+  position: absolute;
+  top: 7px;
+  right: 1px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--t3x-heat);
+  display: none;
+}
+.t3x-burn:is([data-t3x-burn="warm"], [data-t3x-burn="hot"], [data-t3x-burn="blazing"], [data-t3x-burn="building"]) .t3x-burn-strip { display: block; }
+.t3x-burn[data-t3x-burn="building"] .t3x-burn-strip { width: 1.5px; opacity: .75; }
+.t3x-burn[data-t3x-burn="blazing"] .t3x-burn-strip { animation: t3x-burn-pulse 2.6s ease-in-out infinite; }
+@keyframes t3x-burn-pulse { 50% { opacity: .45; } }
+.t3x-burn-tint { position: absolute; inset: 2px 0; border-radius: 8px; display: none; background: color-mix(in oklab, #ef4444 7%, transparent); }
+.t3x-burn[data-t3x-burn="blazing"] .t3x-burn-tint { display: block; }
+.t3x-burn-ember {
+  position: absolute;
+  left: var(--ex, calc(100% - 18px));
+  top: var(--ey, 10px);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--sidebar, var(--background)) 85%, transparent);
+  pointer-events: auto;
+}
+.t3x-burn-recent .t3x-burn-ember { opacity: .45; }
+.t3x-burn-chip {
+  position: absolute;
+  right: var(--cr, 10px);
+  top: var(--cy, 50%);
+  transform: translateY(-50%);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--t3x-heat) 18%, var(--sidebar, var(--background)));
+  color: color-mix(in oklab, var(--t3x-heat) 55%, var(--sidebar-foreground, var(--foreground)));
+  font: 600 10.5px/1.35 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+/* Narrow sidebar (140-160 px): the compact chip; the minutes move to the tooltip. */
+.t3x-burn-narrow .t3x-burn-chip { font-size: 0; padding: 1px 5px; }
+.t3x-burn-narrow .t3x-burn-chip::after { content: attr(data-short); font-size: 10px; }
+.t3x-burn-hdr {
+  --t3x-heat: #f59e0b;
+  cursor: default;
+  color: color-mix(in oklab, var(--t3x-heat) 60%, var(--foreground));
+  border-color: color-mix(in oklab, var(--t3x-heat) 45%, transparent);
+}
+.t3x-burn-hdr[data-t3x-burn="hot"] { --t3x-heat: #f97316; }
+.t3x-burn-hdr[data-t3x-burn="blazing"] { --t3x-heat: #ef4444; }
+@media (prefers-reduced-motion: reduce) { .t3x-burn-strip { animation: none !important; } }
+
+/* Action words (<ins>) underline in the browser by default. Quiet them in the reply, then
+ * the footer card below puts the line back on one layer: the verb in an open item. */
+.chat-markdown ins { text-decoration: none; }
+
+
+/* ---------- font role leaves ---------- */
+/* tables */
+html[data-t3x-ftables] [data-message-role="assistant"] .chat-markdown .chat-markdown-table-container:not(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child)):not(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) .chat-markdown-table-container) :is(th, td) {
+  font-family: "T3X Tables", var(--t3x-base-ftables, var(--font-sans));
+}
+html[data-t3x-ftables]:not([data-t3x-flinks]) [data-message-role="assistant"] .chat-markdown .chat-markdown-table-container :is(th, td) a,
+html[data-t3x-ftables]:not([data-t3x-fpaths]) [data-message-role="assistant"] .chat-markdown .chat-markdown-table-container :is(th, td) :is(.chat-markdown-file-link, [data-slot="context-chip"]),
+html[data-t3x-ftables] [data-message-role="assistant"] .chat-markdown .chat-markdown-table-container :is(th, td) :is(button, svg, input, select) {
+  font-family: var(--font-sans);
+}
+html[data-t3x-ftables] [data-message-role="assistant"] .chat-markdown .chat-markdown-table-container :is(th, td) :is(code, pre, kbd, .font-mono, .chat-markdown-shiki, :is(code, pre, kbd, .font-mono, .chat-markdown-shiki) *) {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+/* footer */
+html[data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) :is(th, td),
+html[data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) [data-markdown-details] :is(p, li, td, th),
+html[data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + sub,
+html[data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + p > sub:only-child,
+html[data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) + sub,
+html[data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) + p > sub:only-child { font-family: "T3X Footer", var(--t3x-base-ffooter, var(--font-sans)); }
+html[data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) :is(th, td) :where(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], :is(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable]) *),
+html[data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) [data-markdown-details] :is(p, li, td, th) :where(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], :is(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable]) *),
+html[data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + sub :where(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], :is(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable]) *),
+html[data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + p > sub:only-child :where(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], :is(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable]) *),
+html[data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) + sub :where(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], :is(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable]) *),
+html[data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) + p > sub:only-child :where(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], :is(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable]) *) { font-family: var(--font-sans); }
+html[data-t3x-ffooter]:not([data-t3x-flinks]) [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) :is(th, td) :where(a:not(.chat-markdown-file-link):not([data-slot="context-chip"]), :is(a:not(.chat-markdown-file-link):not([data-slot="context-chip"])) *),
+html[data-t3x-ffooter]:not([data-t3x-flinks]) [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) [data-markdown-details] :is(p, li, td, th) :where(a:not(.chat-markdown-file-link):not([data-slot="context-chip"]), :is(a:not(.chat-markdown-file-link):not([data-slot="context-chip"])) *),
+html[data-t3x-ffooter]:not([data-t3x-flinks]) [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + sub :where(a:not(.chat-markdown-file-link):not([data-slot="context-chip"]), :is(a:not(.chat-markdown-file-link):not([data-slot="context-chip"])) *),
+html[data-t3x-ffooter]:not([data-t3x-flinks]) [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + p > sub:only-child :where(a:not(.chat-markdown-file-link):not([data-slot="context-chip"]), :is(a:not(.chat-markdown-file-link):not([data-slot="context-chip"])) *),
+html[data-t3x-ffooter]:not([data-t3x-flinks]) [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) + sub :where(a:not(.chat-markdown-file-link):not([data-slot="context-chip"]), :is(a:not(.chat-markdown-file-link):not([data-slot="context-chip"])) *),
+html[data-t3x-ffooter]:not([data-t3x-flinks]) [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) + p > sub:only-child :where(a:not(.chat-markdown-file-link):not([data-slot="context-chip"]), :is(a:not(.chat-markdown-file-link):not([data-slot="context-chip"])) *) { font-family: var(--font-sans); }
+html[data-t3x-ffooter]:not([data-t3x-fpaths]) [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) :is(th, td) :where(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], :is(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"]) *),
+html[data-t3x-ffooter]:not([data-t3x-fpaths]) [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) [data-markdown-details] :is(p, li, td, th) :where(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], :is(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"]) *),
+html[data-t3x-ffooter]:not([data-t3x-fpaths]) [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + sub :where(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], :is(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"]) *),
+html[data-t3x-ffooter]:not([data-t3x-fpaths]) [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + p > sub:only-child :where(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], :is(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"]) *),
+html[data-t3x-ffooter]:not([data-t3x-fpaths]) [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) + sub :where(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], :is(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"]) *),
+html[data-t3x-ffooter]:not([data-t3x-fpaths]) [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) + p > sub:only-child :where(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], :is(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"]) *) { font-family: var(--font-sans); }
+html[data-t3x-ffooter][data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) :is(th, td) :where(code, pre, kbd, .font-mono, .chat-markdown-shiki, :is(code, pre, kbd, .font-mono, .chat-markdown-shiki) *),
+html[data-t3x-ffooter][data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) [data-markdown-details] :is(p, li, td, th) :where(code, pre, kbd, .font-mono, .chat-markdown-shiki, :is(code, pre, kbd, .font-mono, .chat-markdown-shiki) *),
+html[data-t3x-ffooter][data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + sub :where(code, pre, kbd, .font-mono, .chat-markdown-shiki, :is(code, pre, kbd, .font-mono, .chat-markdown-shiki) *),
+html[data-t3x-ffooter][data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + p > sub:only-child :where(code, pre, kbd, .font-mono, .chat-markdown-shiki, :is(code, pre, kbd, .font-mono, .chat-markdown-shiki) *),
+html[data-t3x-ffooter][data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) + sub :where(code, pre, kbd, .font-mono, .chat-markdown-shiki, :is(code, pre, kbd, .font-mono, .chat-markdown-shiki) *),
+html[data-t3x-ffooter][data-t3x-ffooter] [data-message-role="assistant"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has(> table > thead [itemprop~="settle-yes"], > table > thead [itemprop~="settle-no"]):has(> table > thead > tr > th:nth-child(3):last-child) + div:has(> [data-markdown-details]) + p > sub:only-child :where(code, pre, kbd, .font-mono, .chat-markdown-shiki, :is(code, pre, kbd, .font-mono, .chat-markdown-shiki) *) { font-family: var(--font-mono, ui-monospace, monospace); }
+/* links */
+html[data-t3x-flinks] [data-message-role="assistant"] .chat-markdown a:not(.chat-markdown-file-link):not([data-slot="context-chip"]):not([role="button"]):not(code *):not(pre *):not(kbd *):not(.font-mono *):not(.chat-markdown-shiki *) {
+  font-family: "T3X Links", var(--t3x-base-flinks, var(--font-sans));
+}
+/* paths */
+html[data-t3x-fpaths] :is([data-message-role="assistant"] .chat-markdown .chat-markdown-file-link, [data-slot="workspace-breadcrumb-text"], [data-slot="context-chip"]):not(code *):not(pre *):not(kbd *):not(.font-mono *):not(.chat-markdown-shiki *) {
+  font-family: "T3X Paths", var(--t3x-base-fpaths, var(--font-sans));
+}
+/* thread titles */
+html[data-t3x-fthreadtitles] [data-testid="sidebar-row-card"] span[data-testid^="thread-title-"],
+html[data-t3x-fthreadtitles] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) span[aria-hidden].min-w-0.flex-1.text-start,
+html[data-t3x-fthreadtitles] [data-slot="sidebar-menu-sub-button"] span[data-testid^="thread-title-"],
+html[data-t3x-fthreadtitles] [data-t3x="grouping-root"] span.t3x-g-title {
+  font-family: "T3X Thread titles", var(--t3x-base-fthreadtitles, var(--font-sans));
+}
+/* tooltips */
+html[data-t3x-ftooltips] :is([data-slot="tooltip-popup"], [data-slot="tooltip-viewport"]) { font-family: "T3X Tooltips", var(--t3x-base-ftooltips, var(--font-sans)); }
+html[data-t3x-ftooltips] :is([data-slot="tooltip-popup"], [data-slot="tooltip-viewport"]) :where(:is(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], a):not(:is(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"])), :is(button, input, textarea, select, option, summary, svg, [role="button"], [role="link"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="checkbox"], [role="radio"], [role="switch"], [role="combobox"], [role="listbox"], [role="option"], [role="slider"], [role="spinbutton"], [role="textbox"], [role="tab"], [role="treeitem"], [contenteditable], a):not(:is(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"])) *) { font-family: var(--font-sans); }
+html[data-t3x-ftooltips]:not([data-t3x-fpaths]) :is([data-slot="tooltip-popup"], [data-slot="tooltip-viewport"]) :where(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"], :is(.chat-markdown-file-link, [data-slot="context-chip"], [data-slot="workspace-breadcrumb-text"]) *) { font-family: var(--font-sans); }
+html[data-t3x-ftooltips][data-t3x-ftooltips] :is([data-slot="tooltip-popup"], [data-slot="tooltip-viewport"]) :where(code, pre, kbd, .font-mono, .chat-markdown-shiki, :is(code, pre, kbd, .font-mono, .chat-markdown-shiki) *) { font-family: var(--font-mono, ui-monospace, monospace); }
+/* usage */
+html[data-t3x-fusage] [data-t3x-usage-page="1"] :is(h1, h2.text-sm.font-medium.text-foreground),
+html[data-t3x-fusage] [data-t3x-usage-page="1"] table.w-full.text-sm :is(th, td) {
+  font-family: "T3X Usage", var(--t3x-base-fusage, var(--font-sans));
+}
+html[data-t3x-fusage] [data-t3x-usage-page="1"] :is(button, input, select, svg) {
+  font-family: var(--font-sans);
+}
+html[data-t3x-fusage] [data-t3x-usage-page="1"] :is(code, pre, kbd, .font-mono) {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+/* sidebar status */
+html[data-t3x-fsidebar] [data-testid="sidebar-row-card"] :is(div.mt-0\.5.flex.min-w-0.items-center.gap-1\.5.text-secondary-label.text-xs, div.mt-0\.5.flex.min-w-0.items-center.gap-1\.5.text-secondary-label.text-xs > span.text-muted-foreground\/40),
+html[data-t3x-fsidebar] [data-t3x="grouping-root"] :is(.t3x-g-meta, .t3x-g-project, .t3x-g-age, .t3x-g-state-text, .t3x-g-badge, .t3x-g-badges, .t3x-g-status, .t3x-g-note, .t3x-g-scope, .t3x-g-counts, .t3x-g-cue, .t3x-g-method) {
+  font-family: "T3X Sidebar", var(--t3x-base-fsidebar, var(--font-sans));
+}
+html[data-t3x-fsidebar] [data-testid="sidebar-row-card"] div.mt-0\.5.flex.min-w-0.items-center.gap-1\.5.text-secondary-label.text-xs :is(button, svg, input, select, [role="button"]),
+html[data-t3x-fsidebar] [data-t3x="grouping-root"] :is(.t3x-g-meta, .t3x-g-badges) :is(svg, .t3x-g-icon, button, select, summary, input, textarea, a, code, pre, kbd, .font-mono, .chat-markdown-file-link, [data-slot="context-chip"]) {
+  font-family: var(--font-sans);
+}
+html[data-t3x-fsidebar] [data-testid="sidebar-row-card"] div.mt-0\.5.flex.min-w-0.items-center.gap-1\.5.text-secondary-label.text-xs :is(code, kbd, .font-mono, .font-mono *),
+html[data-t3x-fsidebar] [data-t3x="grouping-root"] :is(.t3x-g-meta, .t3x-g-badges) :is(code, pre, kbd, .font-mono, .font-mono *) {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+/* ---------- end font role leaves ---------- */
+
+/* Dedicated Fonts workspace: the host's type, colors and controls, one editor. */
+.t3x-font-entry { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; margin-top:12px; padding:10px 0; border:0; border-block:1px solid var(--border); background:transparent; color:var(--foreground); font:600 14px/1.4 var(--font-sans); text-align:left; cursor:pointer; }
+.t3x-font-entry .t3x-muted { font-weight:400; font-size:12px; }
+.t3x-font-workspace { box-sizing:border-box; width:min(980px,calc(100vw - 24px)); height:min(760px,calc(100dvh - 24px)); max-width:calc(100vw - 24px); max-height:calc(100dvh - 24px); padding:0; margin:auto; border:1px solid var(--border); border-radius:12px; background:var(--popover,var(--background)); color:var(--foreground); font:400 14px/1.45 var(--font-sans); text-align:left; overflow:hidden; box-shadow:0 12px 48px #0003; }
+.t3x-font-workspace::backdrop { background:#0006; }
+.t3x-font-workspace[open] { display:flex; flex-direction:column; }
+.t3x-font-workspace *, .t3x-font-workspace *::before, .t3x-font-workspace *::after { box-sizing:border-box; }
+.t3x-font-workspace [hidden] { display:none!important; }
+.t3x-font-workspace :is(button,input,select):focus-visible { outline:2px solid var(--ring,var(--primary)); outline-offset:2px; }
+.t3x-font-workspace button { cursor:pointer; }
+.t3x-font-workspace .t3x-btn { min-height:32px; height:auto; font:500 13px/1.35 var(--font-sans); padding:6px 10px; white-space:normal; }
+.t3x-font-workspace-head { flex:none; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px; border-bottom:1px solid var(--border); }
+.t3x-font-workspace h2 { margin:0; font-size:20px; line-height:1.25; font-weight:600; }
+.t3x-font-workspace-head p { margin:4px 0 0; color:var(--muted-foreground); font-size:13px; }
+.t3x-font-workspace-body { display:grid; grid-template-columns:minmax(220px,32%) minmax(0,1fr); flex:1; min-height:0; }
+.t3x-font-navigation { min-width:0; min-height:0; display:flex; flex-direction:column; padding:16px 0 0; border-right:1px solid var(--border); }
+.t3x-font-navigation > label { margin:0 16px 6px; font-weight:600; font-size:13px; }
+.t3x-font-search { flex:none; width:calc(100% - 32px); min-width:0; min-height:34px; margin:0 16px 12px; padding:6px 9px; border:1px solid var(--border); border-radius:8px; background:var(--background); color:var(--foreground); font:inherit; }
+.t3x-font-index { flex:1; min-height:0; overflow:auto; overflow-x:hidden; padding:0 8px 16px; overscroll-behavior:contain; scrollbar-gutter:stable; }
+.t3x-font-area-group { margin:0 0 16px; }
+.t3x-font-area-group h3 { margin:8px 8px 6px; font-size:12px; line-height:1.4; color:var(--muted-foreground); font-weight:600; }
+.t3x-font-area { display:block; width:100%; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--foreground); text-align:left; padding:9px 10px; font:inherit; overflow-wrap:anywhere; }
+.t3x-font-area:hover { background:var(--accent); }
+.t3x-font-area[aria-current="true"] { background:var(--accent); border-color:var(--border); box-shadow:inset 3px 0 var(--primary,var(--foreground)); }
+.t3x-font-area-name { display:block; font-weight:500; line-height:1.35; }
+.t3x-font-area-summary { display:block; color:var(--muted-foreground); font-size:12px; line-height:1.4; margin-top:3px; }
+.t3x-font-editor { min-width:0; min-height:0; overflow:auto; overscroll-behavior:contain; padding:20px 24px 28px; scrollbar-gutter:stable; }
+.t3x-font-editor h3 { margin:0 0 18px; font-size:19px; font-weight:600; line-height:1.3; overflow-wrap:anywhere; }
+.t3x-font-editor label, .t3x-font-scope-label { display:block; margin:16px 0 6px; font-size:13px; font-weight:600; }
+.t3x-font-scope { margin:0 0 10px; color:var(--muted-foreground); overflow-wrap:anywhere; }
+.t3x-font-local-targets { display:flex; flex-direction:column; gap:4px; margin-bottom:18px; }
+.t3x-font-workspace .t3x-select { min-height:34px; height:auto; padding:6px 8px; min-width:0; font-size:13px; }
+.t3x-font-resolved { margin:8px 0; font-size:13px; overflow-wrap:anywhere; }
+.t3x-font-own { margin-top:20px; }
+.t3x-workspace-browse { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:6px; }
+.t3x-workspace-size { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:14px; }
+.t3x-workspace-size output { min-width:42px; text-align:center; font-variant-numeric:tabular-nums; }
+.t3x-workspace-size > span { margin-right:auto; font-size:13px; }
+.t3x-font-workspace .t3x-note { margin:10px 0; color:var(--muted-foreground); font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+.t3x-font-preview-label { margin-top:22px; font-size:12px; color:var(--muted-foreground); }
+.t3x-workspace-sample { padding:16px; font-size:19px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
+.t3x-font-back { display:none; }
+.t3x-font-return { margin:0 0 14px; }
+.t3x-font-guidance { margin:16px 8px 0; color:var(--muted-foreground); font-size:12px; line-height:1.5; }
+.t3x-font-guidance[data-match="true"] { color:var(--foreground); }
+.t3x-font-empty { padding:8px; }
+@media(max-width:719px) {
+ .t3x-font-workspace { width:calc(100vw - 16px); height:calc(100dvh - 16px); max-width:calc(100vw - 16px); max-height:calc(100dvh - 16px); }
+ .t3x-font-workspace-head { padding:12px 16px; }
+ .t3x-font-workspace-body { display:flex; min-height:0; }
+ .t3x-font-navigation, .t3x-font-editor { flex:1; width:100%; }
+ .t3x-font-navigation { border-right:0; }
+ .t3x-font-editor { padding:16px; }
+ .t3x-font-workspace[data-view="index"] .t3x-font-editor, .t3x-font-workspace[data-view="editor"] .t3x-font-navigation { display:none; }
+ .t3x-font-back { display:inline-flex; margin:0 0 14px; }
+ .t3x-font-return { display:block; }
+ .t3x-workspace-browse { grid-template-columns:1fr 1fr; }
+ .t3x-workspace-browse select { grid-column:1/-1; grid-row:1; }
+}
+
+/* ---------- ✦ panel "Your fonts": each pick's name in its own face, with Previous/Next ---------- */
+.t3x-fs-row { display: flex; flex-direction: column; padding: 2px 0; }
+.t3x-fs-area { display: flex; gap: 6px; align-items: baseline; color: var(--muted-foreground); font: 11px var(--font-sans); }
+.t3x-fs-also { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t3x-fs-pos { margin-left: auto; flex: none; font-variant-numeric: tabular-nums; opacity: .75; }
+.t3x-fs-pick { display: flex; align-items: center; gap: 2px; }
+.t3x-fs-step {
+  flex: none; width: 28px; height: 30px; border: 1px solid var(--border); border-radius: 8px;
+  background: transparent; color: inherit; cursor: pointer; font: 17px/1 var(--font-sans);
+}
+.t3x-fs-step[disabled] { opacity: .35; cursor: default; }
+.t3x-fs-name {
+  flex: 1 1 auto; min-width: 0; border: 0; border-radius: 8px; background: transparent;
+  color: inherit; cursor: pointer; padding: 0 6px; font-size: 20px; line-height: 30px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.t3x-fs-step:hover:not([disabled]), .t3x-fs-name:hover { background: var(--accent); }
+.t3x-fs button:focus-visible { outline: 2px solid var(--ring, currentColor); outline-offset: 1px; }
+
+/* ---------- reply footer card ----------
+ * Round 11 (approved by Andy 19 Oct 2026).
+ * The footer agents write for Andy (rule "End every reply to Andy with a footer" in ~/.claude/CLAUDE.md):
+ * `---`, a three-column plan table (status · step · who and when) whose header holds the verdict
+ * (<span itemprop="settle-yes|settle-no">), an optional <details> team rundown, then a small <sub> line.
+ * Only the table right after a reply's last <hr> changes, and only when it carries the verdict hook and has three
+ * columns (round 9's two-column footers, already in old threads, keep T3's own table look).
+ * Colours come from the active T3 theme (--info, --destructive, --success, --muted-foreground), so every theme works.
+ */
+
+.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) {
+  --t3x-run: var(--info, #2563eb);
+  --t3x-bad: var(--destructive, #dc2626);
+  --t3x-ok: var(--success, #15803d);
+  --t3x-line: color-mix(in srgb, var(--contrast-border) 70%, transparent);
+  width: fit-content;
+  min-width: min(100%, 34rem);
+  max-width: 100%;
+  margin-bottom: 0;
+  border: 1px solid var(--contrast-border);
+  border-radius: var(--radius, .625rem);
+  background: var(--card);
+  overflow: hidden;
+
+  & > :not(:first-child) { display: none; }
+  /* each row is a line of its own: status · step · who and when. Who-and-when stays on one line at the right while it
+   * fits beside a step of at least 18rem; otherwise it drops under the step, still at the right, so the step never
+   * gets squeezed and rows don't grow tall from a wrapped right column (Andy, 20 Oct 2026: "fix the column/row
+   * resizing", "Still off"). Status labels share one width per card, wide enough for the longest label it uses. */
+  --t3x-lw: calc(5.1em + 1rem);
+  &:has(tbody [itemprop~="saved"]) { --t3x-lw: calc(6.3em + 1rem); }
+  /* "Decided for you" is the last row and has no who-and-when (:has() can't nest, so this is how it is found) */
+  &:has(tbody tr:last-child > td:last-child:empty) { --t3x-lw: calc(7.9em + 1rem); }
+  & table { display: block; width: 100%; min-width: 0; font-size: .8125rem; line-height: 1.5; font-variant-numeric: tabular-nums; }
+  & tbody { display: block; }
+  & tbody tr { display: flex; flex-wrap: wrap; align-items: flex-start; }
+  & :is(th, td) {
+    padding: .14rem .75rem;
+    vertical-align: top;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    max-width: none;
+    overflow-wrap: break-word;
+    border: 0;
+  }
+  /* status and who/when: small, quiet, fitted to their words; times right-aligned in even-width figures */
+  & td:first-child, & td:last-child {
+    font-size: .75rem;
+    line-height: 1.25rem;
+    color: var(--muted-foreground);
+  }
+  & td:first-child { flex: 0 0 auto; box-sizing: border-box; min-width: var(--t3x-lw); padding-right: .25rem; white-space: nowrap; }
+  & td:nth-child(2) { flex: 1 1 min(18rem, 55%); min-width: 0; line-height: 1.25rem; overflow-wrap: anywhere; }
+  & td:nth-child(2) :is(code, a) { white-space: normal; overflow-wrap: anywhere; }
+  /* where supported, a short step claims only its own width (up to 18rem), so who-and-when can sit beside it */
+  @supports (width: calc-size(max-content, size)) {
+    & td:nth-child(2) { flex: 1 1 auto; width: calc-size(max-content, min(size, 18rem)); }
+  }
+  & td:last-child { flex: 0 1 auto; margin-left: auto; text-align: right; padding-left: 1.25rem; text-wrap: balance; }
+  & td:last-child:empty { display: none; }
+  /* groups are separated by space, not lines (a margin, so a tinted row's tint stays tight); rows inside a group sit close */
+  & tbody tr:has(> td:first-child:not(:empty)) { margin-top: .42rem; }
+  & tbody tr:is(:has([itemprop~="running"]), :has([itemprop~="saved"])) { padding-block: .2rem; }
+  & tbody tr:first-child { padding-top: .41rem; }
+  & tbody tr:last-child { padding-bottom: .46rem; }
+
+  /* done: crossed out in the text's own (quiet) colour */
+  & tbody tr:has(del) td:nth-child(2) { color: var(--muted-foreground); }
+  & td del { text-decoration-line: line-through; text-decoration-thickness: 1.5px; text-decoration-color: currentColor; }
+
+  /* running: the one accent, a bar and tint that follow the theme, a pulsing dot */
+  & tbody tr:has([itemprop~="running"]) { background: color-mix(in srgb, var(--t3x-run) 10%, transparent); box-shadow: inset 2px 0 0 var(--t3x-run); }
+  & tbody tr:has([itemprop~="running"]) :is(td:first-child, td:last-child) { color: color-mix(in srgb, var(--t3x-run) 68%, var(--foreground)); }
+  & [itemprop~="running"]::before {
+    content: "";
+    display: inline-block;
+    width: .45em;
+    height: .45em;
+    margin-right: .5em;
+    border-radius: 50%;
+    background: var(--t3x-run);
+    vertical-align: .1em;
+    animation: t3x-footer-pulse 1.6s ease-in-out infinite;
+  }
+
+  /* needs you: a neutral bar and a faint tint, the label in full strength.
+   * The action word is the one underlined layer: a direct <ins> in that row's step.
+   * The same word in the body, a finished step, or the team list stays plain. */
+  & tbody tr:has(> td:nth-child(2) > strong:first-child) { background: color-mix(in srgb, var(--foreground) 5%, transparent); box-shadow: inset 2px 0 0 var(--foreground); padding-block: .36rem; }
+  & tbody tr:has(> td:nth-child(2) > strong:first-child) td:first-child { color: var(--foreground); }
+  & tbody tr:has(> td:nth-child(2) > strong:first-child) > td:nth-child(2) > ins { text-decoration-line: underline; text-decoration-thickness: 1.5px; text-underline-offset: .18em; text-decoration-color: currentColor; text-decoration-skip-ink: auto; }
+  /* decided for you: quiet, still readable */
+  & tbody tr:has(> td:last-child:empty):not(:has(strong, del, [itemprop])) td:nth-child(2) { color: var(--muted-foreground); }
+  & [itemprop~="failed"] { color: color-mix(in srgb, var(--t3x-bad) 75%, var(--foreground)); }
+  /* a change made to save usage (rule "Saved usage"): a warning-coloured bar and faint tint, text at full strength */
+  & tbody tr:has([itemprop~="saved"]) { background: color-mix(in srgb, var(--warning, #f59e0b) 9%, transparent); box-shadow: inset 2px 0 0 var(--warning, #f59e0b); }
+  & tbody tr:has([itemprop~="saved"]) td:first-child { color: var(--foreground); }
+  & tbody tr:has([itemprop~="saved"]) td:last-child { color: color-mix(in srgb, var(--muted-foreground) 55%, var(--foreground)); }
+  /* time over its plan (rule "Honest time"): the theme's warning text colour */
+  & [itemprop~="over"] { color: var(--warning-foreground, #b45309); }
+
+  /* header as a caption: verdict, reason, then progress and ETA on the right */
+  & thead {
+    display: block;
+    border-bottom: 1px solid var(--contrast-border);
+    background: color-mix(in srgb, var(--foreground) 4%, transparent);
+    & tr { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: .9rem; row-gap: .1rem; padding: .55rem .75rem; }
+    & th { display: block; width: auto; padding: 0; font-size: .875rem; font-weight: 500; white-space: nowrap; }
+    & th:first-child { font-size: .9375rem; font-weight: 650; }
+    & th:last-child { margin-left: auto; font-size: .75rem; font-weight: 450; color: color-mix(in srgb, var(--muted-foreground) 80%, var(--foreground)); }
+    & [itemprop~="settle-no"]  { color: color-mix(in srgb, var(--t3x-bad) 75%, var(--foreground)); }
+    & [itemprop~="settle-yes"] { color: color-mix(in srgb, var(--t3x-ok) 55%, var(--foreground)); }
+  }
+}
+@keyframes t3x-footer-pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) [itemprop~="running"]::before { animation: none; } }
+
+/* the team rundown under the card. T3 draws a reply's <details> as its own collapsible: a wrapper <div>, then
+ * [data-markdown-details] holding a trigger button ([data-markdown-details-summary], chevron + summary text) and a panel
+ * whose [data-markdown-details-content] holds the table. The ✦ panel's "Footer team list" switch sets
+ * html[data-t3x-footer-team]: always-show (can't fold), start-open (default), start-folded (the add-ons fold it once), always-hide. */
+.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]) {
+  margin: .45rem 0 0;
+  border: 0;
+  font-size: .75rem;
+  color: var(--muted-foreground);
+  & [data-markdown-details-summary] {
+    width: fit-content;
+    gap: .3rem;
+    padding: .1rem 0;
+    font-size: .75rem;
+    line-height: 1.25rem;
+    font-weight: 400;
+    color: var(--muted-foreground);
+  }
+  & [data-markdown-details-summary] > svg { width: .875rem; height: .875rem; }
+  & [data-markdown-details-content] { padding: .15rem 0 .1rem 1.15rem; color: var(--muted-foreground); }
+  & .chat-markdown-table-container { margin: 0; width: fit-content; max-width: 100%; }
+  & .chat-markdown-table-container > :not(:first-child) { display: none; }
+  & table { min-width: 0; font-size: .75rem; }
+  & :is(th, td) { padding: .15rem 1rem .15rem 0; border: 0; background: transparent; white-space: normal; max-width: none; overflow: visible; text-overflow: clip; font-weight: 400; color: var(--muted-foreground); }
+  & :is(th, td):nth-child(2) { color: var(--foreground); white-space: nowrap; }
+  & em { font-style: normal; color: var(--muted-foreground); }
+  & [itemprop~="failed"] { color: color-mix(in srgb, var(--destructive, #dc2626) 85%, var(--foreground)); }
+}
+html[data-t3x-footer-team="always-hide"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]) { display: none; }
+html[data-t3x-footer-team="always-show"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]) [data-markdown-details-summary] { pointer-events: none; cursor: default; }
+html[data-t3x-footer-team="always-show"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]) [data-markdown-details-summary] > svg { display: none; }
+
+/* the small line, right after the card or after the rundown (a bare <sub> when the blank line before it was left out) */
+:is(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)),
+    .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]))
+  + p:has(> sub:only-child) {
+  margin: .35rem 0 0;
+  line-height: 1.35;
+  & > sub { font-size: 11px; vertical-align: baseline; color: var(--muted-foreground); }
+}
+:is(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)),
+    .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]))
+  + sub {
+  display: block;
+  margin: .35rem 0 0;
+  line-height: 1.35;
+  font-size: 11px;
+  vertical-align: baseline;
+  color: var(--muted-foreground);
+}
+
+/* phones: who and when drop under the step, left-aligned with it */
+@media (max-width: 480px) {
+  .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) {
+    & td:first-child { flex-basis: 4.9rem; min-width: 0; white-space: normal; }
+    & td:nth-child(2) { flex: 1 1 0; }
+    & td:last-child { flex: 1 0 100%; margin-left: 0; padding: 0 .75rem .2rem calc(4.9rem + .75rem); text-align: left; text-wrap: wrap; line-height: 1.4; }
+  }
+}

@@ -1,0 +1,1 @@
+acorn 8.18.0 (MIT), copied from /opt/homebrew/lib/node_modules/netlify-cli/node_modules/acorn/dist/acorn.mjs on 2026-10-18
