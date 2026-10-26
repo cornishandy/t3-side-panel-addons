@@ -772,6 +772,13 @@ func runNode(arguments: [String], timeout: Double) -> NodeRun {
 }
 
 func nodeBinary() -> String? {
+  // The installer records the absolute node it probed. Homebrew paths are only
+  // the fallback (a fresh install's reminders are off, so this rarely runs).
+  let saved = (keeperHome() as NSString).appendingPathComponent("node-path")
+  if let text = try? String(contentsOfFile: saved, encoding: .utf8) {
+    let path = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    if path.hasPrefix("/"), FileManager.default.isExecutableFile(atPath: path) { return path }
+  }
   for candidate in ["/opt/homebrew/bin/node", "/usr/local/bin/node"] {
     if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
   }

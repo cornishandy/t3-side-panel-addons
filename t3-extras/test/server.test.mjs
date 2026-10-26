@@ -152,7 +152,7 @@ before(async () => {
   const dir = path.join(tmp, "install");
   fs.mkdirSync(path.join(dir, "public"), { recursive: true });
   fs.mkdirSync(path.join(dir, "fonts"));
-  for (const f of ["server.mjs", "lib.mjs", "history.mjs", "burn.mjs", "burn-core.mjs", "burn-sql-worker.mjs", "fonts.json"]) fs.copyFileSync(path.join(SRC, f), path.join(dir, f));
+  for (const f of ["server.mjs", "lib.mjs", "history.mjs", "burn.mjs", "burn-core.mjs", "burn-sql-worker.mjs", "fonts.json", "payload.mjs", "private-file.mjs"]) fs.copyFileSync(path.join(SRC, f), path.join(dir, f));
   fs.mkdirSync(path.join(tmp, "home"));
   fs.writeFileSync(path.join(dir, "public/extras.js"), "void 0;");
   fs.writeFileSync(path.join(dir, "public/extras.css"), "html{}");
@@ -201,7 +201,7 @@ test("the service listens on 127.0.0.1 only", async () => {
 });
 
 test("every endpoint refuses a request without T3's Origin", async () => {
-  for (const p of ["/state?thread=c0ffee00-0000-4000-8000-000000000002", "/extras.js", "/extras.css", "/version", "/fonts/kalam-latin-400.woff2", "/diag?cards=1"]) {
+  for (const p of ["/state?thread=c0ffee00-0000-4000-8000-000000000002", "/extras.js", "/extras.css", "/extras.sig", "/version", "/fonts/kalam-latin-400.woff2", "/diag?cards=1"]) {
     const r = await get(p, { "Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "navigate" });
     assert.equal(r.status, 403, p);
     assert.doesNotMatch(r.body, /Wrap side-panel|HANDOFF/, p);

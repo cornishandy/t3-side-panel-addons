@@ -1,10 +1,11 @@
-#!/opt/homebrew/bin/node
+#!/usr/bin/env node
 /**
- * t3-extras: a small read-only service for Andy's T3 Code (Nightly) add-ons.
+ * t3-extras: a small read-only service for T3 Code (Nightly) add-ons.
  * Listens on 127.0.0.1:8793 only (never the tailnet). The keeper's inline loader in T3's
  * index.html fetches /extras.js and /extras.css from here.
  *
- *   GET /extras.js, /extras.css     the add-ons (inserted inline by the loader)
+ *   GET /extras.js, /extras.css, /extras.sig
+ *                                   the add-ons and the signature the loader checks
  *   GET /grouping                   this Mac's top-level thread index (metadata only)
  *   GET /version                    changes whenever those files change (reload on focus)
  *   GET /fonts/<file>               bundled fonts and their licences, allowlisted names only
@@ -29,10 +30,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { PORT, guard, usageView, labsFromView, historySample, chainView, diagEntry } from "./lib.mjs";
 import { createHistory } from "./history.mjs";
 import { createBurn } from "./burn.mjs";
+import { payloadVersion } from "./payload.mjs";
+import { openPrivate, READ_ONLY, WRITE_APPEND } from "./private-file.mjs";
 
 const DIR = process.env.T3X_DIR || path.dirname(fileURLToPath(import.meta.url));
 const LISTEN_PORT = Number(process.env.T3X_PORT || PORT);
 const LAB_USAGE = process.env.T3X_LAB_USAGE || path.join(os.homedir(), ".claude/bin/lab-usage");
+const HANDOVER_BIN = process.env.T3X_HANDOVER_BIN || path.join(os.homedir(), ".claude/bin/handover");
 const HANDOVER_STATE = process.env.T3X_HANDOVER_STATE || path.join(os.homedir(), ".local/share/handover/state.json");
 // T3's id for this Mac's environment: the add-ons offer handover only for threads that run here.
 const ENV_ID_FILE = process.env.T3X_ENV_ID_FILE || path.join(os.homedir(), ".t3/userdata/environment-id");
@@ -89,7 +93,11 @@ function readPublic() {
   const groupCss = readOptionalPublic("grouping.css");
   const jsOut = groupJs ? Buffer.concat([js, Buffer.from("\n;\n"), groupJs]) : js;
   const cssOut = groupCss ? Buffer.concat([css, Buffer.from("\n"), groupCss]) : css;
-  return { js: jsOut, css: cssOut, version: crypto.createHash("sha256").update(jsOut).update(cssOut).digest("hex").slice(0, 16) };
+  let sig = null;
+  try {
+    sig = fs.readFileSync(path.join(DIR, "public/extras.sig"));
+  } catch {}
+  return { js: jsOut, css: cssOut, sig, version: payloadVersion(jsOut, cssOut) };
 }
 let files = readPublic();
 let filesCheckedAt = Date.now();
@@ -112,15 +120,47 @@ let usage = { fetchedAt: null, view: null, error: null };
 let inflight = null;
 let lastActive = 0;
 
+function executableFile(file) {
+  try {
+    const st = fs.statSync(file);
+    return st.isFile() && (st.mode & 0o111) !== 0;
+  } catch {
+    return false;
+  }
+}
+
+function currentTools() {
+  return { labUsage: executableFile(LAB_USAGE), handover: executableFile(HANDOVER_BIN) };
+}
+
+function clearUsage() {
+  usage = { fetchedAt: null, view: null, error: null, failedAt: null };
+}
+
+function emptyUsage() {
+  return { fetchedAt: null, claude: { ok: false }, codex: { ok: false }, labs: [], error: null, failedAt: null };
+}
+
 function refreshUsage() {
+  if (!executableFile(LAB_USAGE)) {
+    clearUsage();
+    return inflight ?? Promise.resolve();
+  }
   if (inflight) return inflight;
   inflight = new Promise((resolve) => {
     execFile(LAB_USAGE, ["--json", "--read-only"], { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 }, (error, stdout) => {
       const fetchedAt = Date.now();
+      // The tool disappeared while this run was in flight: drop the result, don't keep a stale view.
+      if (!executableFile(LAB_USAGE)) {
+        clearUsage();
+        inflight = null;
+        resolve();
+        return;
+      }
       try {
         const view = usageView(JSON.parse(stdout), fetchedAt);
         view.labs = labsFromView(view);
-        usage = { fetchedAt, view, error: null };
+        usage = { fetchedAt, view, error: null, failedAt: null };
         logHistory(view.labs, fetchedAt);
       } catch {
         // Keep the last good numbers (they carry their own age); report the failure.
@@ -151,13 +191,25 @@ function logHistory(labs, at) {
 }
 
 setInterval(() => {
+  if (!executableFile(LAB_USAGE)) {
+    clearUsage();
+    return;
+  }
   if (Date.now() - lastActive < ACTIVE_FOR_MS && Date.now() - (usage.fetchedAt ?? 0) >= USAGE_EVERY_MS) refreshUsage();
 }, 15_000).unref();
 
-async function usageFor(fresh) {
+async function usageFor(fresh, tools = currentTools()) {
+  if (!tools.labUsage) {
+    clearUsage();
+    return emptyUsage();
+  }
   const age = Date.now() - (usage.fetchedAt ?? 0);
   if (!usage.view || (fresh && age >= FRESH_FLOOR_MS)) {
     await Promise.race([refreshUsage(), new Promise((r) => setTimeout(r, 15_000))]);
+  }
+  if (!executableFile(LAB_USAGE)) {
+    clearUsage();
+    return emptyUsage();
   }
   return { ...(usage.view ?? { fetchedAt: null, claude: { ok: false }, codex: { ok: false }, labs: [] }), error: usage.error, failedAt: usage.failedAt ?? null };
 }
@@ -224,10 +276,35 @@ function groupingFailure() {
 
 function writeDiag(entry) {
   if (!Object.keys(entry).length) return;
+  let fd;
+  let size = 0;
   try {
-    if (fs.statSync(DIAG_LOG).size > 256 * 1024) fs.renameSync(DIAG_LOG, `${DIAG_LOG}.1`);
-  } catch {}
-  fs.appendFileSync(DIAG_LOG, `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`, { mode: 0o600 });
+    fd = openPrivate(DIAG_LOG, READ_ONLY);
+    size = fs.fstatSync(fd).size;
+  } catch (error) {
+    if (error.code !== "ENOENT") return; // a symlink is not followed and not written through
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch {}
+    }
+  }
+  if (size > 256 * 1024) {
+    const rotated = `${DIAG_LOG}.1`;
+    try {
+      fs.renameSync(DIAG_LOG, rotated);
+      const out = openPrivate(rotated, READ_ONLY);
+      fs.closeSync(out);
+    } catch {
+      return;
+    }
+  }
+  const line = `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`;
+  const out = openPrivate(DIAG_LOG, WRITE_APPEND);
+  try {
+    fs.writeSync(out, line);
+  } finally {
+    fs.closeSync(out);
+  }
 }
 
 // ---------- http ----------
@@ -264,6 +341,11 @@ export function handler(req, res) {
   const p = url.pathname;
   if (p === "/extras.js") return send(res, 200, currentFiles().js, { ...cors, "Content-Type": "text/javascript; charset=utf-8" });
   if (p === "/extras.css") return send(res, 200, currentFiles().css, { ...cors, "Content-Type": "text/css; charset=utf-8" });
+  if (p === "/extras.sig") {
+    const sig = currentFiles().sig;
+    if (!sig) return send(res, 404, "not found", cors);
+    return send(res, 200, sig, { ...cors, "Content-Type": "text/plain; charset=utf-8" });
+  }
   if (p === "/version") return send(res, 200, currentFiles().version, { ...cors, "Content-Type": "text/plain" });
   if (p === "/grouping") {
     return groupingSnapshot().then((body) => {
@@ -295,13 +377,15 @@ export function handler(req, res) {
   if (p === "/state") {
     lastActive = Date.now();
     const fresh = url.searchParams.get("fresh") === "1";
-    return usageFor(fresh).then((u) => {
-      const st = handoverState();
+    const tools = currentTools();
+    return usageFor(fresh, tools).then((u) => {
+      const st = tools.handover ? handoverState() : null;
       const thread = url.searchParams.get("thread");
       send(res, 200, JSON.stringify({
         now: Date.now(),
         localEnvironmentId: localEnvironmentId(),
         usage: u,
+        tools,
         handover: { mode: typeof st?.mode === "string" ? st.mode : null, chain: thread ? chainView(st, thread) : null },
       }), { ...cors, "Content-Type": "application/json" });
     }, () => send(res, 500, "error", cors));

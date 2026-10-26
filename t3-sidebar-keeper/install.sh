@@ -3,9 +3,10 @@
 #   ~/.local/share/t3-sidebar-keeper/keeper.mjs, reminders.mjs, proc-birth, vendor/acorn
 #   ~/.local/share/t3-sidebar-keeper/T3 Restart Reminders.app
 #   ~/Library/LaunchAgents/com.cornishandy.t3-sidebar-keeper.plist
-# The job runs Homebrew's node directly, so node needs App Management
-# (System Settings > Privacy & Security > App Management). A Homebrew node
+# The job runs the discovered node directly, so that exact binary needs App
+# Management (System Settings > Privacy & Security > App Management). A node
 # update can switch that off; the keeper then posts a notification.
+# T3X_NODE, when set, is that binary (absolute path, not resolved).
 # Reminder state (snooze, interval, pending) is not part of this install and
 # is never rolled back with the code.
 # Usage: install.sh            install or update
@@ -20,8 +21,8 @@ set -euo pipefail
 
 SRC="$(cd "$(dirname "$0")" && pwd)"
 LABEL="com.cornishandy.t3-sidebar-keeper"
-NODE="/opt/homebrew/bin/node"
 DOMAIN="gui/$(id -u)"
+EXTRAS_SRC="$(cd "$SRC/../t3-extras" && pwd)"
 FAIL_AT="${T3_KEEPER_INSTALL_FAIL_AT:-}"
 REAL_HOME="$HOME"
 
@@ -37,18 +38,117 @@ else
 fi
 PLIST="$LAUNCH_DIR/$LABEL.plist"
 
+discover_node() {
+  local c
+  if [[ -n "${T3X_NODE:-}" ]]; then
+    printf '%s\n' "$T3X_NODE"
+    return
+  fi
+  c="$(command -v node 2>/dev/null || true)"
+  if [[ -n "$c" && "$c" == /* ]]; then
+    printf '%s\n' "$c"
+    return
+  fi
+  for c in /opt/homebrew/bin/node /usr/local/bin/node; do
+    if [[ -x "$c" ]]; then
+      printf '%s\n' "$c"
+      return
+    fi
+  done
+  return 1
+}
+
+warn_version_manager() {
+  case "$1" in
+    */.nvm/*|*/.volta/*|*/.asdf/*|*/.fnm/*|*/fnm/node-versions/*)
+      echo "warning: node is managed by a version manager and can move; App Management is tied to this exact path: $1" >&2
+      ;;
+  esac
+}
+
+write0600() {
+  local dest="$1"
+  local tmp
+  tmp="$(mktemp "${dest}.tmp.XXXXXX")"
+  cat > "$tmp"
+  chmod 600 "$tmp"
+  mv -f "$tmp" "$dest"
+  chmod 600 "$dest"
+}
+
+# Fresh = no installed keeper and no disabled.json, decided before either is created.
+# A defaults-pending marker means an interrupted fresh install: finish the defaults,
+# and never replace a disabled.json that is already there without that marker.
+write_fresh_defaults() {
+  local keeper="$HOME_DIR/keeper.mjs"
+  local disabled="$HOME_DIR/disabled.json"
+  local reminders="$HOME_DIR/restart-reminders-disabled.json"
+  local marker="$HOME_DIR/defaults-pending"
+  if [[ -f "$marker" ]]; then
+    :
+  elif [[ ! -e "$keeper" && ! -e "$disabled" ]]; then
+    mkdir -p "$HOME_DIR"
+    chmod 700 "$HOME_DIR"
+    write0600 "$marker" <<'EOF'
+pending
+EOF
+  else
+    return 0
+  fi
+  mkdir -p "$HOME_DIR"
+  chmod 700 "$HOME_DIR"
+  if [[ ! -e "$disabled" ]]; then
+    write0600 "$disabled" <<'EOF'
+{"disabled":["rule","fit","titleGuide"]}
+EOF
+  fi
+  if [[ ! -e "$reminders" ]]; then
+    write0600 "$reminders" <<'EOF'
+{"disabled":true}
+EOF
+  fi
+  rm -f "$marker"
+}
+
 if [[ "${1:-}" == "--uninstall" ]]; then
   launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
   rm -f "$PLIST"
   echo "Uninstalled the job. Kept $HOME_DIR (backups, log); T3 stays patched until its next update."
+  echo "The app stays patched until: node $HOME_DIR/keeper.mjs --restore"
   exit 0
+fi
+
+if ! NODE="$(discover_node)"; then
+  echo "need Node 22.16+ or 24+ (set T3X_NODE, or install node on PATH, or use Homebrew)" >&2
+  exit 1
 fi
 
 for v in "$REAL_HOME" "$NODE" "${T3_KEEPER_INSTALL_ROOT:-}"; do
   if [[ -n "$v" && "$v" == *[\&\<\>\"\']* ]]; then echo "path needs XML escaping, refusing: $v" >&2; exit 1; fi
 done
-if [[ ! -x "$NODE" ]] || ! "$NODE" -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 20 ? 0 : 1)'; then
-  echo "need Node 20+ at $NODE" >&2; exit 1
+if [[ "$NODE" != /* || ! -x "$NODE" ]]; then
+  echo "node must be an absolute executable path: $NODE" >&2
+  exit 1
+fi
+if ! "$NODE" "$EXTRAS_SRC/node-probe.mjs"; then
+  echo "need Node 22.16+ or 24+ that can open sqlite, at $NODE" >&2
+  exit 1
+fi
+warn_version_manager "$NODE"
+if ! xcrun --find swiftc >/dev/null 2>&1 || ! xcrun --find clang >/dev/null 2>&1; then
+  echo "need Xcode Command Line Tools (swiftc and clang). Install them with: xcode-select --install" >&2
+  exit 1
+fi
+if [[ "$(uname -m)" != "arm64" ]]; then
+  echo "Apple silicon (arm64) only; the reminder helper is built for arm64" >&2
+  exit 1
+fi
+
+NODE_BIN_DIR="$(dirname "$NODE")"
+if [[ "$NODE_BIN_DIR" == "/usr/bin" || "$NODE_BIN_DIR" == "/bin" ]]; then
+  NODE_PATH_ENV="/usr/bin:/bin:/usr/sbin:/sbin"
+else
+  NODE_PATH_ENV="$NODE_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin"
 fi
 
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
@@ -84,7 +184,7 @@ write_plist() {
 	<key>EnvironmentVariables</key>
 	<dict>
 		<key>PATH</key>
-		<string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<string>$NODE_PATH_ENV</string>
 		<key>NODE_OPTIONS</key>
 		<string></string>
 	</dict>
@@ -96,12 +196,10 @@ write_plist() {
 	<array>
 		<string>$REAL_HOME/.t3/userdata/server-runtime.json</string>
 	</array>
+	<!-- Standard, not Background / Nice / LowPriorityIO: under load that throttling kept the job in
+	     xpcproxy for 4+ minutes after T3 started (26 Oct 2026). A run with nothing to do takes ~0.15 s. -->
 	<key>ProcessType</key>
-	<string>Background</string>
-	<key>LowPriorityIO</key>
-	<true/>
-	<key>Nice</key>
-	<integer>10</integer>
+	<string>Standard</string>
 	<key>StandardOutPath</key>
 	<string>$HOME_DIR/keeper.log</string>
 	<key>StandardErrorPath</key>
@@ -163,6 +261,13 @@ if [[ "${1:-}" == "--rollback" ]]; then
   exit 0
 fi
 
+write_fresh_defaults
+mkdir -p "$HOME_DIR"
+chmod 700 "$HOME_DIR"
+write0600 "$HOME_DIR/node-path" <<EOF
+$NODE
+EOF
+
 stage_tree
 if [[ "$FAIL_AT" == "stage" ]]; then die "injected failure at stage"; fi
 validate_tree
@@ -171,3 +276,6 @@ if [[ "$FAIL_AT" == "validate" ]]; then die "injected failure at validate"; fi
 "$NODE" "$SRC/install-transaction.mjs" "$HOME_DIR" "$STAGE" "$PLIST" "$DOMAIN"
 register_installed_app
 echo "Loaded $LABEL (checks every 30 s and whenever T3's server starts)."
+echo "App Management: grant it to this exact node binary (System Settings > Privacy & Security > App Management):"
+echo "  $NODE"
+echo "Install t3-extras before this keeper so the add-ons loader can be signed."

@@ -416,7 +416,7 @@ function get(port, pathname, headers = {}, method = "GET") {
 function copyServer(dir, { grouping }) {
   fs.mkdirSync(path.join(dir, "public"), { recursive: true });
   fs.mkdirSync(path.join(tmp, "home"), { recursive: true });
-  for (const file of ["server.mjs", "lib.mjs", "history.mjs", "burn.mjs", "burn-core.mjs", "burn-sql-worker.mjs", "fonts.json"]) {
+  for (const file of ["server.mjs", "lib.mjs", "history.mjs", "burn.mjs", "burn-core.mjs", "burn-sql-worker.mjs", "fonts.json", "payload.mjs", "private-file.mjs"]) {
     fs.copyFileSync(path.join(SRC, file), path.join(dir, file));
   }
   if (grouping) {

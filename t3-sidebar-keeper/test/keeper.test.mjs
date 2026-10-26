@@ -1,4 +1,4 @@
-// Run: node --test test/   (works on APFS clones of the installed app.asar in a temp dir; never writes to the app)
+// Local-only: node --test test/ reads the installed app.asar and this build's backup with cp -c, then works on that temp clone. It never writes to the app or the backup.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -8,6 +8,8 @@ import vm from "node:vm";
 import { execFileSync, spawnSync } from "node:child_process";
 import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
+import crypto from "node:crypto";
+import { signedBytes } from "../../t3-extras/payload.mjs";
 import * as acorn from "../vendor/acorn/acorn.mjs";
 
 const APP = "/Applications/T3 Code (Nightly).app";
@@ -25,6 +27,10 @@ process.env.T3_KEEPER_QUIET = "1";
 process.env.T3_USER_DATA_DIR = path.join(tmp, "userdata"); // keep the real T3 caches out of tests
 process.env.T3_TEMP_DIR = path.join(tmp, "tempdir");
 fs.mkdirSync(process.env.T3_KEEPER_HOME);
+const loaderPair = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
+const LOADER_SPKI = loaderPair.publicKey.export({ type: "spki", format: "der" }).toString("base64");
+process.env.T3X_LOADER_KEY = path.join(tmp, "loader-key.json");
+fs.writeFileSync(process.env.T3X_LOADER_KEY, `${JSON.stringify({ spki: LOADER_SPKI })}\n`, { mode: 0o600 });
 const K = await import("../keeper.mjs");
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 
@@ -246,23 +252,25 @@ const indexOf = (file) => {
 
 const loaderCsp = 'function makeDesktopContentSecurityPolicy(input) { return [`script-src "\'unsafe-inline\'"`, `connect-src "http:"`, `img-src x`].join("; "); }';
 const roomyWrappedPage = () => K.unitWrap(html("// " + "padding ".repeat(500) + "\nconst nativeBoot = 1;"), ctx).text;
+const extrasBoot = () => K.extrasBoot(LOADER_SPKI);
+const extrasOn = (extra = {}) => ({ loaderKey: LOADER_SPKI, ...extra });
 
 test("extras on an already wrapped page takes its bytes from wrap's padding", () => {
   const before = roomyWrappedPage();
-  const out = K.unitExtras(before, { desktopMain: loaderCsp });
+  const out = K.unitExtras(before, extrasOn({ desktopMain: loaderCsp }));
   assert.equal(out.state, "patched");
   const next = out.text;
   assert.equal(Buffer.byteLength(next), Buffer.byteLength(before));
   const style = next.indexOf(`<style id="${K.STYLE_ID}">`);
   const end = next.indexOf("</style>", style) + "</style>".length;
-  assert.ok(next.startsWith(K.EXTRAS_BOOT, end), "loader is not right after wrap's style");
+  assert.ok(next.startsWith(extrasBoot(), end), "loader is not right after wrap's style");
   assert.equal(next.slice(0, style), before.slice(0, style), "roomy page's native boot changed");
-  assert.equal(next.slice(end + K.EXTRAS_BOOT.length), before.slice(before.indexOf("</style>", style) + 8), "bytes after the loader changed");
+  assert.equal(next.slice(end + extrasBoot().length), before.slice(before.indexOf("</style>", style) + 8), "bytes after the loader changed");
 });
 
 test("--disable extras returns the exact roomy page and leaves wrap intact", () => {
   const before = roomyWrappedPage();
-  const enabled = K.unitExtras(before, { desktopMain: loaderCsp }).text;
+  const enabled = K.unitExtras(before, extrasOn({ desktopMain: loaderCsp })).text;
   const off = K.unitExtras(enabled, { disabled: new Set(["extras"]) });
   assert.equal(off.state, "removed");
   assert.equal(off.text, before);
@@ -277,14 +285,14 @@ test("extras refuses when wrap's padding is too small, and when the CSP would bl
   const page = `<!doctype html><html><head>${css}\n</head><body></body></html>`;
   const csp = 'function makeDesktopContentSecurityPolicy(input) { return [`script-src ${["\'self\'", "\'unsafe-inline\'"].join(" ")}`, `connect-src ${["\'self\'", "http:"].join(" ")}`, `img-src x`].join("; "); }';
   assert.ok(K.cspAllowsLoader(csp));
-  assert.throws(() => K.unitExtras(page, { desktopMain: csp }), new RegExp(`needs ${Buffer.byteLength(K.EXTRAS_BOOT) - 20} more bytes`));
+  assert.throws(() => K.unitExtras(page, extrasOn({ desktopMain: csp })), new RegExp(`needs ${Buffer.byteLength(extrasBoot()) - 20} more bytes`));
   const roomy = page.replace(" ".repeat(20), " ".repeat(2000));
-  const out = K.unitExtras(roomy, { desktopMain: csp });
+  const out = K.unitExtras(roomy, extrasOn({ desktopMain: csp }));
   assert.equal(out.state, "patched");
   assert.equal(Buffer.byteLength(out.text), Buffer.byteLength(roomy));
-  assert.throws(() => K.unitExtras(roomy, { desktopMain: csp.replace("\'unsafe-inline\'", "\'none\'") }), /content policy/);
-  assert.throws(() => K.unitExtras(roomy, { desktopMain: csp.replace('"http:"', '"https:"') }), /content policy/);
-  assert.throws(() => K.unitExtras("<html><head></head></html>", { desktopMain: csp }), /wrap's <style> is missing/);
+  assert.throws(() => K.unitExtras(roomy, extrasOn({ desktopMain: csp.replace("\'unsafe-inline\'", "\'none\'") })), /content policy/);
+  assert.throws(() => K.unitExtras(roomy, extrasOn({ desktopMain: csp.replace('"http:"', '"https:"') })), /content policy/);
+  assert.throws(() => K.unitExtras("<html><head></head></html>", extrasOn({ desktopMain: csp })), /wrap's <style> is missing/);
 });
 
 test("an older loader version is replaced in place", () => {
@@ -294,17 +302,17 @@ test("an older loader version is replaced in place", () => {
   const old = '<script id="t3x-boot-0">(()=>{})()</script>';
   const withOld = page.replace(" ".repeat(old.length) + "</style>", "</style>" + old);
   assert.equal(withOld.length, page.length);
-  const out = K.unitExtras(withOld, { desktopMain: csp.replace("connect-src http:", 'connect-src "http:"') });
+  const out = K.unitExtras(withOld, extrasOn({ desktopMain: csp.replace("connect-src http:", 'connect-src "http:"') }));
   assert.equal(out.state, "patched");
-  assert.ok(!out.text.includes("t3x-boot-0") && out.text.includes(K.EXTRAS_BOOT));
+  assert.ok(!out.text.includes("t3x-boot-0") && out.text.includes(extrasBoot()));
   assert.equal(out.text.length, page.length);
 });
 
 test("extras reclaims boot indentation without changing template text or automatic semicolons", () => {
-  const script = `\n${" ".repeat(700)}globalThis.result = (() => {\n    const text = \`first\n        keep template indentation\nlast\`;\n    const regex = /a  b/;\n    // keep this comment\n    return\n      [text, regex.source];\n  })();\n`;
+  const script = `\n${" ".repeat(1600)}globalThis.result = (() => {\n    const text = \`first\n        keep template indentation\nlast\`;\n    const regex = /a  b/;\n    // keep this comment\n    return\n      [text, regex.source];\n  })();\n`;
   const page = html(script).replace("</head>", `<style id="${K.STYLE_ID}">a{b:c}</style></head>`);
   const csp = 'function makeDesktopContentSecurityPolicy(input) { return [`script-src "\'unsafe-inline\'"`, `connect-src "http:"`, `img-src x`].join("; "); }';
-  const out = K.unitExtras(page, { desktopMain: csp });
+  const out = K.unitExtras(page, extrasOn({ desktopMain: csp }));
   assert.equal(Buffer.byteLength(out.text), Buffer.byteLength(page));
   assert.ok(out.text.includes("        keep template indentation"));
   assert.ok(out.text.includes("// keep this comment"));
@@ -314,11 +322,11 @@ test("extras reclaims boot indentation without changing template text or automat
   vm.runInNewContext(boot, after);
   assert.equal(after.result, before.result);
   assert.equal(after.result, undefined, "return newline must not turn into return expression");
-  assert.equal(K.unitExtras(out.text, { desktopMain: csp }).state, "already");
+  assert.equal(K.unitExtras(out.text, extrasOn({ desktopMain: csp })).state, "already");
   const off = K.unitExtras(out.text, { disabled: new Set(["extras"]) });
   assert.equal(Buffer.byteLength(off.text), Buffer.byteLength(page));
   assert.ok(!off.text.includes("t3x-boot"));
-  assert.equal(K.unitExtras(off.text, { desktopMain: csp }).state, "patched");
+  assert.equal(K.unitExtras(off.text, extrasOn({ desktopMain: csp })).state, "patched");
 });
 
 test("extras reclaims enough space on the current nightly and preserves native theme startup", () => {
@@ -331,7 +339,7 @@ test("extras reclaims enough space on the current nightly and preserves native t
     desktopMain = K.readEntry(fd, layout, targets.desktopMain).toString();
   } finally { fs.closeSync(fd); }
   const wrapped = K.unitWrap(original, { desktopMain }).text;
-  const out = K.unitExtras(wrapped, { desktopMain });
+  const out = K.unitExtras(wrapped, extrasOn({ desktopMain }));
   assert.equal(out.state, "patched");
   assert.equal(Buffer.byteLength(out.text), Buffer.byteLength(original));
   const scriptOf = (text) => text.match(/<script>([\s\S]*?)<\/script>/)[1];
@@ -354,8 +362,11 @@ test("extras reclaims enough space on the current nightly and preserves native t
 });
 
 test("the loader inserts the add-ons inline, re-fetches on a new /version, and is silent when the service is down", async () => {
-  const inner = K.EXTRAS_BOOT.slice(K.EXTRAS_BOOT.indexOf(">") + 1, -"</script>".length);
+  const inner = extrasBoot().slice(extrasBoot().indexOf(">") + 1, -"</script>".length);
+  assert.ok(inner.includes("http://127.0.0.1:8793/"));
   assert.ok(!inner.includes("<") && /^[\x20-\x7e]*$/.test(inner));
+  new vm.Script(inner);
+  const sign = (version, css, js) => crypto.sign("sha256", signedBytes(version, css, js), { key: loaderPair.privateKey, dsaEncoding: "ieee-p1363" }).toString("base64");
   const run = async (serve) => {
     const head = [];
     const listeners = {};
@@ -365,29 +376,41 @@ test("the loader inserts the add-ons inline, re-fetches on a new /version, and i
       querySelectorAll: (sel) => head.filter((n) => sel.split(",").includes(`#${n.id}`)),
     };
     const win = { addEventListener: (type, fn) => { listeners[type] = fn; } };
-    const fetch = async (url) => {
-      const body = serve(url);
-      if (body === null) throw new TypeError("Failed to fetch");
-      return { ok: true, text: async () => body };
+    const pending = [];
+    const fetch = (url) => {
+      const job = (async () => {
+        const body = await serve(url);
+        if (body === null) throw new TypeError("Failed to fetch");
+        return { ok: true, text: async () => body };
+      })();
+      pending.push(job);
+      return job;
     };
-    vm.runInNewContext(inner, { document: doc, window: win, fetch, Promise });
-    await new Promise((r) => setTimeout(r, 20));
+    vm.runInNewContext(inner, { document: doc, window: win, fetch, Promise, crypto, atob, TextEncoder, Uint8Array });
+    await Promise.allSettled(pending);
+    await new Promise((r) => setTimeout(r, 50));
     return { head, listeners, win };
   };
   let version = "1";
-  const served = await run((url) => ({ version, "extras.css": "x{}", "extras.js": "void 0" })[url.replace("http://127.0.0.1:8793/", "")]);
+  const css = "x{}";
+  const js = "void 0";
+  const served = await run(async (url) => {
+    const name = url.replace("http://127.0.0.1:8793/", "");
+    if (name === "extras.sig") return sign(version, css, js);
+    return { version, "extras.css": css, "extras.js": js }[name];
+  });
   assert.deepEqual(served.head.map((n) => [n.tag, n.id, n.textContent]), [["style", "t3x-css", "x{}"], ["script", "t3x-js", "void 0"]]);
   let torn = 0;
   served.win.t3xTeardown = () => { torn += 1; };
   served.listeners.focus();
-  await new Promise((r) => setTimeout(r, 20));
+  await new Promise((r) => setTimeout(r, 40));
   assert.equal(torn, 0, "same version must not reload");
   version = "2";
   served.listeners.focus();
-  await new Promise((r) => setTimeout(r, 20));
+  await new Promise((r) => setTimeout(r, 40));
   assert.equal(torn, 1);
   assert.equal(served.head.length, 2, "old add-on nodes were not removed");
-  const down = await run(() => null);
+  const down = await run(async () => null);
   assert.equal(down.head.length, 0);
   assert.equal(typeof down.listeners.focus, "function");
 });
@@ -436,7 +459,7 @@ test("firstClick refuses when T3 sets acceptFirstMouse itself or the Mac branch 
 test("--disable refuses units that can't be switched off on their own", () => {
   const r = spawnSync(process.execPath, [fileURLToPath(new URL("../keeper.mjs", import.meta.url)), "--disable", "wrap"], { env: { ...process.env }, encoding: "utf8" });
   assert.equal(r.status, 64);
-  assert.match(r.stderr, /only extras can be switched off/);
+  assert.match(r.stderr, /only extras, rule, fit, titleGuide can be switched off/);
 });
 
 test("the old copy a running app holds open gets the same bytes (live effect)", () => {

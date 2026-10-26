@@ -13,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { HISTORY, parseSample, compactSamples, boundedSamples } from "./lib.mjs";
+import { openPrivate, READ_ONLY, WRITE_APPEND, WRITE_NEW } from "./private-file.mjs";
 
 const READ_LIMIT = Math.round(HISTORY.maxBytes * 1.2);
 
@@ -20,7 +21,7 @@ const READ_LIMIT = Math.round(HISTORY.maxBytes * 1.2);
 function readTail(file) {
   let fd;
   try {
-    fd = fs.openSync(file, "r");
+    fd = openPrivate(file, READ_ONLY);
   } catch (error) {
     if (error.code === "ENOENT") return { samples: [], size: 0, lines: 0 };
     throw error;
@@ -60,7 +61,15 @@ export function createHistory(file, { now = () => Date.now(), log = () => {} } =
     const kept = compactSamples(samples, now());
     const body = kept.map((x) => JSON.stringify(x)).join("\n") + (kept.length ? "\n" : "");
     const tmp = path.join(path.dirname(file), `.${path.basename(file)}.tmp-${process.pid}`);
-    const fd = fs.openSync(tmp, "w", 0o600);
+    let existing = null;
+    try {
+      existing = fs.lstatSync(tmp);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    if (existing?.isSymbolicLink()) throw new Error("history compaction temp is a symlink");
+    if (existing) fs.unlinkSync(tmp);
+    const fd = openPrivate(tmp, WRITE_NEW);
     try {
       fs.writeSync(fd, body);
       fs.fsyncSync(fd);
@@ -68,6 +77,8 @@ export function createHistory(file, { now = () => Date.now(), log = () => {} } =
       fs.closeSync(fd);
     }
     fs.renameSync(tmp, file);
+    const locked = openPrivate(file, READ_ONLY);
+    fs.closeSync(locked);
     lines = kept.length;
     bytes = Buffer.byteLength(body);
     last.clear();
@@ -121,7 +132,12 @@ export function createHistory(file, { now = () => Date.now(), log = () => {} } =
       // Crossing a cap needs a successful compaction first; otherwise nothing is written.
       if ((lines + due.length > HISTORY.maxLines || bytes + Buffer.byteLength(text) > HISTORY.maxBytes) && !tryCompact()) return;
       if (lines + due.length > HISTORY.maxLines || bytes + Buffer.byteLength(text) > HISTORY.maxBytes) return;
-      fs.appendFileSync(file, text, { mode: 0o600 });
+      const fd = openPrivate(file, WRITE_APPEND);
+      try {
+        fs.writeSync(fd, text);
+      } finally {
+        fs.closeSync(fd);
+      }
       lines += due.length;
       bytes += Buffer.byteLength(text);
       for (const [k, ts] of next) last.set(k, Math.max(last.get(k) ?? 0, ts));
@@ -132,7 +148,12 @@ export function createHistory(file, { now = () => Date.now(), log = () => {} } =
   /** Bounded samples since `since` (ms). Never throws: a broken file reads as empty. */
   function read(since = 0) {
     try {
-      const st = fs.statSync(file);
+      const st = fs.lstatSync(file);
+      if (st.isSymbolicLink()) {
+        const error = new Error("history file is a symlink");
+        error.code = "ELOOP";
+        throw error;
+      }
       const key = `${st.mtimeMs}:${st.size}`;
       if (cache?.key !== key) cache = { key, samples: readTail(file).samples.sort((a, b) => a.ts - b.ts) };
       return boundedSamples(cache.samples, Math.max(since, now() - HISTORY.keepMs));

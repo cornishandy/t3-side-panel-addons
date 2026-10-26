@@ -63,7 +63,19 @@ function restore(dir) {
   if (fs.existsSync(path.join(dir, 'old.plist'))) fs.copyFileSync(path.join(dir, 'old.plist'), plist);
   else fs.rmSync(plist, { force: true });
 }
-function bootstrap() { if (fs.existsSync(plist)) ctl(['bootstrap', domain, plist]); }
+// launchd opens keeper.log itself (stdout/stderr), so make it a regular 0600 file first.
+function prepareLog() {
+  const file = path.join(home, 'keeper.log');
+  try { if (fs.lstatSync(file).isSymbolicLink()) fs.rmSync(file); } catch {}
+  const fd = fs.openSync(file, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_APPEND | fs.constants.O_NOFOLLOW, 0o600);
+  try { fs.fchmodSync(fd, 0o600); } finally { fs.closeSync(fd); }
+}
+// Every start, rollback included, prepares the log first; if that fails the job stays stopped.
+function bootstrap() {
+  if (!fs.existsSync(plist)) return;
+  prepareLog();
+  ctl(['bootstrap', domain, plist]);
+}
 
 let installLock, codeLock, nativeLock, backup, recovery = null, touched = false, paused = false, success = false;
 function holdNativeBarrier() {
@@ -75,6 +87,7 @@ function holdNativeBarrier() {
 }
 try {
   fs.mkdirSync(home, { recursive: true, mode: 0o700 });
+  fs.chmodSync(home, 0o700);
   fs.mkdirSync(path.dirname(plist), { recursive: true });
   installLock = acquireKernelLock(path.join(home, 'install.flock'));
   if (!installLock) throw new Error('Another install is running.');

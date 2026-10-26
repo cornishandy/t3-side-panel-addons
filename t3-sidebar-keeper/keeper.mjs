@@ -23,9 +23,9 @@
  *   keeper.mjs --restore       put back this build's original bytes
  *   keeper.mjs --dry-run       patch a temporary copy and report (writes nothing to the app)
  *   keeper.mjs --probe         can this process open app.asar for writing? (changes nothing)
- *   keeper.mjs --disable extras / --enable extras
- *                              switch one unit off or on (kept in disabled.json); the
- *                              other units stay as they are
+ *   keeper.mjs --disable <unit> / --enable <unit>
+ *                              extras, rule, fit or titleGuide (kept in disabled.json);
+ *                              the other units stay as they are until --restore
  *   keeper.mjs --reminders     restart-reminder status (JSON)
  *   keeper.mjs --snooze 3h     snooze restart reminders (also 90m, 1h, …)
  *   keeper.mjs --resume-reminders
@@ -39,8 +39,8 @@
  *     running T3 process has open (same device and inode, checked with lsof).
  *   - Refuses to patch if Electron's asar-integrity fuse is on (T3 would not start).
  *   - Comments are found with a real parser (vendored acorn), never by pattern.
- *   - The file on disk is never edited in place: a clone is patched, verified and
- *     renamed over app.asar (atomic), so a crash leaves either the old or the new
+ *   - The file on disk is swapped atomically: a clone is patched, verified and
+ *     renamed over app.asar, so a crash leaves either the old or the new
  *     complete file. The running app keeps the old file open, so the same bytes
  *     are then written into that old copy too; that is what Shift-Cmd-R reloads.
  */
@@ -88,7 +88,7 @@ const USER_DATA = process.env.T3_USER_DATA_DIR || path.join(os.homedir(), "Libra
 const FRAMEWORK = path.join(APP, "Contents/Frameworks/Electron Framework.framework/Electron Framework");
 const STYLE_ID = "t3-keeper-sidebar-1"; // bump the number when WRAP_CSS changes
 const KEEP_BACKUPS = 3;
-const KEEPER_VERSION = 12; // bump when units change so --auto re-checks an already-handled build
+const KEEPER_VERSION = 13; // bump when units change so --auto re-checks an already-handled build
 const MIN_FREE_BYTES = 1024 ** 3;
 const TMP_PREFIX = ".app.asar.t3-keeper-";
 const PARSE = { ecmaVersion: "latest", allowHashBang: true };
@@ -120,15 +120,45 @@ const INLINE_STYLE_CSP = "style-src 'self' 'unsafe-inline'";
 // allows inline scripts and fetch() to http:. So the loader fetches the add-ons' code from the
 // loopback service and inserts it inline. It re-fetches when /version changes, checked only on
 // window focus. Silent when the service is down. ASCII only and no "<" inside, so its bytes are
-// exact and "</script>" ends it. Bump the number in EXTRAS_ID when EXTRAS_BOOT changes.
-const EXTRAS_ID = "t3x-boot-1";
-const EXTRAS_BOOT = `<script id="${EXTRAS_ID}">(()=>{try{const u="http://127.0.0.1:8793/",d=document,w=window;let v;` +
-  `const g=p=>fetch(u+p,{cache:"no-store"}).then(r=>r.ok?r.text():Promise.reject(r.status)),` +
-  `L=()=>Promise.all([g("version"),g("extras.css"),g("extras.js")]).then(([n,c,j])=>{v=n;` +
-  `try{w.t3xTeardown&&w.t3xTeardown()}catch(e){}d.querySelectorAll("#t3x-css,#t3x-js").forEach(x=>x.remove());` +
-  `const s=d.createElement("style"),e=d.createElement("script");s.id="t3x-css";s.textContent=c;` +
-  `e.id="t3x-js";e.textContent=j;d.head.append(s,e)},()=>{});` +
-  `w.addEventListener("focus",()=>{g("version").then(n=>{n!==v&&L()},()=>{})});L()}catch(e){}})()</script>`;
+// exact and "</script>" ends it. Bump the number in EXTRAS_ID when the loader changes.
+// The public key is read from loader-key.json at patch time and baked into this string.
+const EXTRAS_ID = "t3x-boot-2";
+const LOADER_KEY = process.env.T3X_LOADER_KEY || path.join(os.homedir(), ".local/share/t3-extras/loader-key.json");
+
+/** Which loader key the last pass saw ("missing" when none), so a new key re-patches the loader. */
+function loaderKeyId() {
+  try {
+    return sha(fs.readFileSync(LOADER_KEY));
+  } catch {
+    return "missing";
+  }
+}
+
+function extrasBoot(spki) {
+  if (typeof spki !== "string" || !/^[A-Za-z0-9+/]+=*$/.test(spki) || spki.length > 200) {
+    throw new Error("loader key is not SPKI base64");
+  }
+  const body = `(()=>{try{const u="http://127.0.0.1:8793/",d=document,w=window,k="${spki}";let v;` +
+    `const g=p=>fetch(u+p,{cache:"no-store"}).then(r=>r.ok?r.text():Promise.reject()),` +
+    `b=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0)),` +
+    `L=()=>Promise.all([g("version"),g("extras.css"),g("extras.js"),g("extras.sig")]).then(([n,c,j,sg])=>` +
+    `crypto.subtle.importKey("spki",b(k),{name:"ECDSA",namedCurve:"P-256"},!1,["verify"]).then(K=>` +
+    `crypto.subtle.verify({name:"ECDSA",hash:"SHA-256"},K,b(sg.trim()),new TextEncoder().encode(JSON.stringify(["t3x1",n,c,j]))))` +
+    `.then(ok=>{if(!ok)return;v=n;try{w.t3xTeardown&&w.t3xTeardown()}catch(e){}` +
+    `d.querySelectorAll("#t3x-css,#t3x-js").forEach(x=>x.remove());` +
+    `const s=d.createElement("style"),e=d.createElement("script");s.id="t3x-css";s.textContent=c;e.id="t3x-js";e.textContent=j;d.head.append(s,e)}))` +
+    `.catch(()=>{});w.addEventListener("focus",()=>{g("version").then(n=>{n!==v&&L()}).catch(()=>{})});L()}catch(e){}})()`;
+  if (body.includes("<") || !/^[\x20-\x7e]*$/.test(body)) throw new Error("loader is not ASCII");
+  return `<script id="${EXTRAS_ID}">${body}</script>`;
+}
+
+function readLoaderKey() {
+  try {
+    const spki = JSON.parse(fs.readFileSync(LOADER_KEY, "utf8")).spki;
+    if (typeof spki === "string" && /^[A-Za-z0-9+/]+=*$/.test(spki)) return spki;
+  } catch {}
+  return null;
+}
 
 // Counts and cuts whole graphemes, so emoji and accents are never split. Drops lone
 // surrogates (left by an upstream UTF-16 cut). "units" caps the UTF-16 length too.
@@ -748,14 +778,31 @@ function reclaimBootIndentation(text) {
 function unitExtras(text, ctx) {
   const present = text.includes('<script id="t3x-boot-');
   if (ctx.disabled?.has("extras")) return present ? { state: "removed", text: removeExtras(text) } : { state: "disabled", text };
-  if (text.includes(EXTRAS_BOOT)) return { state: "already", text };
+  const spki = ctx.loaderKey ?? null;
+  let boot = null;
+  try {
+    if (spki) boot = extrasBoot(spki);
+  } catch {
+    boot = null;
+  }
+  // No key: do not leave an older unsigned loader in place, and do not claim the add-ons are protected.
+  if (!boot) {
+    const error = "install t3-extras first";
+    if (!present) return { state: "blocked", text, error };
+    try {
+      return { state: "blocked", text: removeExtras(text), error };
+    } catch (error2) {
+      throw new Error(`${error} (${error2.message})`);
+    }
+  }
+  if (text.includes(boot)) return { state: "already", text };
   if (!cspAllowsLoader(ctx.desktopMain)) throw new Error("T3's content policy may block the add-ons loader");
-  let base = present ? removeExtras(text) : text; // an older loader version is replaced
+  let base = present ? removeExtras(text) : text; // an older loader version, or another key, is replaced
   let styleOpen = base.indexOf(`<style id="${STYLE_ID}">`);
   if (styleOpen < 0) throw new Error("unit wrap's <style> is missing (extras takes its room from it)");
   let styleClose = base.indexOf("</style>", styleOpen);
   let pad = base.slice(styleOpen, styleClose).match(/ *$/)[0].length;
-  const need = Buffer.byteLength(EXTRAS_BOOT);
+  const need = Buffer.byteLength(boot);
   if (pad < need) {
     base = reclaimBootIndentation(base);
     styleOpen = base.indexOf(`<style id="${STYLE_ID}">`);
@@ -764,7 +811,7 @@ function unitExtras(text, ctx) {
   }
   if (pad < need) throw new Error(`index.html needs ${need - pad} more bytes`);
   const after = styleClose + "</style>".length;
-  return { state: "patched", text: base.slice(0, styleClose - need) + "</style>" + EXTRAS_BOOT + base.slice(after) };
+  return { state: "patched", text: base.slice(0, styleClose - need) + "</style>" + boot + base.slice(after) };
 }
 
 const MIN_WIDTH_PATTERNS = [
@@ -803,8 +850,10 @@ const RULE_FROM = "- 3-8 words, fewer than 40 characters.";
 const RULE_TO = "- 2-5 words, fewer than 36 characters.";
 
 /** rule: the title prompt's length rule (byte balance is done once for the file). */
-function unitRule(text) {
-  if (text.includes(RULE_TO) && !text.includes(RULE_FROM)) return { state: "already", text };
+function unitRule(text, ctx = {}) {
+  const applied = text.includes(RULE_TO) && !text.includes(RULE_FROM);
+  if (ctx.disabled?.has("rule")) return applied ? { state: "retained", text } : { state: "disabled", text };
+  if (applied) return { state: "already", text };
   if (!text.includes(RULE_FROM)) throw new Error("title prompt length rule not found");
   return { state: "patched", text: text.split(RULE_FROM).join(RULE_TO) };
 }
@@ -817,7 +866,10 @@ function fitWrapper(name, max, preFit, nativeAgent = false) {
 }
 
 /** fit: wrap the three server title functions, upgrading the exact v9 helper in place. */
-function unitFit(text) {
+function unitFit(text, ctx = {}) {
+  const legacy = text.includes("function t3KeeperFitTitle(");
+  const applied = text.includes(FIT_TITLE) && text.includes(fitWrapper("subagentThreadTitle", 42, true, true));
+  if (ctx.disabled?.has("fit")) return (applied || legacy) ? { state: "retained", text } : { state: "disabled", text };
   if (text.includes("function t3KeeperFitTitle(")) {
     if (text.split("function t3KeeperFitTitle(").length !== 2) throw new Error("title fitter declared more than once");
     const oldWrapper = fitWrapper("subagentThreadTitle", 42, true);
@@ -848,7 +900,20 @@ function unitFit(text) {
 }
 
 /** titleGuide: one replaceable last instruction section, found by the stable array name. */
-function unitTitleGuide(text) {
+function unitTitleGuide(text, ctx = {}) {
+  if (ctx.disabled?.has("titleGuide")) {
+    try {
+      const next = titleGuideBody(text);
+      if (next.state === "already" || text.includes("## Titles\n")) return { state: "retained", text };
+      return { state: "disabled", text };
+    } catch {
+      return { state: "disabled", text };
+    }
+  }
+  return titleGuideBody(text);
+}
+
+function titleGuideBody(text) {
   if (Buffer.byteLength(TITLE_GUIDE) >= 4000) throw new Error("title guide must stay under 4,000 bytes");
   const comments = [];
   const ast = acorn.parse(text, { ...PARSE, sourceType: "module", onComment: comments });
@@ -978,8 +1043,9 @@ const UNITS = [
   { name: "firstClick", file: "desktopMain", run: unitFirstClick },
 ];
 
-// Units that can be switched off on their own (the others are undone only by --restore).
-const SWITCHABLE = ["extras"];
+// Units that can be switched off on their own. rule, fit and titleGuide are personal
+// defaults: a fresh install turns them off, and an already-patched build keeps them until --restore.
+const SWITCHABLE = ["extras", "rule", "fit", "titleGuide"];
 
 function loadDisabled() {
   try {
@@ -1016,6 +1082,7 @@ function plan(fd, layout, targets) {
   const ctx = {
     desktopMain: entryAt(layout.header, DESKTOP_MAIN) ? readEntry(fd, layout, DESKTOP_MAIN).toString("utf8") : "",
     disabled: loadDisabled(),
+    loaderKey: readLoaderKey(),
   };
   const originals = {};
   const results = {};
@@ -1030,7 +1097,7 @@ function plan(fd, layout, targets) {
     const before = texts[unit.file] ?? originals[unit.file].toString("utf8");
     try {
       const out = unit.run(before, ctx);
-      results[unit.name] = { state: out.state };
+      results[unit.name] = { state: out.state, ...(out.error ? { error: out.error } : {}) };
       texts[unit.file] = out.text;
     } catch (error) {
       results[unit.name] = { state: "failed", error: error.message };
@@ -1121,6 +1188,7 @@ function reminderPlanFrom(results, files) {
     if (results.rule?.state === "patched") startupReasons.push("rule");
     if (results.fit?.state === "patched") startupReasons.push("fit");
     if (results.titleGuide?.state === "patched") startupReasons.push("titleGuide");
+    if (results.geminiQuota?.state === "patched") startupReasons.push("geminiQuota");
     if (startupReasons.length === 0) startupReasons.push("server");
   }
   if (files.desktopMain) startupReasons.push(results.firstClick?.state === "patched" ? "firstClick" : "desktop-main");
@@ -1190,7 +1258,7 @@ function cmdRestore() {
     }
     const out = commit({ checked, version, layout, items, reminder: false });
     // Keyed to the restored file, so --auto leaves it alone until T3's next update.
-    saveState({ keeperVersion: KEEPER_VERSION, key: asarKey(out.produced), status: "restored", build: version, produced: null });
+    saveState({ keeperVersion: KEEPER_VERSION, loaderKey: loaderKeyId(), key: asarKey(out.produced), status: "restored", build: version, produced: null });
     try {
       reminders.noteRestored({ home: HOME, actual: out.produced });
     } catch (error) {
@@ -1213,7 +1281,12 @@ function cmdStatus() {
   const { targets, results, missingHooks } = inspect();
   const units = Object.fromEntries(
     Object.entries(results).map(([k, v]) => [k, {
-      already: "patched", patched: "not patched", disabled: "switched off", removed: "switched off (still in the app until --apply)",
+      already: "patched",
+      patched: "not patched",
+      disabled: "switched off",
+      removed: "switched off (still in the app until --apply)",
+      retained: "switched off (still in the app until --restore)",
+      blocked: v.error || "install t3-extras first",
     }[v.state] ?? `cannot patch: ${v.error}`]),
   );
   console.log(JSON.stringify({
@@ -1262,7 +1335,7 @@ function cmdDryRun() {
 
 function recordApply(out) {
   const prev = loadState();
-  saveState({ keeperVersion: KEEPER_VERSION, key: asarKey(out.produced ?? out.checked), build: out.version, status: out.failed.length ? "partial" : "patched", results: out.results, produced: out.produced ? { build: out.version, identity: out.produced } : prev.produced ?? null, lastPatchedAt: out.wrote ? new Date().toISOString() : prev.lastPatchedAt ?? null });
+  saveState({ keeperVersion: KEEPER_VERSION, loaderKey: loaderKeyId(), key: asarKey(out.produced ?? out.checked), build: out.version, status: out.failed.length ? "partial" : "patched", results: out.results, produced: out.produced ? { build: out.version, identity: out.produced } : prev.produced ?? null, lastPatchedAt: out.wrote ? new Date().toISOString() : prev.lastPatchedAt ?? null });
   return out.failed.length ? 2 : 0;
 }
 
@@ -1278,7 +1351,7 @@ function cmdApply() {
 function cmdSwitch(on) {
   const unit = process.argv[3];
   if (!SWITCHABLE.includes(unit)) {
-    console.error(`only ${SWITCHABLE.join(", ")} can be switched ${on ? "on" : "off"} on its own; --restore undoes every unit`);
+    console.error(`only ${SWITCHABLE.join(", ")} can be switched ${on ? "on" : "off"} on its own; --restore undoes every other unit`);
     return 64;
   }
   return withLock(() => {
@@ -1306,7 +1379,7 @@ function cmdAuto() {
     reminderTick(); // before the handled-archive return, including a build that is already patched
     const state = loadState();
     const identity = asarIdentity();
-    if (state.key === asarKey(identity) && state.keeperVersion === KEEPER_VERSION) return 0; // this exact app.asar was handled
+    if (state.key === asarKey(identity) && state.keeperVersion === KEEPER_VERSION && state.loaderKey === loaderKeyId()) return 0; // this exact app.asar was handled, with this key
     const version = bundleVersion();
     if (!launchedByT3(identity)) {
       if (state.status !== "waiting-first-launch" || state.waitingFor !== version) {
@@ -1343,6 +1416,7 @@ function cmdAuto() {
     }
     saveState({
       keeperVersion: KEEPER_VERSION,
+      loaderKey: loaderKeyId(),
       key: asarKey(out.produced ?? identity),
       produced: out.produced ? { build: version, identity: out.produced } : state.produced ?? null,
       build: version,
@@ -1359,14 +1433,31 @@ function cmdAuto() {
 // For test/keeper.test.mjs.
 export {
   unitWrap, unitMinWidth, unitRule, unitFit, unitTitleGuide, unitGeminiQuota, unitExtras, unitFirstClick, finishBinCli, absorb, FIT_TITLE, FIT_TITLE_V9, TITLE_GUIDE, WRAP_CSS, TMP_PREFIX,
-  EXTRAS_BOOT, STYLE_ID, cspAllowsLoader,
+  extrasBoot, EXTRAS_ID, STYLE_ID, cspAllowsLoader,
   readLayout, readEntry, writeEntries, findTargets, inspect, apply, asarIdentity, sha, removeStaleTemps, launchedByT3,
 };
 
 function rotateLog() {
   const file = path.join(HOME, "keeper.log");
+  let fd;
+  let size = 0;
   try {
-    if (fs.statSync(file).size > 1024 * 1024) fs.renameSync(file, `${file}.1`);
+    fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    size = fs.fstatSync(fd).size;
+    fs.fchmodSync(fd, 0o600);
+  } catch {
+    return; // missing, or a symlink this will not follow
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch {}
+    }
+  }
+  if (size <= 1024 * 1024) return;
+  try {
+    const rotated = `${file}.1`;
+    fs.renameSync(file, rotated);
+    const out = fs.openSync(rotated, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    try { fs.fchmodSync(out, 0o600); } finally { fs.closeSync(out); }
   } catch {}
 }
 

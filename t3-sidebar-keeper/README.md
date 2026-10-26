@@ -2,26 +2,27 @@
 
 > **Personal experiment.** I'm not a professional developer; I use T3 Code on my Mac for personal movie and Twitter projects. I made this to suit my own workflow. It isn't an official T3 Code project or a supported product.
 
-Keeps Andy's sidebar-title changes in **T3 Code (Nightly)** across restarts and auto-updates:
+Keeps sidebar-title changes in **T3 Code (Nightly)** across restarts and auto-updates:
 
 - **wrap**: sidebar thread titles word-wrap instead of ending in "…" (cards, slim rows, drafts, search results, legacy rows).
 - **minWidth**: the sidebar can be dragged down to 140 px (T3's own minimum is 208 px).
 - **rule**: T3's title prompt asks for 2–5 words, under 36 characters (T3 says 3–8 words, under 40).
 - **fit**: generated titles are capped at 40 characters and child/subagent titles at 42, cut at a word boundary, keeping a trailing `(model)` tag or `subagent N`; native subagent IDs become readable words, and shortened roles keep the word before a bare number. Upgrades the previous helper in place.
 - **titleGuide**: appends one compact, replaceable `## Titles` section to every provider's orchestration instructions; starts after T3's next restart.
-- **extras**: a tiny loader for Andy's add-ons (usage displays, handover button, handwriting fonts, sidebar polish), which live in `../t3-extras/` and its always-on loopback service. Its bytes come out of the **wrap** style's padding, so it needs **wrap**. If the service isn't running, T3 just shows nothing extra. Added 19 Oct 2026.
+- **extras**: a tiny signed loader for the add-ons (usage displays, handover button, handwriting fonts, sidebar polish), which live in `../t3-extras/` and its loopback service. Install t3-extras first so `~/.local/share/t3-extras/loader-key.json` exists. Without that key the loader is not applied, and an older unsigned loader is taken out. Its bytes come out of the **wrap** style's padding, so it needs **wrap**. If the service isn't running, T3 just shows nothing extra. Added 19 Oct 2026.
 - **firstClick**: the first click on an inactive T3 window also clicks what is under it, so one click opens a thread when you come back from another app. T3 leaves Electron's `acceptFirstMouse` off, so on a Mac that click only brought the window forward. Added 19 Oct 2026.
+- **geminiQuota**: Gemini rows come back in Usage → Limits and the ✦ bar. T3's Antigravity limits probe calls itself `antigravity/hub/1.0.0`, and Google leaves the `gemini-5h` / `gemini-weekly` buckets out of its quota summary for that version (checked 26 Oct 2026 with T3's own request: only `3p-weekly,3p-5h` come back). The unit swaps in `2.24.0` in `binCli-*.mjs`, matched by the literal User-Agent text. It is server code, which T3 reads only at launch, so **each new build needs one quit-and-reopen (⌘Q) after the keeper has patched it** before Gemini shows. Nothing avoids that: there is no setting or environment variable for the version, the build can't be patched before its first launch (Gatekeeper), and a `NODE_OPTIONS` preload doesn't reach the server (Electron strips `--require` from a packaged app's `NODE_OPTIONS`, and refuses Node variables when another app starts the binary). Restart reminders are off on this Mac by request, so `--status` (unit `geminiQuota: patched`, set after the server started) is the way to tell. Upstream pingdotgg/t3code#22876; when T3 fixes it, the unit fails with "found 0 times" and can be deleted. Added 25 Oct 2026.
 
 Every nightly update replaces the app, which wipes these changes. The keeper puts them back automatically.
 
 ## How it works
 
 - `keeper.mjs` edits four files (`index.html`, `main-*.js`, `binCli-*.mjs` and the desktop `main.cjs`) inside `/Applications/T3 Code (Nightly).app/Contents/Resources/app.asar` in place, keeping every file's byte length so nothing else in the archive moves. It finds what to change by stable markers (data attributes, a storage key, function names), not by the build's minified names, so it keeps working across builds. The CSS lives in a `<style>` added to T3's `index.html`; the room for it comes from deleting code comments, located with a real JavaScript parser (vendored acorn). If the add-ons loader needs more room, keeper v11 also removes indentation between boot-script tokens, preserving token contents and line breaks and checking token equivalence. Disabling the loader returns its bytes to style padding; reclaimed indentation stays compacted until an archive restore.
-- A LaunchAgent (`com.cornishandy.t3-sidebar-keeper`) runs it every 30 seconds and whenever T3's server starts. It rechecks an unhandled archive. App restart reminders are permanently disabled; reload notifications remain enabled.
+- A LaunchAgent (`com.cornishandy.t3-sidebar-keeper`) runs it every 30 seconds and whenever T3's server starts, at standard priority: with `ProcessType` Background, `Nice` 10 and low-priority I/O, a busy Mac kept the job stuck in launch for 4–5 minutes after T3 started (26 Oct 2026), while a run with nothing to do takes about 0.15 s. It rechecks an unhandled archive. A fresh install turns app-restart reminders off; an existing `restart-reminders-disabled.json` is left as it is. Reload notifications remain enabled.
 - **It waits for each new build's first launch.** macOS Gatekeeper checks a new app version the first time it opens and blocks it ("damaged") if it was modified before then. That was tested on a copy on 18 Oct 2026. Patching after the first launch is fine. The keeper proves the first launch by checking (with `lsof`) that a running T3 process has that exact file open.
-- **It never edits the file on disk in place.** It patches an instant APFS copy, checks it, and swaps it in with one atomic rename, so a crash leaves either the old file or the new one, never a mix. The running T3 keeps the old copy open, so the keeper also writes the changed bytes of the two UI files into that copy (one write per file, put back if anything fails). That is what makes Shift-Cmd-R work without restarting.
+- **It swaps the file on disk atomically.** It patches an instant APFS copy, checks it, and swaps it in with one atomic rename, so a crash leaves either the old file or the new one, never a mix. The running T3 keeps the old copy open, so the keeper also writes the changed bytes of the two UI files into that copy (one write per file, put back if anything fails). That is what makes Shift-Cmd-R work without restarting.
 - After patching it posts a notification. Press **Shift-Cmd-R** in T3 (View > Force Reload) to see wrapped titles straight away. The shorter-title rules and **firstClick** start when you next quit and reopen T3: they live in code T3 loads only at start-up (the server and the desktop window code, `apps/desktop/dist-electron/main.cjs`). So after each nightly update, the first-click fix is off until one more restart.
-- macOS's **App Management** protection stops background jobs from changing apps. The job runs Homebrew's `node`, which is switched on in **System Settings > Privacy & Security > App Management** (since 18 Oct 2026). A Homebrew node update can switch it off again; the keeper then posts a notification saying so. (A separate helper app would have been narrower, but macOS wouldn't let it be added to that list.)
+- macOS's **App Management** protection stops background jobs from changing apps. The job runs the Node binary recorded in `node-path` (mode 0600, the absolute path the installer found, not a resolved symlink). That binary needs **System Settings > Privacy & Security > App Management**. On the author's Mac that path is Homebrew's `node` (since 18 Oct 2026). A Node update that replaces the file can switch the grant off; the keeper then posts a notification saying so. The reminder helper reads `node-path` first, then its older Homebrew guesses. (A separate helper app would have been narrower, but macOS wouldn't let it be added to that list.)
 
 ## Safety
 
@@ -32,7 +33,7 @@ Every nightly update replaces the app, which wipes these changes. The keeper put
 - Each part applies fully or not at all. If a future build changes too much, that part is skipped and a notification names it.
 - If a denied write or other error happens, it waits 10 minutes before trying the same build again. `keeper.log` rotates at 1 MB.
 - Changing the CSS: bump the number in `STYLE_ID` (`t3-keeper-sidebar-1`); a build that already has an older keeper style needs `--restore` first.
-- Changing the add-ons loader: bump the number in `EXTRAS_ID` (`t3x-boot-1`); an older loader is replaced in place.
+- Changing the add-ons loader: bump the number in `EXTRAS_ID` (`t3x-boot-2`); an older loader is replaced in place. The loader verifies `extras.js` and `extras.css` before inserting them. A bad signature inserts nothing.
 
 ## Commands
 
@@ -46,19 +47,22 @@ node ~/.local/share/t3-sidebar-keeper/keeper.mjs --enable extras    # put it bac
 tail ~/.local/share/t3-sidebar-keeper/keeper.log             # what the background job did
 ```
 
-`--disable` / `--enable` work for **extras** only (kept in `disabled.json`, so it stays off across nightly updates); the other units are undone only by `--restore`. If T3 isn't running that build, the switch is applied once it starts.
+`--disable` / `--enable` work for **extras**, **rule**, **fit** and **titleGuide** (kept in `disabled.json`, so the choice stays across nightly updates). **extras** comes out on the next apply. **rule**, **fit** and **titleGuide** are left out of the next build, but a build that already has them keeps them until `--restore`. Status then says they are switched off and still in the app until `--restore`. wrap, minWidth, firstClick and geminiQuota are undone only by `--restore`. If T3 isn't running that build, the switch is applied once it starts.
 
 To pause it: `launchctl bootout gui/$(id -u)/com.cornishandy.t3-sidebar-keeper`. To resume: run `install.sh` again.
 
 ## Install, update, uninstall
 
 ```bash
+# Install t3-extras first, so the add-ons loader has a public key.
 ./install.sh              # copies keeper.mjs + vendor/ to ~/.local/share/t3-sidebar-keeper and loads the job
-./install.sh --uninstall  # removes the job; T3 stays patched until its next update
-node --test test/         # tests (work on a temporary copy of the installed app.asar)
+./install.sh --uninstall  # removes the job; T3 stays patched until --restore
+node --test test/         # local-only tests (a temporary copy of the installed app.asar; they do not write the app)
 ```
 
-`keeper.mjs` in this folder is the source. The background job runs the installed copy, so re-run `install.sh` after editing it.
+You need Apple silicon and Xcode Command Line Tools (`swiftc` and `clang`). The helper is compiled on every install. A fresh install (no `keeper.mjs` and no `disabled.json`) writes `disabled.json` with `rule`, `fit` and `titleGuide` off, and writes `restart-reminders-disabled.json`, before the new code is published. A retry that finds `defaults-pending` finishes those files and does not replace a `disabled.json` that is already there. An existing install is not given those defaults.
+
+`keeper.mjs` in this folder is the source. The background job runs the installed copy, so re-run `install.sh` after editing it. Re-running writes `node-path` again. It does not change an existing `disabled.json` or an existing reminder opt-out.
 
 ## App restart reminders are disabled
 

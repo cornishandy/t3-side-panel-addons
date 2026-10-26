@@ -1,5 +1,5 @@
 /*
- * t3-extras: Andy's add-ons for T3 Code (Nightly). Plain JS, no build step, no framework.
+ * t3-extras: add-ons for T3 Code (Nightly). Plain JS, no build step, no framework.
  * The keeper's inline loader fetches this file from 127.0.0.1:8793 and inserts it inline.
  *
  * Rules this file keeps (BRIEF-extras + ADDENDUM-1 + Astra round 1; BRIEF-round2 + STEER + Astra round 2):
@@ -1045,6 +1045,24 @@
     return fails.length ? Math.min(...fails) : null;
   }
 
+  /** Missing `tools` means both tools are present, so older mocked /state keeps its behaviour. */
+  function toolGates(state) {
+    const tools = state && typeof state === "object" ? state.tools : undefined;
+    if (!tools || typeof tools !== "object") return { labUsage: true, handover: true };
+    return { labUsage: tools.labUsage !== false, handover: tools.handover !== false };
+  }
+  function labsForMerge(state) {
+    return toolGates(state).labUsage ? (state?.usage?.labs ?? null) : null;
+  }
+  /** No lab-usage failure when that tool is absent. Transport failure is reported on its own. */
+  function labFailure(state, transportFailedAt) {
+    if (!toolGates(state).labUsage) return null;
+    return labUsageFailedSince(state?.usage, transportFailedAt);
+  }
+  function handoverGate(state) {
+    return toolGates(state).handover ? null : "needs the handover tool";
+  }
+
   // ---------- sidebar sections: which active threads count as older ----------
 
   /** T3's row age ("now", "24m", "13h", "2d"; always rounded down) in hours, or null for anything
@@ -1091,7 +1109,7 @@
     DEFAULTS, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, usagePageHash, usageContainerMatches,
     FOOTER_TEAM, FOOTER_DETAILS, footerPass, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
-    forecast, seriesSegments, mergeSeries, dGeometry, fmtClock, lowRefills, compactParts, composerLabel, labUsageFailedSince, HANDOVER_REQUEST, chainLabel, contrast, STALE_MS, T3_STALE_MS,
+    forecast, seriesSegments, mergeSeries, dGeometry, fmtClock, lowRefills, compactParts, composerLabel, labUsageFailedSince, toolGates, labsForMerge, labFailure, handoverGate, HANDOVER_REQUEST, chainLabel, contrast, STALE_MS, T3_STALE_MS,
   };
   if (W.__T3X_TEST__) {
     W.__T3X_TEST__.core = core;
@@ -1376,7 +1394,8 @@
     route.kind === "thread" && Boolean(lastState?.localEnvironmentId) && normId(lastState.localEnvironmentId) === normId(route.environmentId);
   /** Why handover can't be offered here, or null. Unknown locality counts as "not here". */
   const handoverBlocker = () =>
-    route.kind === "draft" ? "Not on a draft: send the first message, then hand over."
+    handoverGate(lastState) ? handoverGate(lastState)
+    : route.kind === "draft" ? "Not on a draft: send the first message, then hand over."
       : route.kind !== "thread" ? "Open a thread first."
       : !lastState ? "Waiting for the add-ons service to say which threads run on this Mac."
       : !lastState.localEnvironmentId ? "Can't tell whether this thread runs on this Mac (T3's environment id couldn't be read)."
@@ -1664,8 +1683,8 @@
   // ---------- the one model every usage place reads ----------
 
   function currentViews(now = Date.now()) {
-    const fails = { labUsage: labUsageFailedSince(lastState?.usage, lastState?.transportFailedAt ?? null), t3: t3.failedAt };
-    return views(mergeLabs(t3.labs, lastState?.usage?.labs), now, fails);
+    const fails = { labUsage: labFailure(lastState, lastState?.transportFailedAt ?? null), t3: t3.failedAt };
+    return views(mergeLabs(t3.labs, labsForMerge(lastState)), now, fails);
   }
 
   // ---------- B glyphs ----------
@@ -1811,7 +1830,8 @@
     const now = Date.now();
     const vs = currentViews(now);
     const lu = lastState?.usage ?? {};
-    const luFailed = labUsageFailedSince(lu, lastState?.transportFailedAt ?? null);
+    const gates = toolGates(lastState);
+    const luFailed = labFailure(lastState, lastState?.transportFailedAt ?? null);
     const width = 312;
     const section = (v) => {
       const fc = forecast(v, now);
@@ -1827,18 +1847,18 @@
             ? h("b", { text: `blocked by the ${v.longAdj} limit until ${fmtWhen(v.long.resetsAt)}` })
             : [h("b", { text: `${fmtPct(v.sp.left)} left` }), ` · even pace ${known(v.sp.timeLeft) ? `${v.sp.timeLeft}% left` : "—"} · ${fmtReset(v.short.resetsAt, now)}${v.sp.pace === "ahead" ? " · ahead of its clock" : ""}`])));
       }
-      if (fc.source === "lab-usage") rows.push(h("div", { class: "t3x-row" }, h("span", { class: "t3x-row-name", text: "Projection" }), h("span", { class: "t3x-row-val", text: `about ${Math.round(v.long.projection)}% used at reset (lab-usage, allowing for manual resets)` })));
+      if (gates.labUsage && fc.source === "lab-usage") rows.push(h("div", { class: "t3x-row" }, h("span", { class: "t3x-row-name", text: "Projection" }), h("span", { class: "t3x-row-val", text: `about ${Math.round(v.long.projection)}% used at reset (lab-usage, allowing for manual resets)` })));
       else if (fc.source === "average") rows.push(h("div", { class: "t3x-row" }, h("span", { class: "t3x-row-name", text: "Projection" }), h("span", { class: "t3x-row-val", text: `about ${Math.round(fc.endUsed)}% used at reset (average since the window started)` })));
       if (lp.bounds?.assumed) rows.push(h("div", { class: "t3x-muted", text: `Pace assumed: ${v.name} doesn't report its window length (taken as ${lp.bounds.assumed === "week" ? "7 days" : "the calendar month"} before the reset).` }));
       // Claude's tier and today's share; Codex's gate, level and resets (lab-usage), shown only from a fresh read.
       const vd = v.verdict;
       const vFresh = vd && v.verdictLive !== false && known(v.verdictAt) && now - v.verdictAt <= STALE_MS && !luFailed;
-      if (vd && v.id === "claude") {
+      if (gates.labUsage && vd && v.id === "claude") {
         rows.push(h("div", { class: "t3x-line" }, vd.tierName ?? vd.tier ?? "tier unknown", vFresh ? "" : " (stale)",
           vd.today && known(vd.today.share) ? ` · today ${known(vd.today.spent) ? vd.today.spent.toFixed(1) : "—"} of ${vd.today.share.toFixed(1)} points` : "",
           vd.stops?.length ? ` · stops: ${vd.stops.join(", ")}` : ""));
       }
-      if (v.id === "codex") {
+      if (gates.labUsage && v.id === "codex") {
         rows.push(h("div", { class: "t3x-line" },
           vd && vFresh && vd.gate ? `gate: ${gateLabel(vd.gate.action)} (${vd.gate.action}${vd.gate.reason ? `, ${vd.gate.reason}` : ""})` : "gate — (needs a fresh live read)",
           vd?.level ? ` · ${vd.level}${known(vd.challengeDay) ? ` day ${vd.challengeDay}` : ""}` : "",
@@ -1876,7 +1896,8 @@
       h("header", { class: "t3x-pop-head" }, h("strong", { text: "Usage · This Mac" }),
         h("span", { class: "t3x-muted", text: t3.readAt ? `read ${fmtAge(now - t3.readAt)}` : lu.fetchedAt ? `updated ${fmtAge(now - lu.fetchedAt)}` : "not read yet" })),
       h("div", { class: "t3x-legend" }, h("div", { text: bLegend(withData) }), h("div", { text: `Strip: time across the window, height = % used. Dashed diagonal = even pace; solid = measured; faint dashes = estimated before logging; dots = projection; ✕ = estimated run-out.${withData.some((v) => v.short) ? ` Lane below: the ${[...new Set(withData.filter((v) => v.short).map((v) => v.shortWord))].join(" or ")} window at its real time, filled to its own % used.` : ""}` })),
-      luFailed ? h("div", { class: "t3x-warn", text: `${lastState?.transportFailedAt ? "Couldn't reach the add-ons service" : "lab-usage's last refresh failed"} ${fmtAge(now - luFailed)}; its numbers are marked stale.` }) : null,
+      lastState?.transportFailedAt ? h("div", { class: "t3x-warn", text: `Couldn't reach the add-ons service ${fmtAge(now - lastState.transportFailedAt)}; its numbers are marked stale.` })
+        : luFailed ? h("div", { class: "t3x-warn", text: `lab-usage's last refresh failed ${fmtAge(now - luFailed)}; its numbers are marked stale.` }) : null,
       t3Note ? h("div", { class: "t3x-warn", text: t3Note }) : null,
       withData.length ? withData.map(section) : h("div", { class: "t3x-muted", text: "No usage readings yet." }),
       unknown.map((v) => h("section", { class: `t3x-lab${v.stale ? " t3x-stale" : ""}` },
@@ -1886,7 +1907,7 @@
         h("div", { class: "t3x-muted", text: known(v.age) ? `T3 last checked ${fmtAge(v.age)}` : "Last check unknown" }))),
       without.length ? h("section", { class: "t3x-lab" }, h("h3", { text: "No meter yet" }),
         h("div", { class: "t3x-muted", text: without.map((v) => `${v.name} (${v.noMeter ?? "no meter yet"})`).join(" · ") })) : null,
-      h("div", { class: "t3x-muted t3x-foot", text: "From T3's own saved quota readings (read only) and lab-usage --json --read-only (tier, gate, projections). Remaining is shown everywhere." }),
+      h("div", { class: "t3x-muted t3x-foot", text: gates.labUsage ? "From T3's own saved quota readings (read only) and lab-usage --json --read-only (tier, gate, projections). Remaining is shown everywhere." : "From T3's own saved quota readings (read only). Remaining is shown everywhere." }),
     ];
   }
   usageDetail.label = "Usage on this Mac";
@@ -1932,7 +1953,7 @@
     update(node, vs, now) {
       const chain = node.querySelector(".t3x-chain");
       const c = lastState?.handover?.chain;
-      const showChain = settings.chainPill && isLocalThread() && c;
+      const showChain = settings.chainPill && toolGates(lastState).handover && isLocalThread() && c;
       chain.hidden = !showChain;
       if (showChain) {
         chain.textContent = chainLabel(c);
@@ -1976,7 +1997,7 @@
     mount: (anchor, node) => anchor.prepend(node),
     update(node, vs, now) {
       const btn = node.querySelector(".t3x-handover");
-      btn.hidden = !settings.handoverButton;
+      btn.hidden = !settings.handoverButton || !toolGates(lastState).handover;
       const why = handoverBlocker();
       btn.setAttribute("aria-disabled", String(Boolean(why)));
       btn.title = why ?? "Adds a handover request to the end of your message; you send it.";
@@ -3079,8 +3100,8 @@
         settings.usageSidebar ? sw("Sidebar: compact in a short window", "usageSidebarShort", `One line per lab while the window is under ${SHORT_WINDOW} px tall.`) : null,
         sw("Thread burn tells", "burnTells", "Gemini threads aren't measured. Estimated API cost equivalent; not your subscription charge.")),
       h("section", {}, h("h3", { text: "Handover" }),
-        sw("Prepare handover button", "handoverButton", "Adds a request to your message; you send it."),
-        sw("Handover chain pill", "chainPill", mode ? `Handover mode: ${mode}` : null)),
+        sw("Prepare handover button", "handoverButton", toolGates(lastState).handover ? "Adds a request to your message; you send it." : "needs the handover tool"),
+        sw("Handover chain pill", "chainPill", toolGates(lastState).handover ? (mode ? `Handover mode: ${mode}` : null) : "needs the handover tool")),
       h("section", {}, h("h3", { text: "Sidebar" }),
         sw("Compact threads", "compactThreads", "Project icon and title on one line; hover the icon for the project and branch."),
         sw("One-row titles", "oneRowTitles", "Long titles end in \u2026 but keep a trailing number like (2). Off: titles wrap (two lines at most with compact threads)."),
