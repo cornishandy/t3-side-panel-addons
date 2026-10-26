@@ -22,7 +22,7 @@ test("the file stops before touching the DOM when loaded for tests", () => {
 
 test("routes: only #/<environment>/<thread> is a thread; drafts and pages are not", () => {
   const env = "11111111-2222-4333-8444-555555555555";
-  const th = "a06b79b7-d73a-42b6-b914-bdf9e9384e41";
+  const th = "a06b79b7-0000-4000-8000-0000000000aa";
   assert.deepEqual(plain(C.parseRoute(`#/${env}/${th}`)), { kind: "thread", environmentId: env, threadId: th });
   assert.equal(C.parseRoute(`#/${env}/${encodeURIComponent("mcp:" + th)}`).threadId, "mcp:" + th);
   assert.equal(C.parseRoute(`#/${env}/${th}?x=1#frag`).threadId, th);
@@ -190,7 +190,7 @@ test("window bounds: no valid length means no pace, except Grok's disclosed 7-da
 
 // ---------------------------------------------------------------- T3's cache, fail closed
 
-const ENV = "1d9a258d-5cc0-4e91-b06e-07406238e117";
+const ENV = "0f0e0d0c-0b0a-4908-8706-050403020100";
 const iso = (t) => new Date(t).toISOString();
 const checked = iso(NOW - 2 * MIN);
 function t3Record(over = {}) {
@@ -733,7 +733,7 @@ function row(item, testid) {
     },
   };
 }
-const LOCAL = "1d9a258d-5cc0-4e91-b06e-07406238e117";
+const LOCAL = "0f0e0d0c-0b0a-4908-8706-050403020100";
 test("burn rows: this Mac's card/slim rows by exact thread id; compact rows only with proof they're local", () => {
   const threads = { "a06b79b7-0000-4000-8000-000000000001": { tier: "warm" }, "thread:delegate-1:%2Fx.y": { tier: "burst" }, "mcp:806769b1-0000": { tier: "hot" }, "remote-thread-1": { tier: "warm" }, "compact-only-1": { tier: "warm" } };
   const lis = [
