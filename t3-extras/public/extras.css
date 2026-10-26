@@ -980,6 +980,37 @@ html[data-t3x-fsidebar] [data-t3x="grouping-root"] :is(.t3x-g-meta, .t3x-g-badge
  .t3x-workspace-browse select { grid-column:1/-1; grid-row:1; }
 }
 
+/* ---------- Find fonts on screen: pick, Shift labels, docked Fonts card, show on screen ---------- */
+.t3x-font-head-actions { display:flex; gap:8px; align-items:center; }
+.t3x-font-tools { margin:-8px 0 12px; }
+.t3x-font-picknote { margin:0 0 12px; padding:8px 10px; border-radius:6px; background:var(--accent); font-size:13px; line-height:1.45; overflow-wrap:anywhere; }
+.t3x-font-dockbar { display:none; }
+.t3x-font-pick-entry { width:100%; margin-top:8px; }
+.t3x-font-workspace[data-mode="dock"] { position:fixed; inset:auto; margin:0; width:min(340px,calc(100vw - 24px)); max-width:calc(100vw - 24px); height:auto; max-height:min(600px,calc(100dvh - 24px)); z-index:2147483001; box-shadow:0 12px 40px #0006; }
+.t3x-font-workspace[data-mode="dock"] :is(.t3x-font-workspace-head, .t3x-font-navigation, .t3x-font-back, .t3x-font-preview-label, .t3x-workspace-sample, .t3x-font-own .t3x-chips, .t3x-font-own > .t3x-note, .t3x-font-editor > .t3x-note:nth-last-child(2)) { display:none!important; }
+.t3x-font-workspace[data-mode="dock"] .t3x-font-workspace-body { display:block; flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.t3x-font-workspace[data-mode="dock"] .t3x-font-editor { padding:14px 16px 12px; overflow:visible; }
+.t3x-font-workspace[data-mode="dock"] .t3x-font-editor h3 { margin:0 0 6px; font-size:16px; }
+.t3x-font-workspace[data-mode="dock"] .t3x-font-scope { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font-size:12.5px; }
+.t3x-font-workspace[data-mode="dock"] .t3x-font-own { margin-top:12px; }
+.t3x-font-workspace[data-mode="dock"] .t3x-font-tools { margin:0 0 8px; }
+.t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); }
+.t3x-font-dockbar .t3x-font-done { margin-left:auto; }
+html[data-t3x-probing] *, html[data-t3x-probing] *::before, html[data-t3x-probing] *::after { transition:none!important; }
+html[data-t3x-picking], html[data-t3x-picking] * { cursor:crosshair!important; }
+.t3x-pick { position:fixed; inset:0; z-index:2147483002; pointer-events:none; font:500 12px/1.35 var(--font-sans); color:var(--foreground); }
+.t3x-pick [data-pick-ui], .t3x-pick [data-pick-ui] * { pointer-events:auto; cursor:default!important; }
+.t3x-pick-shield { position:fixed; pointer-events:auto; background:transparent; }
+.t3x-pick-box { position:fixed; box-sizing:border-box; border:2px solid var(--primary,#7aa2ff); border-radius:4px; background:color-mix(in srgb,var(--primary,#7aa2ff) 12%,transparent); }
+.t3x-pick-box.t3x-pick-shown { background:color-mix(in srgb,var(--primary,#7aa2ff) 18%,transparent); }
+.t3x-pick-area { position:fixed; box-sizing:border-box; border:1.5px dashed color-mix(in srgb,var(--primary,#7aa2ff) 75%,transparent); border-radius:4px; }
+.t3x-pick-tag { position:fixed; box-sizing:border-box; max-width:min(380px,calc(100vw - 16px)); padding:6px 10px; border:1px solid var(--border); border-radius:7px; background:var(--popover,var(--background)); color:var(--popover-foreground,var(--foreground)); box-shadow:0 6px 20px #0005; }
+.t3x-pick-tag strong { display:block; font-size:13px; font-weight:600; }
+.t3x-pick-tag span { display:block; margin-top:1px; color:var(--muted-foreground); font-weight:400; }
+.t3x-pick-bar { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); box-sizing:border-box; display:flex; align-items:center; gap:12px; max-width:calc(100vw - 24px); padding:6px 6px 6px 14px; border:1px solid var(--border); border-radius:999px; background:var(--popover,var(--background)); color:var(--popover-foreground,var(--foreground)); box-shadow:0 6px 24px #0006; font-size:13px; }
+.t3x-pick-bar .t3x-btn { border-radius:999px; }
+.t3x-pick .t3x-pick-label { position:fixed; height:18px; padding:0 6px; border:0; border-radius:4px; background:var(--primary,#7aa2ff); color:var(--primary-foreground,#0b1020); font:600 11px/18px var(--font-sans); white-space:nowrap; cursor:pointer!important; box-shadow:0 2px 6px #0005; }
+
 /* ---------- ✦ panel "Your fonts": each pick's name in its own face, with Previous/Next ---------- */
 .t3x-fs-row { display: flex; flex-direction: column; padding: 2px 0; }
 .t3x-fs-area { display: flex; gap: 6px; align-items: baseline; color: var(--muted-foreground); font: 11px var(--font-sans); }

@@ -93,10 +93,14 @@
     showPartly: false,
     interfaceFontsOpen: false,
     settingsOpen: false, // the ✦ panel's Settings show/hide, remembered
+    fontPicker: true, // Fonts: "Pick from screen" (hover names the area under the pointer; click opens it)
+    fontPickDock: true, // a picked area opens as a small Fonts card beside the text, not the full window
+    fontPickLabels: true, // while picking, hold Shift to label every area on screen
+    fontShowOnScreen: true, // Fonts: "Show on screen" outlines where an area applies
     footerTeam: "start-open", // the reply footer's team list: always-show | start-open | start-folded | always-hide
     fontTargets: Object.freeze({ composer: true, quotes: true, projects: true, pills: true, headings: true, replies: true, mine: true, ...Object.fromEntries(INTERFACE_TARGETS.map(([key]) => [key, false])) }),
   });
-  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "printOnly", "showPartly", "interfaceFontsOpen", "settingsOpen"];
+  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "printOnly", "showPartly", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen"];
   const MARKERS = ["bar", "outline", "off"];
   const FOOTER_TEAM = [
     ["always-show", "Always show"],
@@ -2901,6 +2905,7 @@
   }
   function preserveFontWorkspaceOnResize() {
     const ui=fontWorkspace;if(!ui)return;
+    if(ui.el.dataset.mode==="dock"){positionDock(ui.el,ui.dockAnchor?.isConnected?ui.dockAnchor.getBoundingClientRect():null);return;}
     const previous=ui.lastFocus;
     // A narrow window keeps the pane the user is working in, including active search.
     if(innerWidth<720&&previous?.isConnected&&ui.navigation.contains(previous)) {
@@ -2912,7 +2917,7 @@
       target.focus({preventScroll:true});
     }
   }
-  function openFontWorkspace(trigger) {
+  function openFontWorkspace(trigger, {dock=null, dockAnchor=null, note=""}={}) {
     if(fontWorkspace)return;
     const anchor=pop?.trigger||trigger;closePopover();
     const el=h("dialog",{[OWN]:"fonts",class:"t3x-font-workspace","aria-labelledby":"t3x-fonts-title"});
@@ -2952,20 +2957,32 @@
     const own=h("div",{class:"t3x-font-own"},h("div",{class:"t3x-chips"},filter("printOnly","Print only"),filter("showPartly","Show semi-cursive")),h("p",{class:"t3x-note",text:"Turn both off to include script fonts. Narrowest first; ★ marks a good fit."}),h("label",{for:"t3x-font-family",text:"Font family"}),h("div",{class:"t3x-workspace-browse"},prev,family,next),h("div",{class:"t3x-workspace-size",role:"group","aria-label":"Font size"},h("span",{text:"Size"}),minus,size,plus,reset));
     const fontNote=h("p",{class:"t3x-note"});
     const sample=h("div",{class:"t3x-font-preview t3x-workspace-sample"});
-    editor.append(back,returnButton,editorTitle,h("strong",{class:"t3x-font-scope-label",text:"Applies to"}),scope,targets,h("label",{for:"t3x-font-source",text:"Font source"}),source,resolved,editSource,own,fontNote,h("div",{class:"t3x-font-preview-label",text:"Preview"}),sample,h("p",{class:"t3x-note",text:"Changes apply immediately. A preview illustrates the face; native surfaces may have different text sizes and layout."}));
-    el.append(h("header",{class:"t3x-font-workspace-head"},h("div",{},title,h("p",{text:"Choose an area, then its font"})),h("button",{type:"button",class:"t3x-btn","aria-label":"Close Fonts",onclick:()=>closeFontWorkspace()},"Close")),h("div",{class:"t3x-font-workspace-body"},h("nav",{class:"t3x-font-navigation","aria-label":"Font areas"},h("label",{for:"t3x-font-search",text:"Find an area"}),search,index),editor));
-    fontWorkspace={el,trigger:anchor,search,index,editor,navigation:el.querySelector(".t3x-font-navigation"),lastFocus:null,switchingArea:true,rows,empty,guidance,title:editorTitle,scope,targets,source,resolved,editSource,own,family,prev,next,minus,plus,size,reset,sample,fontNote,returnButton,role:null,optionsKey:null};
+    const pickNote=h("p",{class:"t3x-font-picknote",role:"note",hidden:true});
+    const showBtn=h("button",{type:"button",class:"t3x-btn t3x-font-show",onclick:()=>showAreaOnScreen(fontNav.role)},"Show on screen");
+    const dockbar=h("div",{class:"t3x-font-dockbar"},
+      h("button",{type:"button",class:"t3x-btn",onclick:()=>startFontPick()},"Pick other text"),
+      h("button",{type:"button",class:"t3x-btn",onclick:()=>undockFonts()},"All fonts…"),
+      h("button",{type:"button",class:"t3x-btn t3x-font-done",onclick:()=>closeFontWorkspace(false)},"Done"));
+    editor.append(back,returnButton,editorTitle,pickNote,h("div",{class:"t3x-font-tools"},showBtn),h("strong",{class:"t3x-font-scope-label",text:"Applies to"}),scope,targets,h("label",{for:"t3x-font-source",text:"Font source"}),source,resolved,editSource,own,fontNote,h("div",{class:"t3x-font-preview-label",text:"Preview"}),sample,h("p",{class:"t3x-note",text:"Changes apply immediately. A preview illustrates the face; native surfaces may have different text sizes and layout."}),dockbar);
+    el.append(h("header",{class:"t3x-font-workspace-head"},h("div",{},title,h("p",{text:"Choose an area, then its font"})),h("div",{class:"t3x-font-head-actions"},settings.fontPicker?h("button",{type:"button",class:"t3x-btn",onclick:()=>startFontPick()},"Pick from screen"):null,h("button",{type:"button",class:"t3x-btn","aria-label":"Close Fonts",onclick:()=>closeFontWorkspace()},"Close"))),h("div",{class:"t3x-font-workspace-body"},h("nav",{class:"t3x-font-navigation","aria-label":"Font areas"},h("label",{for:"t3x-font-search",text:"Find an area"}),search,index),editor));
+    fontWorkspace={el,trigger:anchor,search,index,editor,navigation:el.querySelector(".t3x-font-navigation"),lastFocus:null,switchingArea:true,rows,empty,guidance,title:editorTitle,scope,targets,source,resolved,editSource,own,family,prev,next,minus,plus,size,reset,sample,fontNote,returnButton,pickNote,showBtn,role:null,optionsKey:null};
     el.addEventListener("focusin",e=>{if(fontWorkspace?.el===el){rememberFontScroll();fontWorkspace.lastFocus=e.target;}});
     for(const pane of [index,editor])pane.addEventListener("scroll",()=>{if(fontWorkspace?.el===el)rememberFontScroll();});
     el.addEventListener("cancel",e=>{e.preventDefault();if(!fontSelectOpen())closeFontWorkspace();});
     el.addEventListener("keydown",e=>{
+      // Docked beside picked text: no focus trap (the page stays usable), and Esc closes it.
+      if(el.dataset.mode==="dock"){if(e.key==="Escape"&&!fontSelectOpen()){e.preventDefault();closeFontWorkspace(false);}return;}
       if(e.key!=="Tab"||fontSelectOpen())return;
       const controls=[...el.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex="0"]')].filter(n=>n.getClientRects().length&&!n.closest("[hidden]"));
       const first=controls[0],last=controls.at(-1);
       if(e.shiftKey&&D.activeElement===first){e.preventDefault();last?.focus();}
       else if(!e.shiftKey&&D.activeElement===last){e.preventDefault();first?.focus();}
     });
-    D.body.append(el);syncFontWorkspace(true);el.showModal();
+    if(dock){el.dataset.mode="dock";el.setAttribute("aria-labelledby","t3x-font-editor-title");}
+    D.body.append(el);syncFontWorkspace(true);
+    pickNote.textContent=note;pickNote.hidden=!note;
+    if(dock){fontWorkspace.dockAnchor=dockAnchor;el.show();positionDock(el,dock);}
+    else el.showModal();
     index.scrollTop=fontNav.indexScroll;editor.scrollTop=fontNav.scroll.get(fontNav.role)||0;
     fontWorkspace.switchingArea=false;
     (fontNav.editor?editorTitle:search).focus({preventScroll:true});
@@ -2995,6 +3012,8 @@
     ui.el.dataset.view=fontNav.editor?"editor":"index";
     syncFontIndex();
     ui.title.textContent=area.label;ui.scope.textContent=area.scope;
+    if(changed)ui.pickNote.hidden=true;
+    ui.showBtn.hidden=!settings.fontShowOnScreen;
     if(changed||force){
       ui.targets.replaceChildren(...(area.targets||[]).map(([key,label])=>h("button",{type:"button",role:"checkbox","data-target":key,"aria-checked":String(settings.fontTargets[key]),class:"t3x-check",onclick:()=>change({fontTargets:{...settings.fontTargets,[key]:!settings.fontTargets[key]}})},h("span",{class:"t3x-box","aria-hidden":"true"}),h("span",{class:"t3x-set-label",text:label}))));
       ui.targets.hidden=!area.targets?.length;
@@ -3010,7 +3029,8 @@
       if(![...ui.source.options].some(o=>o.value===src))ui.source.append(h("option",{value:src,text:"Linked cycle · uses T3 default",disabled:true}));
       ui.source.value=src;
     }
-    ui.own.hidden=src!=="own";ui.editSource.hidden=!src.startsWith("link:");
+    // Docked beside picked text: the font list shows straight away (choosing one makes it this area's own).
+    ui.own.hidden=src!=="own"&&ui.el.dataset.mode!=="dock";ui.editSource.hidden=!src.startsWith("link:");
     ui.resolved.textContent=`${src.startsWith("link:")?`Same as ${fontArea(src.slice(5))?.label}. `:""}${fontResolvedText(id)}${effective.family==="off"?" · follows current T3 settings":""}`;
     const options=fontOptions(catalog,settings,pick.family,nativeAvailable,id),optionsKey=JSON.stringify([options,pick.family]);
     if(ui.optionsKey!==optionsKey){
@@ -3047,6 +3067,7 @@
       h("header", { class: "t3x-pop-head" }, h("strong", { text: "✦ Add-ons" }),
         h("span", { class: "t3x-muted", text: lastState ? "This Mac · service running" : "service not answering" })),
       h("button", {type:"button",class:"t3x-font-entry","data-focus":"open-fonts",onclick:e=>openFontWorkspace(e.currentTarget)},h("span",{text:"Fonts…"}),h("span",{class:"t3x-muted",text:fontsCustomized()?`${fontsCustomized()} customized`:"All T3 default"})),
+      settings.fontPicker ? h("button", { type: "button", class: "t3x-btn t3x-font-pick-entry", "data-focus": "pick-font", onclick: () => startFontPick() }, "Pick a font from the screen") : null,
       fontPickList(),
       paused ? h("div", { class: "t3x-warn", text: "Add-ons paused after repeated errors. Press Shift-Cmd-R to retry." }) : null,
       h("details", { class: "t3x-more", open: settings.settingsOpen, ontoggle: (e) => { if (e.currentTarget.open !== settings.settingsOpen) { settings = readSettings(JSON.stringify({ ...settings, settingsOpen: e.currentTarget.open })); saveSettings(); } } },
@@ -3081,6 +3102,13 @@
         h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: "Footer team list" }),
           h("div", { class: "t3x-radios t3x-col t3x-indent", role: "radiogroup", "aria-label": "Footer team list" },
             FOOTER_TEAM.map(([value, label]) => radio("footerTeam", value, settings.footerTeam, label, (v) => change({ footerTeam: v })))))),
+      h("section", {}, h("h3", { text: "Fonts on screen" }),
+        sw("Pick from screen", "fontPicker", "Hover any text to see which Fonts area controls it; click it to change that font."),
+        settings.fontPicker ? [
+          sw("Change it beside the text", "fontPickDock", "A picked area opens as a small Fonts card next to the text, without dimming the screen. Off: the full Fonts window opens."),
+          sw("Shift labels everything", "fontPickLabels", "While picking, hold Shift to label every Fonts area on screen."),
+        ] : null,
+        sw("Show on screen", "fontShowOnScreen", "In Fonts, outline every place an area applies.")),
       h("footer", { class: "t3x-pop-foot" },
         h("button", { type: "button", class: "t3x-btn", "data-focus": "reset", onclick: () => change(null) }, "Reset defaults"),
         h("span", { class: "t3x-muted" }, "Remove everything: see ", h("code", { text: "t3-extras/README.md" })))),
@@ -3115,6 +3143,374 @@
     fontNav.role = id; fontNav.editor = true; fontNav.returns.length = 0;
     openFontWorkspace(trigger);
   }
+  // ---------- Find fonts on screen: one inspector ----------
+  // Hover names the Fonts area that controls the text under the pointer; holding Shift labels every
+  // area on screen; a click opens Fonts on that area, docked beside the text so changes show live;
+  // "Show on screen" outlines where an area applies. Ownership is read from the live CSS: the add-on's
+  // own <html> attributes are switched for a synchronous probe and restored before any frame paints.
+  // An area is named only when switching that one area on (the others as they are) gives the text its face.
+  const AREA_TARGETS = Object.fromEntries(FONT_AREAS.map((a) => [a.id, (a.targets || []).map(([k]) => k)]));
+  const ALIAS_ROLE = Object.fromEntries(FONT_ROLES.map((r) => [r.alias, r.id]));
+  const PROBE_ATTRS = [...FONT_ROLES.map((r) => r.attr), ...TARGETS.map((t) => `data-t3x-ft-${t}`)];
+  const PICK_EVENTS = ["pointerdown", "mousedown", "pointerup", "mouseup", "click", "dblclick", "auxclick", "contextmenu"];
+  const roleAttrs = (id) => [ROLE[id].attr, ...AREA_TARGETS[id].map((t) => `data-t3x-ft-${t}`)];
+  const roleOfFamily = (family) => ALIAS_ROLE[String(family).split(",")[0].trim().replace(/^["']|["']$/g, "")] ?? null;
+  /** The area whose face each element shows, per state: null = as now, else {add, drop} attributes.
+   *  Inside an inspector session transitions stay off throughout, so restoring can settle lazily. */
+  function probeAreas(states, els) {
+    const root = D.documentElement, session = root.hasAttribute("data-t3x-probing"), saved = PROBE_ATTRS.map((a) => [a, root.getAttribute(a)]);
+    const put = () => { for (const [a, v] of saved) if (root.getAttribute(a) !== v) (v === null ? root.removeAttribute(a) : root.setAttribute(a, v)); };
+    const read = () => els.map((el) => (el.isConnected ? roleOfFamily(getComputedStyle(el).fontFamily) : null));
+    const out = [];
+    try {
+      for (const st of states) {
+        put();
+        if (st && !session && !root.hasAttribute("data-t3x-probing")) root.setAttribute("data-t3x-probing", "");
+        for (const a of st?.drop || []) root.removeAttribute(a);
+        for (const a of st?.add || []) if (!root.hasAttribute(a)) root.setAttribute(a, "");
+        out.push(read());
+      }
+    } finally {
+      put();
+      if (!session && root.hasAttribute("data-t3x-probing")) { read(); root.removeAttribute("data-t3x-probing"); } // settle with transitions off
+    }
+    return out;
+  }
+  /** Each element's owning area: { role, active } (active: it shows that area's face now), or null.
+   *  `cache` (element → owner) is reused and filled; `thorough: false` leaves rare cases uncached. */
+  function areaOwners(els, { cache = null, thorough = true } = {}) {
+    const res = els.map((el) => (cache?.has(el) ? cache.get(el) : undefined));
+    const todo = els.flatMap((_, i) => (res[i] === undefined ? [i] : [])), sub = todo.map((i) => els[i]);
+    if (!sub.length) return res;
+    const [now] = probeAreas([null], sub), rest = sub.flatMap((_, k) => (now[k] ? [] : [k])); // as now: no restyle
+    const all = sub.map(() => null);
+    if (rest.length) probeAreas([{ add: PROBE_ATTRS }], rest.map((k) => sub[k]))[0].forEach((r, n) => { all[rest[n]] = r; });
+    let open = [];
+    sub.forEach((_, k) => { res[todo[k]] = now[k] ? { role: now[k], active: true } : null; if (!now[k] && all[k]) open.push(k); });
+    // With every area on, precedence can differ from one area alone: verify each candidate on its own.
+    const settle = (ids) => {
+      if (!open.length || !ids.length) return;
+      const got = probeAreas(ids.map((id) => ({ add: roleAttrs(id) })), open.map((k) => sub[k]));
+      open = open.filter((k, j) => {
+        const first = ids.findIndex((id, n) => got[n][j] === id), pref = ids.indexOf(all[k]);
+        const n = pref >= 0 && got[pref][j] === all[k] ? pref : first;
+        if (n < 0) return true;
+        res[todo[k]] = { role: ids[n], active: false };
+        return false;
+      });
+    };
+    const tried = [...new Set(open.map((k) => all[k]))];
+    settle(tried);
+    if (thorough) settle(FONT_ROLES.map((r) => r.id).filter((id) => !tried.includes(id)));
+    else for (const k of open) res[todo[k]] = undefined; // a later single lookup checks these fully
+    if (cache) todo.forEach((i) => { if (res[i] !== undefined) cache.set(els[i], res[i]); });
+    return res.map((r) => r ?? null);
+  }
+  /** The area's "Applies to" box that covers `el`, if the area has such boxes. */
+  function areaTargetOf(el, id) {
+    const keys = AREA_TARGETS[id];
+    if (!keys.length) return null;
+    const others = (t) => keys.filter((k) => k !== t).map((k) => `data-t3x-ft-${k}`);
+    const got = probeAreas(keys.map((t) => ({ add: [ROLE[id].attr, `data-t3x-ft-${t}`], drop: others(t) })), [el]);
+    const k = got.findIndex(([r]) => r === id);
+    return k < 0 ? null : keys[k];
+  }
+  function textUnder(x, y) {
+    const pos = D.caretPositionFromPoint?.(x, y), range = pos ? null : D.caretRangeFromPoint?.(x, y);
+    const node = pos ? pos.offsetNode : range?.startContainer, offset = pos ? pos.offset : range?.startOffset ?? 0;
+    if (!node || node.nodeType !== 3 || !node.data.trim()) return null;
+    const el = node.parentElement;
+    if (!el || el.closest(`[${OWN}="pick"], .t3x-font-workspace`)) return null;
+    // Caret lookups snap to the nearest text; require the pointer to be on a character.
+    const r = D.createRange();
+    for (const k of [offset, offset - 1]) {
+      if (k < 0 || k >= node.data.length) continue;
+      r.setStart(node, k); r.setEnd(node, k + 1);
+      for (const q of r.getClientRects()) if (x >= q.left - 1 && x <= q.right + 1 && y >= q.top - 1 && y <= q.bottom + 1) return { el, ch: node.data[k] };
+    }
+    return null;
+  }
+  /** What the pointer is on: the element, its outline (largest same-area ancestor, size-capped) and owner. */
+  function selectionFor(el, cache) {
+    const chain = [];
+    for (let n = el; n && n !== D.body && chain.length < 8; n = n.parentElement) chain.push(n);
+    const owners = areaOwners(chain, { cache }), owner = owners[0];
+    let region = el;
+    if (owner) for (let i = 1; i < chain.length && owners[i]?.role === owner.role; i++) {
+      const b = chain[i].getBoundingClientRect();
+      if (b.height > innerHeight * 0.6 || b.width > innerWidth * 0.9) break;
+      region = chain[i];
+    }
+    return { el, region, owner };
+  }
+  function visibleTextElements(limit = 1500) {
+    const out = new Set(), vw = innerWidth, vh = innerHeight;
+    const off = (b) => b.bottom <= 0 || b.top >= vh || b.right <= 0 || b.left >= vw;
+    const walker = D.createTreeWalker(D.body, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, { acceptNode(n) {
+      if (n.nodeType === 3) return n.data.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+      if (n.matches(`[${OWN}="pick"], .t3x-font-workspace, script, style, noscript, template`)) return NodeFilter.FILTER_REJECT;
+      const b = n.getBoundingClientRect();
+      return b.width && b.height && off(b) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP;
+    } });
+    for (let n = walker.nextNode(); n && out.size < limit; n = walker.nextNode()) {
+      const b = n.parentElement.getBoundingClientRect();
+      if (b.width && b.height && !off(b)) out.add(n.parentElement);
+    }
+    return [...out];
+  }
+  const clipRect = (b) => { const l = Math.max(0, b.left), t = Math.max(0, b.top), r = Math.min(innerWidth, b.right), btm = Math.min(innerHeight, b.bottom); return r > l && btm > t ? { left: l, top: t, right: r, bottom: btm } : null; };
+  const near = (a, b, m) => a.left - m < b.right && b.left - m < a.right && a.top - m < b.bottom && b.top - m < a.bottom;
+  /** Same-area elements that touch merge into one outline, so a table or a reply gets one label. */
+  function areaClusters(els, owners) {
+    const clusters = [];
+    els.forEach((el, i) => {
+      const o = owners[i], b = o && clipRect(el.getBoundingClientRect());
+      if (!b) return;
+      let c = clusters.find((c) => c.owner.role === o.role && near(c.rect, b, 12));
+      if (!c) clusters.push((c = { owner: o, el, rect: { ...b } }));
+      else Object.assign(c.rect, { left: Math.min(c.rect.left, b.left), top: Math.min(c.rect.top, b.top), right: Math.max(c.rect.right, b.right), bottom: Math.max(c.rect.bottom, b.bottom) });
+    });
+    return clusters;
+  }
+  const placeBox = (node, b, pad = 2) => Object.assign(node.style, { left: `${b.left - pad}px`, top: `${b.top - pad}px`, width: `${b.right - b.left + 2 * pad}px`, height: `${b.bottom - b.top + 2 * pad}px` });
+
+  /** Frames swallow pointer and key events, so while inspecting each visible frame gets an owned cover. */
+  function shieldFrames(s) {
+    for (const cover of s.shields?.keys() ?? []) cover.remove(); // keys are our covers; values are T3's frames
+    s.shields = new Map();
+    for (const frame of D.querySelectorAll("iframe")) {
+      const b = clipRect(frame.getBoundingClientRect());
+      if (!b || frame.closest(`[${OWN}]`)) continue;
+      const cover = h("div", { class: "t3x-pick-shield" });
+      placeBox(cover, b, 0);
+      s.shields.set(cover, frame);
+      s.layer.prepend(cover);
+    }
+    if (D.activeElement?.tagName === "IFRAME") D.activeElement.blur(); // Esc must reach the picker
+  }
+  const frameOwner = (frame) => (isVizFrame(frame) ? { role: "viz", active: D.documentElement.hasAttribute(ROLE.viz.attr) } : null);
+  const vizFrameClusters = () => [...D.querySelectorAll("iframe")].filter(isVizFrame).flatMap((frame) => { const rect = clipRect(frame.getBoundingClientRect()); return rect ? [{ owner: frameOwner(frame), el: frame, rect }] : []; });
+  let inspector = null;
+  function endInspector() {
+    const s = inspector;
+    if (!s) return;
+    inspector = null;
+    for (const [type, fn] of s.listeners) W.removeEventListener(type, fn, true);
+    cancelAnimationFrame(s.raf);
+    clearTimeout(s.timer);
+    s.layer.remove();
+    D.documentElement.removeAttribute("data-t3x-picking");
+    D.documentElement.removeAttribute("data-t3x-probing");
+    s.onEnd?.();
+  }
+  function beginInspector(onEnd) {
+    endInspector();
+    const s = { layer: h("div", { [OWN]: "pick", class: "t3x-pick" }), listeners: [], raf: 0, timer: 0, onEnd };
+    s.on = (type, fn) => { const g = guarded(`pick-${type}`, fn); W.addEventListener(type, g, true); s.listeners.push([type, g]); };
+    s.bar = (text, button) => h("div", { class: "t3x-pick-bar", "data-pick-ui": "" }, h("span", { text }), h("button", { type: "button", class: "t3x-btn", onclick: () => endInspector() }, button));
+    D.body.append(s.layer);
+    D.documentElement.setAttribute("data-t3x-probing", ""); // transitions off while probing (see probeAreas)
+    inspector = s;
+    return s;
+  }
+  function areaLine(sel) {
+    if (!sel.owner) return [sel.digit ? "Digits 0–9 keep T3's font" : "Not one of the Fonts areas", "Code, controls and some app text keep T3's font; change it in T3's settings."];
+    const { role, active } = sel.owner, bits = [fontSummary(role)];
+    if (!active && D.documentElement.hasAttribute(ROLE[role].attr)) bits.push("not applied here: one of its Applies to boxes is off");
+    if (sel.digit) bits.push("digits 0–9 keep T3's font");
+    bits.push("click to change");
+    return [fontArea(role).label, bits.join(" · ")];
+  }
+  function drawPick(s) {
+    const sel = s.labels ? null : s.sel, b = sel && clipRect(sel.region.getBoundingClientRect()); // labels replace the hover tag
+    s.box.hidden = s.tag.hidden = !b;
+    if (!b) return;
+    placeBox(s.box, b);
+    const [name, detail] = areaLine(sel);
+    s.tag.replaceChildren(h("strong", { text: name }), h("span", { text: detail }));
+    const w = s.tag.offsetWidth, ht = s.tag.offsetHeight;
+    const top = b.bottom + 8 + ht <= innerHeight - 8 ? b.bottom + 8 : Math.max(8, b.top - 8 - ht);
+    Object.assign(s.tag.style, { left: `${Math.min(Math.max(8, b.left), innerWidth - w - 8)}px`, top: `${top}px` });
+  }
+  // Which areas show a face right now; a font finishing its load mid-session changes it.
+  const probeSignature = () => PROBE_ATTRS.filter((a) => D.documentElement.hasAttribute(a)).join(" ");
+  function freshOwners(s) {
+    const sig = probeSignature();
+    if (s.sig !== sig) { s.sig = sig; s.owners.clear(); }
+    return s.owners;
+  }
+  function hoverAt(s, fresh = false) {
+    if (s.x === undefined) return;
+    const hit = textUnder(s.x, s.y);
+    let sel = null;
+    if (hit) {
+      sel = { ...selectionFor(hit.el, fresh ? null : freshOwners(s)), digit: /[0-9]/.test(hit.ch) }; // a click re-reads its text
+    } else {
+      const under = D.elementFromPoint(s.x, s.y), frame = s.shields?.get(under) ?? (under?.tagName === "IFRAME" ? under : null);
+      if (frame) sel = { el: frame, region: frame, owner: frameOwner(frame) };
+    }
+    s.sel = sel;
+    drawPick(s);
+  }
+  function showLabels(s) {
+    s.labels?.remove();
+    s.labels = h("div", { class: "t3x-pick-labels" });
+    const els = visibleTextElements(), placed = [];
+    for (const c of [...areaClusters(els, areaOwners(els, { cache: freshOwners(s), thorough: false })), ...vizFrameClusters()]) {
+      const outline = h("div", { class: "t3x-pick-area" });
+      placeBox(outline, c.rect, 1);
+      s.labels.append(outline);
+      if (placed.length >= 40 || c.rect.bottom - c.rect.top < 8) continue;
+      const text = fontArea(c.owner.role).label, w = text.length * 6.6 + 14, ht = 18;
+      let spot = null;
+      for (const dy of [-ht - 2, 0, ht, 2 * ht]) {
+        const r = { left: Math.min(Math.max(2, c.rect.left), innerWidth - w - 2), top: Math.max(2, c.rect.top + dy) };
+        r.right = r.left + w; r.bottom = r.top + ht;
+        if (!placed.some((p) => near(p, r, 1))) { spot = r; break; }
+      }
+      if (!spot) continue;
+      placed.push(spot);
+      const label = h("button", { type: "button", class: "t3x-pick-label", "data-pick-ui": "", onclick: () => pickChosen({ el: c.el, region: c.el, rect: c.rect, owner: c.el.tagName === "IFRAME" ? frameOwner(c.el) : areaOwners([c.el])[0] }) }, text); // re-read: a font may have loaded since
+      Object.assign(label.style, { left: `${spot.left}px`, top: `${spot.top}px` });
+      s.labels.append(label);
+    }
+    s.layer.insertBefore(s.labels, s.box);
+    s.hint.textContent = "Click a label or text to change its font · Esc to stop";
+    drawPick(s);
+  }
+  function hideLabels(s) {
+    if (!s.labels) return;
+    s.labels.remove();
+    s.labels = null;
+    s.hint.textContent = s.hintText;
+    drawPick(s);
+  }
+  function startFontPick() {
+    if (!settings.fontPicker || disposed) return;
+    closePopover();
+    closeFontWorkspace(false);
+    const s = beginInspector();
+    s.owners = new Map(); // element → owner, read once per screen so hovering stays instant
+    D.documentElement.setAttribute("data-t3x-picking", "");
+    s.box = h("div", { class: "t3x-pick-box", hidden: true });
+    s.tag = h("div", { class: "t3x-pick-tag", role: "status", "aria-live": "polite", hidden: true });
+    s.hintText = `Click text to change its font${settings.fontPickLabels ? " · hold Shift to label everything" : ""} · Esc to stop`;
+    const bar = s.bar(s.hintText, "Stop");
+    s.hint = bar.firstChild;
+    s.layer.append(s.box, s.tag, bar);
+    shieldFrames(s);
+    // Read the visible screen (text and its nearby containers) once, after the bar has painted.
+    const prefetch = () => {
+      if (inspector !== s) return;
+      const els = new Set();
+      for (const el of visibleTextElements()) for (let n = el, d = 0; n && n !== D.body && d < 4; n = n.parentElement, d++) els.add(n);
+      areaOwners([...els], { cache: freshOwners(s), thorough: false });
+      s.hint.textContent = s.labels ? s.hint.textContent : s.hintText;
+      schedule(); // show the tag for wherever the pointer already is
+    };
+    s.hint.textContent = "Reading this screen's fonts…";
+    s.raf = requestAnimationFrame(() => { s.raf = 0; s.timer = setTimeout(guarded("pick-read", prefetch), 0); });
+    const schedule = () => { if (!s.raf) s.raf = requestAnimationFrame(() => { s.raf = 0; if (inspector === s) hoverAt(s); }); };
+    s.on("pointermove", (e) => { s.x = e.clientX; s.y = e.clientY; schedule(); });
+    const moved = () => {
+      shieldFrames(s);
+      schedule();
+      clearTimeout(s.timer);
+      s.timer = setTimeout(guarded("pick-read", () => { prefetch(); if (inspector === s && s.labels) showLabels(s); }), 200);
+    };
+    s.on("scroll", moved);
+    s.on("resize", moved);
+    for (const type of PICK_EVENTS) s.on(type, (e) => {
+      if (e.target?.closest?.("[data-pick-ui]")) return;
+      // Picking never reaches T3: no navigation, selection or focus change.
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (type === "click" && e.button === 0) { s.x = e.clientX; s.y = e.clientY; hoverAt(s, true); pickChosen(s.sel); }
+    });
+    s.on("keydown", (e) => {
+      if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); endInspector(); }
+      else if (e.key === "Shift" && settings.fontPickLabels && !s.labels) showLabels(s);
+    });
+    s.on("keyup", (e) => { if (e.key === "Shift") hideLabels(s); });
+    s.on("blur", () => hideLabels(s));
+  }
+  function pickNoteFor(sel) {
+    const { role } = sel.owner, notes = [];
+    const target = areaTargetOf(sel.el, role);
+    if (target && !settings.fontTargets[target]) notes.push(`The text you picked is under “${fontArea(role).targets.find(([k]) => k === target)[1]}”, which is off. Tick it under Applies to.`);
+    if (sel.digit) notes.push("Digits 0–9 always keep T3's font.");
+    return notes.join(" ");
+  }
+  function pickChosen(sel) {
+    if (!sel?.owner) return; // the tag already says it isn't a Fonts area; keep picking
+    // Dock beside the block the text sits in (a picked link keeps its paragraph in view).
+    let block = sel.region;
+    while (block.parentElement && block.parentElement !== D.body && getComputedStyle(block).display.startsWith("inline")) block = block.parentElement;
+    const rect = sel.rect || block.getBoundingClientRect(), id = sel.owner.role, note = pickNoteFor(sel);
+    endInspector();
+    if (settings.fontPickDock) {
+      fontNav.role = id; fontNav.editor = true; fontNav.returns.length = 0;
+      openFontWorkspace(null, { dock: rect, dockAnchor: sel.rect ? null : block, note });
+    } else {
+      openFontsAt(id);
+      if (fontWorkspace && note) { fontWorkspace.pickNote.textContent = note; fontWorkspace.pickNote.hidden = false; }
+    }
+  }
+  function positionDock(el, rect) {
+    const m = 12, w = el.offsetWidth, ht = el.offsetHeight, vw = innerWidth, vh = innerHeight;
+    if (!rect) { // the picked text is gone: keep the card where it is, inside the window
+      const b = el.getBoundingClientRect();
+      return Object.assign(el.style, { left: `${Math.max(m, Math.min(b.left, vw - w - m))}px`, top: `${Math.max(m, Math.min(b.top, vh - ht - m))}px` });
+    }
+    let left = rect.right + m + w <= vw - m ? rect.right + m : rect.left - m - w >= m ? rect.left - m - w : null, top;
+    if (left !== null) top = Math.min(Math.max(m, rect.top), vh - ht - m);
+    else {
+      left = Math.min(Math.max(m, rect.left), vw - w - m);
+      top = rect.bottom + m + ht <= vh - m ? rect.bottom + m : rect.top - m - ht;
+    }
+    Object.assign(el.style, { left: `${Math.max(m, left)}px`, top: `${Math.max(m, top)}px` });
+  }
+  function undockFonts() {
+    const ui = fontWorkspace;
+    if (!ui || ui.el.dataset.mode !== "dock") return;
+    ui.el.close();
+    delete ui.el.dataset.mode;
+    ui.el.style.removeProperty("left");
+    ui.el.style.removeProperty("top");
+    ui.el.setAttribute("aria-labelledby", "t3x-fonts-title");
+    ui.el.showModal();
+    syncFontWorkspace();
+    ui.title.focus({ preventScroll: true });
+  }
+  /** Outline every visible place an area applies (or would, once it has a font). */
+  function showAreaOnScreen(id) {
+    if (!settings.fontShowOnScreen || disposed) return;
+    const ui = fontWorkspace, modal = !!ui && ui.el.dataset.mode !== "dock";
+    if (modal) ui.el.close(); // step aside; it comes back when this ends
+    const s = beginInspector(() => { if (modal && fontWorkspace === ui && !disposed) { ui.el.showModal(); ui.showBtn.focus({ preventScroll: true }); } });
+    const draw = () => {
+      s.layer.replaceChildren();
+      const els = visibleTextElements(), [fam] = probeAreas([{ add: roleAttrs(id) }], els);
+      const clusters = [...areaClusters(els, fam.map((r) => (r === id ? { role: id } : null))), ...(id === "viz" ? vizFrameClusters() : [])];
+      for (const c of clusters.slice(0, 80)) { const box = h("div", { class: "t3x-pick-box t3x-pick-shown" }); placeBox(box, c.rect); s.layer.append(box); }
+      const label = fontArea(id).label;
+      shieldFrames(s);
+      s.layer.append(s.bar(clusters.length ? `${label}: outlined where it applies on this screen · click or Esc to go back` : `${label} isn't on this screen right now · click or Esc to go back`, "Back"));
+    };
+    draw();
+    for (const type of PICK_EVENTS) s.on(type, (e) => {
+      if (e.target?.closest?.("[data-pick-ui]")) return;
+      if (ui && !modal && ui.el.contains(e.target)) { if (type === "pointerdown") endInspector(); return; }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (type === "click") endInspector();
+    });
+    s.on("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); endInspector(); } });
+    const moved = () => { clearTimeout(s.timer); s.timer = setTimeout(guarded("pick-show", () => { if (inspector === s) draw(); }), 120); };
+    s.on("scroll", moved);
+    s.on("resize", moved);
+  }
+  if (W.__T3X_PICK_TEST__) Object.assign(W.__T3X_PICK_TEST__, { areaOwners, roleAttrs, roleOfFamily, startFontPick, showAreaOnScreen, endInspector, openFontsAt, active: () => inspector, workspace: () => fontWorkspace });
   function stepAreaFont(id, dir) {
     const r = ROLE[id], cur = settings[r.key].family;
     const next = fontNeighbor(catalog, settings, cur, dir, nativeAvailable, id);
@@ -3298,6 +3694,7 @@
     }
     timers.clear();
     closePopover();
+    endInspector();
     closeFontWorkspace(false);
     closeFontPreviews();
     for (const f of Object.values(features)) f.node?.remove();
