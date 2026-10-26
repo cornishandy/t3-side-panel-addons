@@ -530,6 +530,13 @@ html[data-t3x-selecting] .t3x-older { display: none; } /* a multi-selection is o
 .t3x-older-range { flex: none; margin-left: auto; white-space: nowrap; color: var(--muted-foreground, currentColor); font-size: .6875rem; font-variant-numeric: tabular-nums; }
 @container (max-width: 11rem) { .t3x-older-range { display: none; } } /* a narrow sidebar: the label alone */
 
+/* ---------- gaps by time ----------
+ * No lines between rows; extras.js marks a row last active 25+ min after the one above it, and
+ * it gets a small gap. Row heights and T3's nodes are unchanged; only a top margin. */
+
+html[data-t3x-gaps] li[data-thread-item] + li[data-thread-item] { background: none; }
+html[data-t3x-gaps] li[data-thread-item][data-t3x-gap] { margin-top: .625rem; }
+
 /* ---------- one-row titles ----------
  * Undo the wrap (the keeper's and compact threads' two-line clamp): one line ending in "…".
  * A trailing "(2)" or "(Opus)" is repeated beside a cut title by an owned aria-hidden span. */

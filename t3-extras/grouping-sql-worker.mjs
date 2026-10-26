@@ -157,17 +157,32 @@ function pickIds(db, total, limit) {
   return [...priority, ...fill];
 }
 
+// The time T3's sidebar prints as a row's age: the last user message's updatedAt, else the
+// thread's updatedAt (T3: latestUserMessageAt ?? updatedAt). Optional: older schemas lack it.
+const hasColumn = (db, table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some((row) => row.name === column);
+// Only with T3's own partial index (thread_id, updated_at WHERE role = 'user'): without it the
+// lookup scans messages per thread and could time the whole snapshot out, so ageAt stays unknown.
+function hasLatestUser(db) {
+  if (!["thread_id", "role", "updated_at"].every((c) => hasColumn(db, "orchestration_v2_projection_messages", c))) return false;
+  const plan = db.prepare(`EXPLAIN QUERY PLAN SELECT m.updated_at FROM orchestration_v2_projection_messages m WHERE m.thread_id = ? AND m.role = 'user' ORDER BY m.updated_at DESC LIMIT 1`).all("x");
+  return plan.some((row) => /USING (COVERING )?INDEX/.test(String(row.detail))) && !plan.some((row) => /TEMP B-TREE/.test(String(row.detail)));
+}
+
 function threadRows(db, ids) {
   const json = JSON.stringify(ids);
+  const latestUser = hasLatestUser(db)
+    ? `(SELECT m.updated_at FROM orchestration_v2_projection_messages m WHERE m.thread_id = t.thread_id AND m.role = 'user' ORDER BY m.updated_at DESC LIMIT 1)`
+    : "NULL";
   return db.prepare(`
     SELECT thread_id AS id, project_id AS projectId, substr(title, 1, 180) AS title, created_at AS createdAt,
+      ${hasColumn(db, "orchestration_v2_projection_threads", "updated_at") ? "updated_at" : "NULL"} AS updatedAt, ${latestUser} AS latestUserAt,
       CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.settledOverride') END AS settledOverride,
       CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.settledAt') END AS settledAt,
       CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.snoozedUntil') END AS snoozedUntil,
       CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.snoozedAt') END AS snoozedAt,
       CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.pinnedAt') END AS pinnedAt,
       CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.limitRecovery.runId') END AS limitRunId
-    FROM orchestration_v2_projection_threads
+    FROM orchestration_v2_projection_threads t
     WHERE thread_id IN (SELECT value FROM json_each(?))`).all(json);
 }
 

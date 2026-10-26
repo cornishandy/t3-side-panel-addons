@@ -259,6 +259,7 @@ export function classifyThreads(raw, now, timeZone) {
       title: cleanText(row.title, 180) || "Untitled thread",
       projectId: safeId(row.projectId, 80),
       createdAt: row.createdAt ?? null,
+      ageAt: row.latestUserAt ?? row.updatedAt ?? null,
       settledOverride: row.settledOverride ?? null,
       settledAt: row.settledAt ?? null,
       snoozedUntil: row.snoozedUntil ?? null,
@@ -408,6 +409,7 @@ function classifyOne(thread, bags, now, timeZone) {
     projectLabel: thread.projectId ? (bags.labels.get(thread.projectId) ?? "Missing project record") : "No project",
     createdAt: parseTime(thread.createdAt),
     activityAt: when.at,
+    ageAt: parseTime(thread.ageAt), // what T3 prints as the row's age (latestUserMessageAt ?? updatedAt)
     activitySource: when.source,
     recentBucket: when.bucket ?? (when.at == null ? "none" : bucket(when.at, now, timeZone)),
     activity,

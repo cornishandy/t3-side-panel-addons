@@ -66,6 +66,7 @@
     foldOlder: true, // older active threads fold under one "Show N older" row
     olderOpen: false, // that row's remembered state
     oneRowTitles: true, // one line per title; a trailing (N) or (Model) stays visible
+    timeGaps: true, // a gap between active threads last active 25+ min apart, instead of lines
     marker: "bar", // bar | outline | off
     fontHead: Object.freeze({ family: "off", size: null }), // size null = the font's own default
     fontBody: Object.freeze({ family: "off", size: null }), // retained only as the migration source
@@ -91,10 +92,11 @@
     printOnly: true,
     showPartly: false,
     interfaceFontsOpen: false,
+    settingsOpen: false, // the ✦ panel's Settings show/hide, remembered
     footerTeam: "start-open", // the reply footer's team list: always-show | start-open | start-folded | always-hide
     fontTargets: Object.freeze({ composer: true, quotes: true, projects: true, pills: true, headings: true, replies: true, mine: true, ...Object.fromEntries(INTERFACE_TARGETS.map(([key]) => [key, false])) }),
   });
-  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "printOnly", "showPartly", "interfaceFontsOpen"];
+  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "printOnly", "showPartly", "interfaceFontsOpen", "settingsOpen"];
   const MARKERS = ["bar", "outline", "off"];
   const FOOTER_TEAM = [
     ["always-show", "Always show"],
@@ -1021,6 +1023,7 @@
       "data-t3x-fold": st.foldOlder ? "" : null,
       "data-t3x-older-open": st.foldOlder && st.olderOpen ? "" : null,
       "data-t3x-onerow": st.oneRowTitles ? "" : null,
+      "data-t3x-gaps": st.timeGaps ? "" : null,
       "data-t3x-inline-icon": st.inlineIcon ? "" : null,
       "data-t3x-project-full": st.projectFull ? "" : null,
       "data-t3x-working": st.workingHeader ? "" : null,
@@ -1064,6 +1067,15 @@
     return a.length - i >= 2 ? a[i] : null;
   }
 
+  /** Gaps by time: for neighbouring rows' age times (ms, newest first; null = unknown), whether a
+   *  gap goes before each row. Only where both times are known and the older row was last active
+   *  at least GAP_MIN minutes before the newer one; a fixed threshold, so unchanged threads never
+   *  regroup just because the clock moved on. */
+  const GAP_MIN = 25;
+  function gapsBefore(times) {
+    return times.map((t, i) => i > 0 && Number.isFinite(t) && Number.isFinite(times[i - 1]) && times[i - 1] - t >= GAP_MIN * 60e3);
+  }
+
   /** A title's trailing "(N)" or "(Model)" (kept visible when a one-row title is cut), or "". */
   function titleSuffix(title) {
     const m = /\s(\([^()]{1,24}\))$/.exec(String(title ?? "").trim());
@@ -1071,7 +1083,7 @@
   }
 
   const core = {
-    rowAgeHours, olderCutoff, titleSuffix,
+    rowAgeHours, olderCutoff, titleSuffix, gapsBefore,
     DEFAULTS, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, usagePageHash, usageContainerMatches,
     FOOTER_TEAM, FOOTER_DETAILS, footerPass, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
@@ -1189,7 +1201,7 @@
 
   // ---------- <html> switches for the CSS-only parts ----------
 
-  const ROOT_ATTRS = ["data-t3x-selecting", "data-t3x-tight", "data-t3x-compact", "data-t3x-pinned-label", "data-t3x-fold", "data-t3x-older-open", "data-t3x-onerow", "data-t3x-inline-icon", "data-t3x-project-full", "data-t3x-working", "data-t3x-marker", "data-t3x-footer-team", "data-t3x-fh", "data-t3x-fb", "data-t3x-fm", ...TARGETS.map((t) => `data-t3x-ft-${t}`)];
+  const ROOT_ATTRS = ["data-t3x-selecting", "data-t3x-tight", "data-t3x-compact", "data-t3x-pinned-label", "data-t3x-fold", "data-t3x-older-open", "data-t3x-onerow", "data-t3x-gaps", "data-t3x-inline-icon", "data-t3x-project-full", "data-t3x-working", "data-t3x-marker", "data-t3x-footer-team", "data-t3x-fh", "data-t3x-fb", "data-t3x-fm", ...TARGETS.map((t) => `data-t3x-ft-${t}`)];
   function applyRootAttrs() {
     const r = D.documentElement;
     for (const [name, value] of Object.entries(rootAttrs(settings))) (value === null ? r.removeAttribute(name) : r.setAttribute(name, value));
@@ -2108,6 +2120,67 @@
   listen(D, "click", trackSelection);
   listen(D, "keydown", trackSelection);
 
+  // ---------- gaps by time ----------
+  // Exact age times come from the add-ons service (/grouping: ageAt, the time T3 prints as each
+  // row's age); the sidebar's own "1h" text is too coarse. Only the active list gets gaps, never
+  // across Pinned, Working, the fold row or a section marker; rows without a known time get none.
+  let gapTimes = null, gapInflight = null, gapTriedAt = 0, gapEnv = null;
+  function fetchGapTimes() {
+    if (disposed || !settings.timeGaps || gapInflight || Date.now() - gapTriedAt < 60e3) return; // one try a minute, answer or not
+    gapTriedAt = Date.now();
+    const ctrl = new AbortController();
+    requests.add(ctrl);
+    const kill = setTimeout(() => ctrl.abort(), 15e3);
+    gapInflight = fetch(`${BASE}grouping`, { cache: "no-store", signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(guarded("gaps", (j) => {
+        if (disposed) return;
+        const m = new Map();
+        for (const t of Array.isArray(j?.threads) ? j.threads : []) if (typeof t?.id === "string" && Number.isFinite(t.ageAt)) m.set(t.id, t.ageAt);
+        gapTimes = m.size ? m : null;
+        gapEnv = typeof j?.localEnvironmentId === "string" && j.localEnvironmentId ? j.localEnvironmentId : null;
+        decorateGaps();
+      }), () => { if (!disposed) gapTimes = null; })
+      .finally(() => {
+        clearTimeout(kill);
+        requests.delete(ctrl);
+        gapInflight = null;
+      });
+  }
+  // T3 keys a row "<environment id>:<thread id>"; the service reads this Mac's database only, so
+  // a row matches only with this Mac's environment and the complete thread id.
+  function rowTime(li) {
+    if (!gapTimes || !gapEnv) return null;
+    const key = li.getAttribute("data-thread-item") || "";
+    if (!key.startsWith(`${gapEnv}:`)) return null;
+    return gapTimes.get(key.slice(gapEnv.length + 1)) ?? null;
+  }
+  function decorateGaps() {
+    const on = settings.timeGaps;
+    if (on) fetchGapTimes();
+    const marked = new Set(D.querySelectorAll("li[data-t3x-gap]"));
+    if (on && gapTimes) {
+      for (const ph of D.querySelectorAll('li[data-testid="sidebar-active-placeholder"]')) {
+        let run = [];
+        const flush = () => {
+          gapsBefore(run.map(rowTime)).forEach((g, i) => {
+            if (!g) return;
+            marked.delete(run[i]);
+            if (!run[i].hasAttribute("data-t3x-gap")) run[i].setAttribute("data-t3x-gap", "");
+          });
+          run = [];
+        };
+        for (let li = ph.nextElementSibling; li; li = li.nextElementSibling) {
+          if (li.hasAttribute(OWN)) { flush(); continue; } // the fold row
+          if (isMarker(li)) break;
+          if (li.matches("li[data-thread-item]") && li.checkVisibility()) run.push(li);
+        }
+        flush();
+      }
+    }
+    for (const li of marked) li.removeAttribute("data-t3x-gap");
+  }
+
   // ---------- one-row titles: keep a trailing (N) or (Model) visible ----------
   // T3's title span already ends in "…" on one line once the wrap is undone (CSS). When a title
   // ending in "(2)" or "(Opus)" is cut, an owned aria-hidden copy of that ending sits beside it, so
@@ -2345,6 +2418,11 @@
       decorateTitles();
     } catch (e) {
       noteError("titles", e);
+    }
+    try {
+      decorateGaps();
+    } catch (e) {
+      noteError("gaps", e);
     }
   }
   every(60e3, () => {
@@ -2971,7 +3049,7 @@
       h("button", {type:"button",class:"t3x-font-entry","data-focus":"open-fonts",onclick:e=>openFontWorkspace(e.currentTarget)},h("span",{text:"Fonts…"}),h("span",{class:"t3x-muted",text:fontsCustomized()?`${fontsCustomized()} customized`:"All T3 default"})),
       fontPickList(),
       paused ? h("div", { class: "t3x-warn", text: "Add-ons paused after repeated errors. Press Shift-Cmd-R to retry." }) : null,
-      h("details", { class: "t3x-more", open: panelMoreOpen, ontoggle: (e) => { panelMoreOpen = e.currentTarget.open; } },
+      h("details", { class: "t3x-more", open: settings.settingsOpen, ontoggle: (e) => { if (e.currentTarget.open !== settings.settingsOpen) { settings = readSettings(JSON.stringify({ ...settings, settingsOpen: e.currentTarget.open })); saveSettings(); } } },
       h("summary", { "data-focus": "more" }, h("span", { text: "Settings" })),
       h("section", {}, h("h3", { text: "Usage" }),
         sw("Header glyphs (one per lab)", "usageHeader", where("header")),
@@ -2986,6 +3064,7 @@
         sw("Compact threads", "compactThreads", "Project icon and title on one line; hover the icon for the project and branch."),
         sw("One-row titles", "oneRowTitles", "Long titles end in \u2026 but keep a trailing number like (2). Off: titles wrap (two lines at most with compact threads)."),
         sw("Pinned label and line", "pinnedLabel", "A small \u201cPinned\u201d label above pinned threads and a line below them."),
+        sw("Gaps by time", "timeGaps", "A small gap between threads last active 25+ min apart, instead of lines between rows."),
         sw("Fold older threads", "foldOlder", "Threads idle well past your newest few fold under \u201cShow N older\u201d."),
         settings.compactThreads ? null : [
           sw("Tighter rows", "tighter"),
@@ -3008,7 +3087,6 @@
     ];
   }
   panelBody.label = "Add-ons";
-  let panelMoreOpen = false; // the Settings disclosure, open for the rest of this session once opened
   function openPanel(btn) {
     openPopover(btn, "panel", panelBody, { width: 360 });
   }

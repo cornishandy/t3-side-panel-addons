@@ -822,3 +822,12 @@ test("one-row titles: only a short trailing (N) or (Model) is kept", () => {
   assert.deepEqual(["Thread health watch (48)", "Sidebar sections and titles (2)", "Review: plan (Astra)", "Good Boy (2026) film podcast", "(2)", "x (a very long parenthetical that is not a chain number)", "Ends with (nested (x))"].map(C.titleSuffix),
     ["(48)", "(2)", "(Astra)", "", "", "", ""]);
 });
+
+test("gaps by time: a gap only where both times are known and 25+ min apart", () => {
+  const M = 60e3, T = 1e12;
+  assert.deepEqual([...C.gapsBefore([T, T - 5 * M, T - 30 * M, T - 54 * M, T - 80 * M])], [false, false, true, false, true]);
+  assert.deepEqual([...C.gapsBefore([T, null, T - 90 * M, T - 200 * M])], [false, false, false, true]); // unknown: no gap either side
+  assert.deepEqual([...C.gapsBefore([T, T - 25 * M + 1])], [false, false]);
+  assert.deepEqual([...C.gapsBefore([T - 60 * M, T])], [false, false]); // out of order: no gap
+  assert.deepEqual([...C.gapsBefore([])], []);
+});
