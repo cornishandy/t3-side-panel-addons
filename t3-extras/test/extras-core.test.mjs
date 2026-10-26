@@ -22,7 +22,7 @@ test("the file stops before touching the DOM when loaded for tests", () => {
 
 test("routes: only #/<environment>/<thread> is a thread; drafts and pages are not", () => {
   const env = "11111111-2222-4333-8444-555555555555";
-  const th = "a06b79b7-0000-4000-8000-0000000000aa";
+  const th = "c0ffee00-0000-4000-8000-0000000000aa";
   assert.deepEqual(plain(C.parseRoute(`#/${env}/${th}`)), { kind: "thread", environmentId: env, threadId: th });
   assert.equal(C.parseRoute(`#/${env}/${encodeURIComponent("mcp:" + th)}`).threadId, "mcp:" + th);
   assert.equal(C.parseRoute(`#/${env}/${th}?x=1#frag`).threadId, th);
@@ -735,22 +735,22 @@ function row(item, testid) {
 }
 const LOCAL = "0f0e0d0c-0b0a-4908-8706-050403020100";
 test("burn rows: this Mac's card/slim rows by exact thread id; compact rows only with proof they're local", () => {
-  const threads = { "a06b79b7-0000-4000-8000-000000000001": { tier: "warm" }, "thread:delegate-1:%2Fx.y": { tier: "burst" }, "mcp:806769b1-0000": { tier: "hot" }, "remote-thread-1": { tier: "warm" }, "compact-only-1": { tier: "warm" } };
+  const threads = { "c0ffee00-0000-4000-8000-000000000001": { tier: "warm" }, "thread:delegate-1:%2Fx.y": { tier: "burst" }, "mcp:deadbeef-0000": { tier: "hot" }, "remote-thread-1": { tier: "warm" }, "compact-only-1": { tier: "warm" } };
   const lis = [
-    row(`${LOCAL}:a06b79b7-0000-4000-8000-000000000001`, "sidebar-row-card"),
+    row(`${LOCAL}:c0ffee00-0000-4000-8000-000000000001`, "sidebar-row-card"),
     row(`${LOCAL}:thread:delegate-1:%2Fx.y`, "sidebar-row-slim"), // colons and % in the id: split at the first colon only
-    row(`${LOCAL}:mcp:806769b1-0000`, "sidebar-row-card"),
+    row(`${LOCAL}:mcp:deadbeef-0000`, "sidebar-row-card"),
     row("99999999-0000-4000-8000-000000000000:remote-thread-1", "sidebar-row-card"), // another environment
     row(`${LOCAL}:not-hot-0001`, "sidebar-row-card"),
-    row("true", "thread-row-a06b79b7-0000-4000-8000-000000000001"), // compact, proven by the card row above
+    row("true", "thread-row-c0ffee00-0000-4000-8000-000000000001"), // compact, proven by the card row above
     row("true", "thread-row-compact-only-1"), // compact, no proof
   ];
   const got = C.burnTargets(lis, threads, LOCAL, { kind: "home" }).map((t) => [t.threadId, t.kind]);
   assert.deepEqual(plain(got), [
-    ["a06b79b7-0000-4000-8000-000000000001", "card"],
+    ["c0ffee00-0000-4000-8000-000000000001", "card"],
     ["thread:delegate-1:%2Fx.y", "slim"],
-    ["mcp:806769b1-0000", "card"],
-    ["a06b79b7-0000-4000-8000-000000000001", "compact"],
+    ["mcp:deadbeef-0000", "card"],
+    ["c0ffee00-0000-4000-8000-000000000001", "compact"],
   ]);
   // The open local thread's route is proof too.
   const open = C.burnTargets(lis, threads, LOCAL, { kind: "thread", environmentId: LOCAL, threadId: "compact-only-1" });

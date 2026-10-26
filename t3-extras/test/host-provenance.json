@@ -6,7 +6,7 @@
     "bytes": 526333,
     "what": "Source evidence for default tokens only. The visual fixture uses the [data-app-sidebar] light rules and the [data-app-sidebar]:is(.dark,.dark *) dark rules, including --font-sans from @layer theme. It is not Andy's current theme or selected font."
   },
-  "fontOwner": "mcp:7c734267-b101-4b3d-b476-1ee9a7410615 reported no captured purple theme and no selected font. Cache fixtures that force Arial or generic colors must not be called the current theme.",
+  "fontOwner": "The font review found no captured custom theme or selected font. Cache fixtures that force Arial or generic colors must not be called the current theme.",
   "preview": "preview.html does not paint a black root, a banner, or a named font. Sidebar color and type use var(--sidebar) and var(--font-sans) so a host injection applies. Default light and dark stay in the visual test fixture and are labeled default-app-sidebar-light and default-app-sidebar-dark.",
   "classesPreserved": [
     "t3x-g-title",

@@ -1,5 +1,7 @@
 # T3 side-panel add-ons
 
+> **Personal experiment.** I'm not a professional developer; I use T3 Code on my Mac for personal movie and Twitter projects. I made this to suit my own workflow. It isn't an official T3 Code project or a supported product.
+
 Personal customizations for the sidebar (side panel) of **T3 Code (Nightly)** on macOS. Two parts, kept together because each needs the other:
 
 - **[`t3-extras/`](t3-extras/README.md)** — the add-ons themselves, behind a **✦** button in the sidebar's bottom row: usage meters for each AI lab (Claude, Codex, Gemini, Grok), thread "burn" tells, a Prepare handover button and handover chain pill, compact thread rows and other sidebar polish, an 18-area Fonts workspace, and the reply-footer card styling. Each add-on has its own switch. A small Node server on `127.0.0.1:8793` (loopback only, every request must come from T3's own `t3code://app` origin) serves them.

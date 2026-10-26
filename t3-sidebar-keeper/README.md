@@ -1,5 +1,7 @@
 # T3 sidebar keeper
 
+> **Personal experiment.** I'm not a professional developer; I use T3 Code on my Mac for personal movie and Twitter projects. I made this to suit my own workflow. It isn't an official T3 Code project or a supported product.
+
 Keeps Andy's sidebar-title changes in **T3 Code (Nightly)** across restarts and auto-updates:
 
 - **wrap**: sidebar thread titles word-wrap instead of ending in "…" (cards, slim rows, drafts, search results, legacy rows).

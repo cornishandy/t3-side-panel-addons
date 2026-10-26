@@ -1,5 +1,7 @@
 # T3 add-ons (t3-extras)
 
+> **Personal experiment.** I'm not a professional developer; I use T3 Code on my Mac for personal movie and Twitter projects. I made this to suit my own workflow. It isn't an official T3 Code project or a supported product.
+
 Small additions to **T3 Code (Nightly)** on this Mac, made 19 Oct 2026. Each one has its own switch, so you can turn off any one you don't like.
 
 ## What you get

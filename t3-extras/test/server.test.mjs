@@ -32,8 +32,8 @@ test("CORS echoes only T3's own origins, nothing broader", () => {
 });
 
 test("thread ids match with or without the mcp: prefix (read side only)", () => {
-  assert.equal(normId("mcp:a06b79b7-d73a"), "a06b79b7-d73a");
-  assert.equal(normId("a06b79b7-d73a"), "a06b79b7-d73a");
+  assert.equal(normId("mcp:c0ffee00-d00d"), "c0ffee00-d00d");
+  assert.equal(normId("c0ffee00-d00d"), "c0ffee00-d00d");
   assert.equal(normId(undefined), "");
 });
 
@@ -42,30 +42,30 @@ const STATE = {
   mode: "ask",
   chains: {
     "dcd3273e-870d-4000-8000-000000000001": {
-      title: "Wrap side-panel thread titles", file: "/x/HANDOFF-dcd3273e.md", owner: "mcp:a06b79b7-0000-4000-8000-000000000002", pending: null,
-      history: [{ at: "2026-10-19T17:43:00Z", from: "dcd3273e-870d-4000-8000-000000000001", to: "mcp:a06b79b7-0000-4000-8000-000000000002" }],
+      title: "Wrap side-panel thread titles", file: "/x/HANDOFF-dcd3273e.md", owner: "mcp:c0ffee00-0000-4000-8000-000000000002", pending: null,
+      history: [{ at: "2026-10-19T17:43:00Z", from: "dcd3273e-870d-4000-8000-000000000001", to: "mcp:c0ffee00-0000-4000-8000-000000000002" }],
     },
-    "mcp:806769b1-0000-4000-8000-000000000003": { title: "Solo", file: "/x/HANDOFF-806769b1.md", owner: "mcp:806769b1-0000-4000-8000-000000000003", pending: null },
+    "mcp:deadbeef-0000-4000-8000-000000000003": { title: "Solo", file: "/x/HANDOFF-deadbeef.md", owner: "mcp:deadbeef-0000-4000-8000-000000000003", pending: null },
   },
   threads: {
     "dcd3273e-870d-4000-8000-000000000001": { chain: "dcd3273e-870d-4000-8000-000000000001", predecessor: null },
-    "mcp:a06b79b7-0000-4000-8000-000000000002": { chain: "dcd3273e-870d-4000-8000-000000000001", predecessor: "dcd3273e-870d-4000-8000-000000000001" },
-    "mcp:806769b1-0000-4000-8000-000000000003": { chain: "mcp:806769b1-0000-4000-8000-000000000003", predecessor: null },
+    "mcp:c0ffee00-0000-4000-8000-000000000002": { chain: "dcd3273e-870d-4000-8000-000000000001", predecessor: "dcd3273e-870d-4000-8000-000000000001" },
+    "mcp:deadbeef-0000-4000-8000-000000000003": { chain: "mcp:deadbeef-0000-4000-8000-000000000003", predecessor: null },
   },
 };
 
 test("chain position comes from the history; bare and mcp: ids are the same thread", () => {
-  const second = chainView(STATE, "a06b79b7-0000-4000-8000-000000000002");
+  const second = chainView(STATE, "c0ffee00-0000-4000-8000-000000000002");
   assert.equal(second.position, 2);
   assert.equal(second.length, 2);
   assert.equal(second.short, "dcd3273e");
   assert.equal(second.current, true);
-  assert.deepEqual(second.history, [{ at: "2026-10-19T17:43:00Z", from: "dcd3273e", to: "a06b79b7" }]);
-  assert.deepEqual(chainView(STATE, "mcp:a06b79b7-0000-4000-8000-000000000002"), second);
+  assert.deepEqual(second.history, [{ at: "2026-10-19T17:43:00Z", from: "dcd3273e", to: "c0ffee00" }]);
+  assert.deepEqual(chainView(STATE, "mcp:c0ffee00-0000-4000-8000-000000000002"), second);
   const first = chainView(STATE, "mcp:dcd3273e-870d-4000-8000-000000000001");
   assert.equal(first.position, 1);
   assert.equal(first.current, false);
-  const solo = chainView(STATE, "806769b1-0000-4000-8000-000000000003");
+  const solo = chainView(STATE, "deadbeef-0000-4000-8000-000000000003");
   assert.equal(solo.position, 1);
   assert.equal(solo.length, 1);
   assert.equal(chainView(STATE, "ffffffff-0000-4000-8000-000000000009"), null);
@@ -201,7 +201,7 @@ test("the service listens on 127.0.0.1 only", async () => {
 });
 
 test("every endpoint refuses a request without T3's Origin", async () => {
-  for (const p of ["/state?thread=a06b79b7-0000-4000-8000-000000000002", "/extras.js", "/extras.css", "/version", "/fonts/kalam-latin-400.woff2", "/diag?cards=1"]) {
+  for (const p of ["/state?thread=c0ffee00-0000-4000-8000-000000000002", "/extras.js", "/extras.css", "/version", "/fonts/kalam-latin-400.woff2", "/diag?cards=1"]) {
     const r = await get(p, { "Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "navigate" });
     assert.equal(r.status, 403, p);
     assert.doesNotMatch(r.body, /Wrap side-panel|HANDOFF/, p);
@@ -236,13 +236,13 @@ test("fonts are served from the allowlist only", async () => {
 });
 
 test("/state: one shared usage snapshot, chain by bare or mcp: id, local environment id", async () => {
-  const a = JSON.parse((await get("/state?thread=a06b79b7-0000-4000-8000-000000000002", { Origin: "t3code://app" })).body);
+  const a = JSON.parse((await get("/state?thread=c0ffee00-0000-4000-8000-000000000002", { Origin: "t3code://app" })).body);
   assert.equal(a.usage.claude.tier, "T0");
   assert.equal(a.usage.codex.gate.action, "GO");
   assert.equal(a.handover.mode, "ask");
   assert.equal(a.handover.chain.position, 2);
   assert.equal(a.localEnvironmentId, "11111111-2222-4333-8444-555555555555");
-  const b = JSON.parse((await get("/state?thread=" + encodeURIComponent("mcp:a06b79b7-0000-4000-8000-000000000002"), { Origin: "t3code://app" })).body);
+  const b = JSON.parse((await get("/state?thread=" + encodeURIComponent("mcp:c0ffee00-0000-4000-8000-000000000002"), { Origin: "t3code://app" })).body);
   assert.deepEqual(b.handover.chain, a.handover.chain);
   assert.equal(b.usage.fetchedAt, a.usage.fetchedAt, "usage should come from one cached snapshot");
 });
