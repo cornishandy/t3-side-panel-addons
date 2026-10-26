@@ -292,6 +292,7 @@ const DIAG_KEYS = {
   fcDraw: BOOL,
   fq: BOOL,
   fqCss: oneOf("true", "false", "none"), // an open question card's prose ("none": no card on screen)
+  fqOpt: oneOf("true", "false", "none"), // an open question card's option label
   fr: BOOL,
   frCss: oneOf("true", "false", "none"), // expanded reasoning prose ("none": none expanded)
   faces: COUNT, // add-on FontFaces in document.fonts

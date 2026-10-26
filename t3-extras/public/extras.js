@@ -222,6 +222,23 @@
     }
     return true;
   }
+  /** Areas close enough to share a font. Nothing follows these on its own: the ✦ panel and Fonts
+   *  offer to point the rest of an area's group at it, and only when asked. */
+  const FONT_SIMILAR_GROUPS = Object.freeze([
+    Object.freeze(["main", "quotes", "reasoning", "plans", "questions"]),
+    Object.freeze(["composer", "prompts"]),
+    Object.freeze(["head", "threadtitles"]),
+    Object.freeze(["tables", "footer"]),
+    Object.freeze(["links", "paths"]),
+    Object.freeze(["sidebar", "tooltips", "interface", "usage"]),
+  ]);
+  /** The rest of id's group that doesn't already use id's font and could follow it without a cycle. */
+  function similarFontAreas(sources, id) {
+    const group = FONT_SIMILAR_GROUPS.find((g) => g.includes(id));
+    if (!group) return [];
+    const terminal = resolveFontGraph(sources);
+    return group.filter((a) => a !== id && terminal[a] !== id && !fontLinkWouldCycle(sources, a, id));
+  }
   function usagePageHash(hash) {
     const path = String(hash ?? "").replace(/^#/, "").split(/[?#]/)[0];
     let parts;
@@ -1107,7 +1124,7 @@
   const core = {
     rowAgeHours, olderCutoff, titleSuffix, gapsBefore,
     DEFAULTS, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
-    effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, usagePageHash, usageContainerMatches,
+    effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, FONT_SIMILAR_GROUPS, similarFontAreas, usagePageHash, usageContainerMatches,
     FOOTER_TEAM, FOOTER_DETAILS, footerPass, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
     forecast, seriesSegments, mergeSeries, dGeometry, fmtClock, lowRefills, compactParts, composerLabel, labUsageFailedSince, toolGates, labsForMerge, labFailure, handoverGate, HANDOVER_REQUEST, chainLabel, contrast, STALE_MS, T3_STALE_MS,
   };
@@ -2865,7 +2882,7 @@
     {id:"paths",group:"Assistant replies",label:"File paths",scope:"Recognized file links, workspace breadcrumbs and context-chip text. This takes precedence over Links; code blocks keep T3’s technical font.",sample:"src/components/FontSettings.tsx 123"},
     {id:"reasoning",group:"Assistant replies",label:"Expanded reasoning",scope:"Expanded reasoning prose and its headings. Collapsed work rows and tool output stay native.",sample:"First, consider what changes when the input grows. 123"},
     {id:"plans",group:"Assistant replies",label:"Proposed plans",scope:"Proposed plan prose and its headings. Plan controls stay native.",sample:"Review the example, then check the result. 123"},
-    {id:"questions",group:"Assistant replies",label:"Questions & saved answers",scope:"Question explanations and saved-answer prose. Option buttons, shortcuts and input controls stay native.",sample:"Which result would be most useful to you? 123"},
+    {id:"questions",group:"Assistant replies",label:"Questions & saved answers",scope:"Question text, its option labels and descriptions, and saved-answer prose. The card header, number shortcuts and input controls stay native.",sample:"Which result would be most useful to you? 123"},
     {id:"viz",group:"Assistant replies",label:"Visualizations & diagrams",scope:"Compatible native HTML visualizations and diagrams when the native bridge is active. Authored styles, images, canvas, math and foreign app cards may keep their own fonts. Expanded diagrams use bundled faces; Mac faces use a fresh layout in T3’s font.",sample:"Input → Process → Result 123"},
     {id:"footer",group:"Assistant replies",label:"Reply footer",scope:"The recognized verdict and plan table, immediate team list and small usage line at the end of an assistant reply. Ordinary tables are separate.",sample:"Done   Review the example\nSol · 10 min · planned 10"},
     {id:"threadtitles",group:"App & interface",label:"Thread titles",scope:"Native thread-title text and grouping thread titles. Project headings and sidebar metadata are separate.",sample:"Visualization font sections 123"},
@@ -2877,6 +2894,7 @@
   const fontArea = id => FONT_AREAS.find(a=>a.id===id);
   const NATIVE_FONT_GUIDANCE = "Code, diffs, terminal text, ASCII digits 0–9 and control labels (buttons, menus and inputs) keep T3’s native fonts. Use T3’s font settings for technical text. Other settings prose and foreign image, canvas, math or app content are not all covered.";
   let fontWorkspace = null;
+  let similarUndo = null; // the last "Use for similar areas": {id, prev: {area: its old source}}
   const fontNav = {role:"main",query:"",editor:false,scroll:new Map(),indexScroll:0,returns:[]};
   function fontsCustomized() {
     return FONT_ROLES.filter(r=>activePick(r.id).family!=="off").length;
@@ -2965,6 +2983,10 @@
     const source=h("select",{class:"t3x-select",id:"t3x-font-source",onchange:e=>change({fontSources:{...settings.fontSources,[fontNav.role]:e.currentTarget.value}})});
     const resolved=h("p",{class:"t3x-font-resolved",role:"status","aria-live":"polite"});
     const editSource=h("button",{type:"button",class:"t3x-btn",hidden:true,onclick:()=>selectFontArea(settings.fontSources[fontNav.role].slice(5),{fromSource:true})},"Edit source");
+    const similarNote=h("p",{class:"t3x-note"});
+    const similarApply=h("button",{type:"button",class:"t3x-btn",onclick:()=>applySimilar(fontNav.role)},"Use for similar areas");
+    const similarBack=h("button",{type:"button",class:"t3x-btn",onclick:()=>undoSimilar()},"Undo");
+    const similar=h("div",{class:"t3x-font-similar",role:"group","aria-label":"Similar areas",hidden:true},similarNote,h("div",{class:"t3x-font-similar-actions"},similarApply,similarBack));
     const choose=family=>{const r=ROLE[fontNav.role];if(family!=="off"&&(family!==settings[r.key].family||settings.fontSources[fontNav.role]!=="own"))change({[r.key]:{family,size:null},fontSources:{...settings.fontSources,[fontNav.role]:"own"}});};
     const family=h("select",{class:"t3x-select t3x-font-select",id:"t3x-font-family","aria-label":"Font family","data-focus":"workspace-family",onpointerdown:e=>warmMenuNames(e.currentTarget),onkeydown:e=>{if([" ","Enter","ArrowDown","ArrowUp","F4"].includes(e.key))warmMenuNames(e.currentTarget);},onchange:e=>choose(e.currentTarget.value),onblur:()=>{if(fontWorkspace?.pending)syncFontWorkspace();}});
     const prev=h("button",{type:"button",class:"t3x-btn","aria-label":"Previous font",onclick:()=>choose(fontNeighbor(catalog,settings,settings[ROLE[fontNav.role].key].family,-1,nativeAvailable,fontNav.role))},"Previous");
@@ -2984,9 +3006,9 @@
       h("button",{type:"button",class:"t3x-btn",onclick:()=>startFontPick()},"Pick other text"),
       h("button",{type:"button",class:"t3x-btn",onclick:()=>undockFonts()},"All fonts…"),
       h("button",{type:"button",class:"t3x-btn t3x-font-done",onclick:()=>closeFontWorkspace(false)},"Done"));
-    editor.append(back,returnButton,editorTitle,pickNote,h("div",{class:"t3x-font-tools"},showBtn),h("strong",{class:"t3x-font-scope-label",text:"Applies to"}),scope,targets,h("label",{for:"t3x-font-source",text:"Font source"}),source,resolved,editSource,own,fontNote,h("div",{class:"t3x-font-preview-label",text:"Preview"}),sample,h("p",{class:"t3x-note",text:"Changes apply immediately. A preview illustrates the face; native surfaces may have different text sizes and layout."}),dockbar);
+    editor.append(back,returnButton,editorTitle,pickNote,h("div",{class:"t3x-font-tools"},showBtn),h("strong",{class:"t3x-font-scope-label",text:"Applies to"}),scope,targets,h("label",{for:"t3x-font-source",text:"Font source"}),source,resolved,editSource,similar,own,fontNote,h("div",{class:"t3x-font-preview-label",text:"Preview"}),sample,h("p",{class:"t3x-note",text:"Changes apply immediately. A preview illustrates the face; native surfaces may have different text sizes and layout."}),dockbar);
     el.append(h("header",{class:"t3x-font-workspace-head"},h("div",{},title,h("p",{text:"Choose an area, then its font"})),h("div",{class:"t3x-font-head-actions"},settings.fontPicker?h("button",{type:"button",class:"t3x-btn",onclick:()=>startFontPick()},"Pick from screen"):null,h("button",{type:"button",class:"t3x-btn","aria-label":"Close Fonts",onclick:()=>closeFontWorkspace()},"Close"))),h("div",{class:"t3x-font-workspace-body"},h("nav",{class:"t3x-font-navigation","aria-label":"Font areas"},h("label",{for:"t3x-font-search",text:"Find an area"}),search,index),editor));
-    fontWorkspace={el,trigger:anchor,search,index,editor,navigation:el.querySelector(".t3x-font-navigation"),lastFocus:null,switchingArea:true,rows,empty,guidance,title:editorTitle,scope,targets,source,resolved,editSource,own,family,prev,next,minus,plus,size,reset,sample,fontNote,returnButton,pickNote,showBtn,role:null,optionsKey:null};
+    fontWorkspace={el,trigger:anchor,search,index,editor,navigation:el.querySelector(".t3x-font-navigation"),lastFocus:null,switchingArea:true,rows,empty,guidance,title:editorTitle,scope,targets,source,resolved,editSource,similar,similarNote,similarApply,similarBack,own,family,prev,next,minus,plus,size,reset,sample,fontNote,returnButton,pickNote,showBtn,role:null,optionsKey:null};
     el.addEventListener("focusin",e=>{if(fontWorkspace?.el===el){rememberFontScroll();fontWorkspace.lastFocus=e.target;}});
     for(const pane of [index,editor])pane.addEventListener("scroll",()=>{if(fontWorkspace?.el===el)rememberFontScroll();});
     el.addEventListener("cancel",e=>{e.preventDefault();if(!fontSelectOpen())closeFontWorkspace();});
@@ -3052,6 +3074,8 @@
     }
     // Docked beside picked text: the font list shows straight away (choosing one makes it this area's own).
     ui.own.hidden=src!=="own"&&ui.el.dataset.mode!=="dock";ui.editSource.hidden=!src.startsWith("link:");
+    const offer=similarOffer(id);ui.similar.hidden=!offer;
+    if(offer){ui.similarNote.textContent=offer.text;ui.similarApply.hidden=!offer.areas.length;ui.similarBack.hidden=!offer.undo;}
     ui.resolved.textContent=`${src.startsWith("link:")?`Same as ${fontArea(src.slice(5))?.label}. `:""}${fontResolvedText(id)}${effective.family==="off"?" · follows current T3 settings":""}`;
     const options=fontOptions(catalog,settings,pick.family,nativeAvailable,id),optionsKey=JSON.stringify([options,pick.family]);
     if(ui.optionsKey!==optionsKey){
@@ -3531,11 +3555,39 @@
     s.on("scroll", moved);
     s.on("resize", moved);
   }
-  if (W.__T3X_PICK_TEST__) Object.assign(W.__T3X_PICK_TEST__, { areaOwners, roleAttrs, roleOfFamily, startFontPick, showAreaOnScreen, endInspector, openFontsAt, active: () => inspector, workspace: () => fontWorkspace });
+  if (W.__T3X_PICK_TEST__) Object.assign(W.__T3X_PICK_TEST__, { areaOwners, roleAttrs, roleOfFamily, startFontPick, showAreaOnScreen, endInspector, openFontsAt, openPanel, active: () => inspector, workspace: () => fontWorkspace });
   function stepAreaFont(id, dir) {
     const r = ROLE[id], cur = settings[r.key].family;
     const next = fontNeighbor(catalog, settings, cur, dir, nativeAvailable, id);
     if (next && next !== cur) change({ [r.key]: { family: next, size: null } });
+  }
+  const listAnd = (names) => names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  /** The optional "use this font for similar areas too" offer for an area with its own font, or null. */
+  function similarOffer(id) {
+    if (!ROLE[id] || settings.fontSources[id] !== "own" || settings[ROLE[id].key].family === "off") return null;
+    if (similarUndo && !Object.keys(similarUndo.prev).every((a) => settings.fontSources[a] === `link:${similarUndo.id}`)) similarUndo = null;
+    const undo = similarUndo?.id === id, areas = similarFontAreas(settings.fontSources, id);
+    if (!areas.length && !undo) return null;
+    const names = listAnd(areas.map(areaTitle)), owned = areas.filter((a) => settings.fontSources[a] === "own").map(areaTitle);
+    const font = settings[ROLE[id].key].family;
+    return { areas, undo,
+      text: areas.length ? `Also use ${font} for ${names}?${owned.length ? ` ${listAnd(owned)} ${owned.length > 1 ? "lose their" : "loses its"} own pick until you undo or change it.` : ""}` : `${listAnd(Object.keys(similarUndo.prev).map(areaTitle))} now follow${Object.keys(similarUndo.prev).length > 1 ? "" : "s"} ${areaTitle(id)}.`,
+    };
+  }
+  /** Point the rest of id's group at it. Each area keeps its own stored font, so Undo restores it. */
+  function applySimilar(id) {
+    const offer = similarOffer(id);
+    if (!offer?.areas.length) return;
+    const before = offer.undo ? { ...similarUndo.prev } : {}, next = { ...settings.fontSources };
+    for (const a of offer.areas) { if (!(a in before)) before[a] = next[a]; next[a] = `link:${id}`; }
+    similarUndo = { id, prev: before };
+    change({ fontSources: next });
+  }
+  function undoSimilar() {
+    if (!similarUndo) return;
+    const { prev } = similarUndo;
+    similarUndo = null;
+    change({ fontSources: { ...settings.fontSources, ...prev } });
   }
   function fontStripGroups() {
     const terminal = resolveFontGraph(settings.fontSources), groups = new Map();
@@ -3567,9 +3619,15 @@
         onkeydown: (e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); stepAreaFont(id, e.key === "ArrowLeft" ? -1 : 1); } },
       }, pick.family);
       name.style.fontFamily = t3 ? f.css : loaded ? `"${ROLE[id].alias}",var(--font-sans)` : "var(--font-sans)";
+      const offer = similarOffer(id);
+      const similar = offer && h("button", {
+        type: "button", class: "t3x-fs-similar", "data-focus": `fs-similar-${id}`, title: offer.text,
+        "aria-label": offer.areas.length ? `${offer.text} Applies now; Undo appears here.` : `Undo: ${offer.text}`,
+        onclick: () => offer.areas.length ? applySimilar(id) : undoSimilar(),
+      }, offer.areas.length ? "Use for similar" : "Undo");
       return h("div", { class: "t3x-fs-row" },
         h("div", { class: "t3x-fs-area" }, h("span", { text: label }), also.length ? h("span", { class: "t3x-fs-also", text: `+ ${also.join(", ")}` }) : null,
-          at >= 0 ? h("span", { class: "t3x-fs-pos", text: `${at + 1} of ${entries.length}` }) : null),
+          similar, at >= 0 ? h("span", { class: "t3x-fs-pos", text: `${at + 1} of ${entries.length}` }) : null),
         h("div", { class: "t3x-fs-pick" }, arrow(-1), name, arrow(1)));
     }));
   }
@@ -3687,6 +3745,7 @@
     p.set("fcDraw", renders("T3X Composer"));
     p.set("fq", String(D.documentElement.hasAttribute("data-t3x-fquestions")));
     p.set("fqCss", cssNames('[data-slot="collapsible"]:has(> [data-pending-user-input-toggle]) > [data-slot="collapsible-panel"] .chat-markdown p', "T3X Questions"));
+    p.set("fqOpt", cssNames('[data-slot="collapsible"]:has(> [data-pending-user-input-toggle]) > [data-slot="collapsible-panel"] button[aria-pressed] > div > span', "T3X Questions"));
     p.set("fr", String(D.documentElement.hasAttribute("data-t3x-fr")));
     p.set("frCss", cssNames('.cursor-auto.ms-7.max-h-96.select-text .chat-markdown p', "T3X Reasoning"));
     p.set("faces", String([...D.fonts].filter((f) => f.family.replace(/^["']|["']$/g, "").startsWith("T3X ")).length));

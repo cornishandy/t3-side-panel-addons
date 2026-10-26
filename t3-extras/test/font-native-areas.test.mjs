@@ -28,7 +28,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
   <button type="button" data-slot="collapsible-trigger" data-pending-user-input-toggle="expanded"><span id="qhead">6. Hosting</span></button>
   <div data-slot="collapsible-panel"><div><div class="min-w-0 ps-8 ps-6 pe-4 pb-1">
     <div class="chat-markdown pt-2"><p id="qprose">Where should the page live?</p><p>See <a id="qlink" href="#x">the page</a> and <code id="qcode">x</code></p></div>
-    <div class="-ms-2 mt-1.5"><button type="button" aria-pressed="false"><div class="min-w-0 flex-1 flex flex-col gap-0.5"><span id="qopt" class="text-sm font-medium">Tailnet (Recommended)</span><span id="qdesc" class="text-secondary-label text-2xs">Private</span></div></button></div>
+    <div class="-ms-2 mt-1.5"><button type="button" aria-pressed="false"><span id="qradio" class="pointer-events-none flex h-5 shrink-0 items-center"><span aria-hidden="true"></span></span><div class="min-w-0 flex-1 flex flex-col gap-0.5"><span id="qopt" class="text-sm font-medium">Tailnet (Recommended)</span><span id="qdesc" class="text-secondary-label text-2xs">Private</span></div><span id="qkey" class="flex h-5 w-7 shrink-0"><kbd id="qkbd">1</kbd></span></button></div>
   </div></div></div>
 </div>
 <!-- a collapsible that is not a question -->
@@ -88,7 +88,9 @@ test("Questions and Reasoning reach T3's own markup without the native bridge", 
     assert.equal(on.qprose, "T3X Questions", "open question prose");
     assert.equal(on.squestion, "T3X Questions", "saved question");
     assert.equal(on.sanswer, "T3X Questions", "saved answer");
-    for (const k of ["qhead", "qopt", "qdesc", "qlink", "qcode", "sattach", "otherprose"]) assert.ok(!on[k].startsWith("T3X"), `${k} stays native (${on[k]})`);
+    assert.equal(on.qopt, "T3X Questions", "option label");
+    assert.equal(on.qdesc, "T3X Questions", "option description");
+    for (const k of ["qhead", "qradio", "qkey", "qkbd", "qlink", "qcode", "sattach", "otherprose"]) assert.ok(!on[k].startsWith("T3X"), `${k} stays native (${on[k]})`);
     assert.equal(on.rprose, "T3X Reasoning", "expanded reasoning prose");
     assert.equal(on.rhead, "T3X Reasoning", "expanded reasoning heading");
     for (const k of ["rcode", "thinking", "preview"]) assert.ok(!on[k].startsWith("T3X"), `${k} stays native (${on[k]})`);
