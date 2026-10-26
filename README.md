@@ -27,6 +27,7 @@ Turn things off from the ✦ panel switches, or: `t3-extras/install.sh --uninsta
 
 - [x] Usage meters, burn tells, handover button and chain pill
 - [x] Compact threads, sidebar polish, Fonts workspace with T3's own fonts
+- [x] Sidebar sections: a "Pinned" label and line, older threads folded under "Show N older", one-row titles that keep a trailing (N) — each with its own switch
 - [x] Keeper units: wrap, minWidth, rule, fit, titleGuide, extras, firstClick, geminiQuota
 - [ ] Keeper `minWidth` unit fails on T3 0.1.3 builds (sidebar width clamp changed shape); 7 keeper tests fail because of it
 - [x] Compact sidebar usage in a short window (under 800 px tall)

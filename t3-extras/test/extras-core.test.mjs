@@ -795,3 +795,30 @@ test("Gemini falls back to Google's per-model quota (T3's fallback) when there i
   assert.equal(Math.round(v.lp.left), 94);
   assert.equal(v.lp.pace ?? null, null, "no window length, so no made-up pace");
 });
+
+test("sidebar sections: T3's row ages read as hours; statuses read as null", () => {
+  assert.deepEqual(["now", "24m", "13h", "2d", " 1h ", "Done", "Working", "Approval", "3w", "", null].map(C.rowAgeHours), [0, 0.4, 13, 48, 1, null, null, null, null, null, null]);
+});
+
+test("sidebar sections: older threads start after the newest run of activity", () => {
+  // Andy's sidebar at 8 PM, 25 Oct 2026: eight under 3 h, then nine from 12 h to 1 d.
+  assert.equal(C.olderCutoff([0, 0.4, 0.4, 0.8, 0.9, 1, 1, 2, 12, 13, 14, 17, 21, 24, 24, 24, 24]), 12);
+  // A session that runs on past 3 h stays current while the gaps stay under 2 h.
+  assert.equal(C.olderCutoff([0.1, 0.5, 1, 2, 3, 4, 12, 13]), 12);
+  // Nothing recent: the newest 3 stay, then the gap decides (2 h, or half the previous age).
+  assert.equal(C.olderCutoff([5, 6, 9, 20, 48, 72]), 20);
+  assert.equal(C.olderCutoff([24, 24, 48, 120, 144]), 120);
+  // "Recent" counts from the newest thread, not from now.
+  assert.equal(C.olderCutoff([5, 5.5, 7.5, 8, 30, 31]), 30);
+  // Folding one thread, or none, saves nothing.
+  assert.equal(C.olderCutoff([1, 2, 3, 10]), null);
+  assert.equal(C.olderCutoff([1, 2, 4]), null);
+  assert.equal(C.olderCutoff([]), null);
+  // Unsorted input and statuses (null) are handled.
+  assert.equal(C.olderCutoff([24, null, 0.5, 13, 1, null, 0.2, 12]), 12);
+});
+
+test("one-row titles: only a short trailing (N) or (Model) is kept", () => {
+  assert.deepEqual(["Thread health watch (48)", "Sidebar sections and titles (2)", "Review: plan (Astra)", "Good Boy (2026) film podcast", "(2)", "x (a very long parenthetical that is not a chain number)", "Ends with (nested (x))"].map(C.titleSuffix),
+    ["(48)", "(2)", "(Astra)", "", "", "", ""]);
+});

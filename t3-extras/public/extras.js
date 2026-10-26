@@ -62,6 +62,10 @@
     projectFull: true,
     workingHeader: true,
     compactThreads: true,
+    pinnedLabel: true, // a small "Pinned" label above pinned threads and a line below them
+    foldOlder: true, // older active threads fold under one "Show N older" row
+    olderOpen: false, // that row's remembered state
+    oneRowTitles: true, // one line per title; a trailing (N) or (Model) stays visible
     marker: "bar", // bar | outline | off
     fontHead: Object.freeze({ family: "off", size: null }), // size null = the font's own default
     fontBody: Object.freeze({ family: "off", size: null }), // retained only as the migration source
@@ -90,7 +94,7 @@
     footerTeam: "start-open", // the reply footer's team list: always-show | start-open | start-folded | always-hide
     fontTargets: Object.freeze({ composer: true, quotes: true, projects: true, pills: true, headings: true, replies: true, mine: true, ...Object.fromEntries(INTERFACE_TARGETS.map(([key]) => [key, false])) }),
   });
-  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "printOnly", "showPartly", "interfaceFontsOpen"];
+  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "printOnly", "showPartly", "interfaceFontsOpen"];
   const MARKERS = ["bar", "outline", "off"];
   const FOOTER_TEAM = [
     ["always-show", "Always show"],
@@ -1013,6 +1017,10 @@
     const out = {
       "data-t3x-tight": st.tighter ? "" : null,
       "data-t3x-compact": st.compactThreads ? "" : null,
+      "data-t3x-pinned-label": st.pinnedLabel ? "" : null,
+      "data-t3x-fold": st.foldOlder ? "" : null,
+      "data-t3x-older-open": st.foldOlder && st.olderOpen ? "" : null,
+      "data-t3x-onerow": st.oneRowTitles ? "" : null,
       "data-t3x-inline-icon": st.inlineIcon ? "" : null,
       "data-t3x-project-full": st.projectFull ? "" : null,
       "data-t3x-working": st.workingHeader ? "" : null,
@@ -1030,7 +1038,40 @@
     return fails.length ? Math.min(...fails) : null;
   }
 
+  // ---------- sidebar sections: which active threads count as older ----------
+
+  /** T3's row age ("now", "24m", "13h", "2d"; always rounded down) in hours, or null for anything
+   *  else (a status such as Working, Done or Approval, or text this doesn't know). */
+  function rowAgeHours(text) {
+    const m = /^(?:(now)|(\d{1,4})([mhd]))$/.exec(String(text ?? "").trim());
+    if (!m) return null;
+    if (m[1]) return 0;
+    const n = Number(m[2]);
+    return m[3] === "m" ? n / 60 : m[3] === "h" ? n : n * 24;
+  }
+
+  /** The age (hours) from which active threads fold away, or null when nothing should fold.
+   *  Current = the newest threads, carried on while the next one follows within 2 h (or within
+   *  half the previous one's age, for older sessions); everything within 3 h of the newest and at
+   *  least the newest 3 always count as current. Folding fewer than 2 saves nothing, so it doesn't. */
+  function olderCutoff(ages) {
+    const a = ages.filter((x) => typeof x === "number" && Number.isFinite(x) && x >= 0).sort((x, y) => x - y);
+    let i = 1;
+    for (; i < a.length; i++) {
+      if (i < 3 || a[i] < a[0] + 3) continue;
+      if (a[i] - a[i - 1] >= Math.max(2, a[i - 1] / 2)) break;
+    }
+    return a.length - i >= 2 ? a[i] : null;
+  }
+
+  /** A title's trailing "(N)" or "(Model)" (kept visible when a one-row title is cut), or "". */
+  function titleSuffix(title) {
+    const m = /\s(\([^()]{1,24}\))$/.exec(String(title ?? "").trim());
+    return m && m.index > 0 ? m[1] : "";
+  }
+
   const core = {
+    rowAgeHours, olderCutoff, titleSuffix,
     DEFAULTS, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, usagePageHash, usageContainerMatches,
     FOOTER_TEAM, FOOTER_DETAILS, footerPass, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
@@ -1148,7 +1189,7 @@
 
   // ---------- <html> switches for the CSS-only parts ----------
 
-  const ROOT_ATTRS = ["data-t3x-tight", "data-t3x-compact", "data-t3x-inline-icon", "data-t3x-project-full", "data-t3x-working", "data-t3x-marker", "data-t3x-footer-team", "data-t3x-fh", "data-t3x-fb", "data-t3x-fm", ...TARGETS.map((t) => `data-t3x-ft-${t}`)];
+  const ROOT_ATTRS = ["data-t3x-selecting", "data-t3x-tight", "data-t3x-compact", "data-t3x-pinned-label", "data-t3x-fold", "data-t3x-older-open", "data-t3x-onerow", "data-t3x-inline-icon", "data-t3x-project-full", "data-t3x-working", "data-t3x-marker", "data-t3x-footer-team", "data-t3x-fh", "data-t3x-fb", "data-t3x-fm", ...TARGETS.map((t) => `data-t3x-ft-${t}`)];
   function applyRootAttrs() {
     const r = D.documentElement;
     for (const [name, value] of Object.entries(rootAttrs(settings))) (value === null ? r.removeAttribute(name) : r.setAttribute(name, value));
@@ -1984,6 +2025,141 @@
     },
   };
 
+  // ---------- sidebar sections: fold older active threads ----------
+  // T3's active threads sit between its active-placeholder marker and the next marker (Working,
+  // Snoozed or Settled). Older ones (olderCutoff, from each row's own age) get an attribute that
+  // CSS hides; one owned row, just above the first of them, shows or hides them again, so the
+  // threads open below the clicked row and it never moves. The open thread, and any row showing a
+  // status (Working, Done, Approval, Failed...) instead of an age, always stays visible.
+  const isMarker = (li) => li.matches('li[data-testid^="sidebar-"]:not([data-thread-item])');
+  function activeRows(list) {
+    const out = [];
+    let li = list.querySelector(':scope > li[data-testid="sidebar-active-placeholder"]')?.nextElementSibling;
+    for (; li; li = li.nextElementSibling) {
+      if (li.hasAttribute(OWN)) continue;
+      if (isMarker(li)) break;
+      if (li.matches("li[data-thread-item]")) out.push(li);
+    }
+    return out;
+  }
+  function rowAge(li) {
+    if (li.querySelector('[aria-current]:not([aria-current="false"])')) return null; // the open thread
+    if (li.contains(D.activeElement)) return null; // focused, or being renamed
+    const slot = li.querySelector('[class*="group/sidebar-status-slot"]');
+    return rowAgeHours(slot?.firstElementChild?.textContent);
+  }
+  const ageText = (hrs) => (hrs < 24 ? `${Math.floor(hrs)}h` : `${Math.floor(hrs / 24)}d`);
+  features.older = {
+    on: () => settings.foldOlder,
+    node: null,
+    find() {
+      const { el, why } = single('li[data-testid="sidebar-active-placeholder"]');
+      return { el: el?.parentElement ?? null, why };
+    },
+    build() {
+      const label = h("span", { class: "t3x-older-label" });
+      const range = h("span", { class: "t3x-older-range" });
+      const btn = h("button", { type: "button", class: "t3x-older-btn", "aria-expanded": "false", onclick: () => change({ olderOpen: !settings.olderOpen }) },
+        h("span", { class: "t3x-older-chev", "aria-hidden": "true" }), label, range);
+      return h("li", { [OWN]: "older", class: "t3x-older", hidden: true }, btn);
+    },
+    mount: (list, node) => list.append(node),
+    update(node) {
+      const list = node.parentElement;
+      // While a row is dragged T3 fills its zero-height markers with hints: change nothing then.
+      if (list.querySelector(':scope > li:is([data-testid="sidebar-pinned-header"], [data-testid="sidebar-pinned-divider"], [data-testid="sidebar-active-placeholder"]):has(> *)')) return;
+      const rows = activeRows(list);
+      const ages = rows.map(rowAge);
+      const cut = olderCutoff(ages);
+      const older = cut === null ? [] : rows.filter((_, i) => ages[i] !== null && ages[i] >= cut);
+      const set = new Set(older);
+      for (const li of list.querySelectorAll(":scope > li[data-t3x-older]")) if (!set.has(li)) li.removeAttribute("data-t3x-older");
+      for (const li of older) if (!li.hasAttribute("data-t3x-older")) li.setAttribute("data-t3x-older", "");
+      node.hidden = older.length === 0;
+      if (!older.length) return;
+      if (node.nextElementSibling !== older[0]) list.insertBefore(node, older[0]);
+      const open = settings.olderOpen;
+      const olderAges = older.map((li) => ages[rows.indexOf(li)]);
+      const lo = ageText(Math.min(...olderAges)), hi = ageText(Math.max(...olderAges));
+      const [btn] = node.children;
+      const [, label, range] = btn.children;
+      const text = open ? "Show fewer" : `Show ${older.length} older`;
+      if (label.textContent !== text) label.textContent = text;
+      const r = lo === hi ? lo : `${lo}–${hi}`;
+      if (range.textContent !== r) range.textContent = r;
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      btn.setAttribute("aria-label", open ? `Hide the ${older.length} older threads` : `Show ${older.length} older threads, idle ${lo} to ${hi}`);
+    },
+  };
+
+  // T3's Shift-click (and Cmd/Ctrl) selection runs over its full thread order, folded rows
+  // included, and T3 marks no selection in the DOM. So from any multi-select click or key in the
+  // list until a plain click on a thread or Escape (T3's ways out of it), every older thread shows
+  // and the fold row steps aside (data-t3x-selecting): a bulk action never reaches a hidden thread.
+  // It runs after T3 has handled the click or key (document bubble phase), so the click lands.
+  const multiSelect = (e) => (e.shiftKey || e.metaKey || e.ctrlKey) && Boolean(e.target?.closest?.("li[data-thread-item]")?.parentElement?.querySelector(':scope > li[data-testid="sidebar-active-placeholder"]'));
+  const setSelecting = (on) => D.documentElement.toggleAttribute("data-t3x-selecting", on);
+  const trackSelection = (e) => {
+    if (e.type === "keydown" && e.key === "Escape") return setSelecting(false);
+    if (e.type === "keydown" && !/^(Arrow|Home$|End$|PageUp$|PageDown$| $|Enter$|a$|A$)/.test(e.key)) return;
+    if (multiSelect(e)) return setSelecting(true);
+    if (e.type === "click" && e.target?.closest?.("li[data-thread-item]")) setSelecting(false);
+  };
+  listen(D, "click", trackSelection);
+  listen(D, "keydown", trackSelection);
+
+  // ---------- one-row titles: keep a trailing (N) or (Model) visible ----------
+  // T3's title span already ends in "…" on one line once the wrap is undone (CSS). When a title
+  // ending in "(2)" or "(Opus)" is cut, an owned aria-hidden copy of that ending sits beside it, so
+  // handover chains stay apart. Screen readers keep T3's own label; the text is never edited.
+  const TITLE_SEL = ':is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) span[aria-hidden].min-w-0.flex-1';
+  // Dragging the sidebar wider or narrower changes no DOM, so a resize watcher re-checks the cuts.
+  let titleBox = null, titleRO = null, titleRaf = 0;
+  function watchTitleBox(t) {
+    const box = t?.closest('[data-slot="sidebar-content"]') ?? t?.closest("ul") ?? null;
+    if (box === titleBox || !W.ResizeObserver) return;
+    if (!titleRO) {
+      titleRO = new ResizeObserver(guarded("titles", () => {
+        if (titleRaf || disposed) return;
+        titleRaf = requestAnimationFrame(guarded("titles", () => {
+          titleRaf = 0;
+          if (!disposed && !paused) decorateTitles();
+        }));
+      }));
+      cleanups.push(() => titleRO.disconnect());
+    }
+    if (titleBox) titleRO.unobserve(titleBox);
+    titleBox = box;
+    if (box) titleRO.observe(box);
+  }
+  if (D.fonts?.addEventListener) listen(D.fonts, "loadingdone", () => { if (!disposed && !paused) decorateTitles(); });
+  function decorateTitles() {
+    const on = settings.oneRowTitles;
+    if (!on && !D.querySelector('[data-t3x="sfx"]')) return;
+    if (on) watchTitleBox(D.querySelector(TITLE_SEL));
+    // A copy belongs straight after a live title; any other (left behind when T3 swapped the title
+    // for its rename box and back) goes, so a title never shows its ending twice.
+    for (const c of D.querySelectorAll('[data-t3x="sfx"]')) if (!c.previousElementSibling?.matches(TITLE_SEL)) c.remove();
+    for (const t of D.querySelectorAll(TITLE_SEL)) {
+      let sfx = t.nextElementSibling?.getAttribute(OWN) === "sfx" ? t.nextElementSibling : null;
+      const want = on ? titleSuffix(t.textContent) : "";
+      if (!want) {
+        sfx?.remove();
+        continue;
+      }
+      if (!sfx) {
+        const keep = [...t.classList].filter((c) => /^(text-|font-)/.test(c) && c !== "text-start");
+        sfx = h("span", { [OWN]: "sfx", class: ["t3x-sfx", ...keep].join(" "), "aria-hidden": "true", hidden: true });
+        t.after(sfx);
+      }
+      if (sfx.textContent !== want) sfx.textContent = want;
+      sfx.classList.toggle("t3x-sfx-n", /^\(\d+\)$/.test(want)); // a chain number never shrinks; a model name can
+      const room = t.clientWidth + (sfx.hidden ? 0 : sfx.offsetWidth);
+      const cut = t.scrollWidth > room + 1;
+      if (sfx.hidden === cut) sfx.hidden = !cut;
+    }
+  }
+
   // ✦ panel button in the sidebar footer row (always on: it is the off switch for everything else).
   features.panel = {
     on: () => true,
@@ -2110,7 +2286,7 @@
     burnCounts.rows = keep.size;
   }
 
-  const ORDER = ["panel", "bars", "header", "composer"];
+  const ORDER = ["panel", "bars", "header", "composer", "older"];
   const insertCounts = {};
   function ensure() {
     if (paused || disposed) return;
@@ -2155,6 +2331,11 @@
       decorateBurn();
     } catch (e) {
       noteError("burn", e);
+    }
+    try {
+      decorateTitles();
+    } catch (e) {
+      noteError("titles", e);
     }
   }
   every(60e3, () => {
@@ -2794,6 +2975,9 @@
         sw("Handover chain pill", "chainPill", mode ? `Handover mode: ${mode}` : null)),
       h("section", {}, h("h3", { text: "Sidebar" }),
         sw("Compact threads", "compactThreads", "Project icon and title on one line; hover the icon for the project and branch."),
+        sw("One-row titles", "oneRowTitles", "Long titles end in \u2026 but keep a trailing number like (2). Off: titles wrap (two lines at most with compact threads)."),
+        sw("Pinned label and line", "pinnedLabel", "A small \u201cPinned\u201d label above pinned threads and a line below them."),
+        sw("Fold older threads", "foldOlder", "Threads idle well past your newest few fold under \u201cShow N older\u201d."),
         settings.compactThreads ? null : [
           sw("Tighter rows", "tighter"),
           sw("Model icon beside the title", "inlineIcon", "Only on rows whose last line held nothing else."),
@@ -2913,10 +3097,12 @@
     checkRoute();
     ensure();
   });
+  const rowText = (n) => Boolean(n?.parentElement?.closest('[data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]'));
   observer = new MutationObserver((records) => {
     if (scheduled || paused) return;
     for (const r of records) {
       if (isOwned(r.target)) continue;
+      if (r.type === "characterData" && !rowText(r.target)) continue; // only sidebar rows' text (titles, ages)
       const nodes = [...r.addedNodes, ...r.removedNodes];
       if (nodes.length && nodes.every(isOwned)) continue; // our own insert/remove
       scheduled = true;
@@ -2926,7 +3112,7 @@
       return;
     }
   });
-  observer.observe(D.body, { childList: true, subtree: true });
+  observer.observe(D.body, { childList: true, subtree: true, characterData: true });
   cleanups.push(() => observer.disconnect());
 
   // Theme changes: recompute the marker colour (attributes on <html> only, cheap).

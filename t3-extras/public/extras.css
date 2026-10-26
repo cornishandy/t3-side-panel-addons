@@ -469,6 +469,86 @@ html[data-t3x-compact] [data-testid="sidebar-row-card"] {
   }
 }
 
+/* ---------- sidebar sections: pinned label and line ----------
+ * While any thread is pinned (T3's zero-height pinned-header marker is not followed straight away
+ * by its pinned-divider marker), the header shows a small "Pinned" label lined up with the
+ * titles and the divider becomes a full-width hairline. While a row is being dragged T3 fills
+ * both markers with its own labels, so these step aside (:not(:has(> *))). CSS only. */
+
+html[data-t3x-pinned-label] li[data-testid="sidebar-pinned-header"]:not(:has(> *)):not(:has(+ li[data-testid="sidebar-pinned-divider"])) {
+  height: auto;
+  margin-bottom: 0;
+  &::before {
+    content: "Pinned";
+    display: block;
+    padding: .375rem var(--sidebar-row-content-inset, .5rem) .125rem calc(var(--sidebar-row-content-inset, .5rem) + var(--t3x-title-indent, 0px));
+    color: var(--muted-foreground, currentColor);
+    font: 500 .6875rem/1rem var(--font-sans);
+  }
+}
+html[data-t3x-compact] { --t3x-title-indent: 1.375rem; } /* compact rows: titles start past the project icon */
+html[data-t3x-pinned-label] li[data-testid="sidebar-pinned-header"]:not(:has(+ li[data-testid="sidebar-pinned-divider"])) ~ li[data-testid="sidebar-pinned-divider"]:not(:has(> *)) {
+  height: 0;
+  margin-block: .3125rem .375rem;
+  border-top: 1px solid color-mix(in oklab, var(--sidebar-foreground, currentColor) 16%, transparent);
+}
+
+/* ---------- sidebar sections: fold older threads ----------
+ * Older active threads (extras.js) are hidden until "Show N older" is opened. That row sits just
+ * above the first of them, its label on the titles' left edge and the age range on the right. */
+
+html[data-t3x-fold]:not([data-t3x-older-open], [data-t3x-selecting]) li[data-t3x-older] { display: none; }
+html[data-t3x-selecting] .t3x-older { display: none; } /* a multi-selection is open: every thread shows */
+.t3x-older { list-style: none; margin: .125rem .125rem 0; container-type: inline-size; }
+.t3x-older-btn {
+  display: flex;
+  align-items: center;
+  gap: .375rem;
+  width: 100%;
+  height: 1.625rem;
+  padding: 0 var(--sidebar-row-content-inset, .5rem);
+  border: 0;
+  border-radius: .375rem;
+  background: transparent;
+  color: var(--sidebar-foreground, var(--foreground));
+  font: 400 .75rem/1 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  &:hover { background: var(--sidebar-row-hover, color-mix(in oklab, currentColor 8%, transparent)); }
+  &:focus-visible { outline: 2px solid var(--ring, currentColor); outline-offset: -2px; }
+}
+.t3x-older-chev {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  background: currentColor;
+  opacity: .55;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 6.5l3 3 3-3' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 1rem no-repeat;
+  [aria-expanded="true"] > & { transform: rotate(180deg); }
+}
+.t3x-older-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t3x-older-range { flex: none; margin-left: auto; white-space: nowrap; color: var(--muted-foreground, currentColor); font-size: .6875rem; font-variant-numeric: tabular-nums; }
+@container (max-width: 11rem) { .t3x-older-range { display: none; } } /* a narrow sidebar: the label alone */
+
+/* ---------- one-row titles ----------
+ * Undo the wrap (the keeper's and compact threads' two-line clamp): one line ending in "…".
+ * A trailing "(2)" or "(Opus)" is repeated beside a cut title by an owned aria-hidden span. */
+
+html[data-t3x-onerow] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) span[aria-hidden].min-w-0.flex-1,
+html[data-t3x-onerow] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) > div.relative.z-10 > div:nth-child(2) > span[aria-hidden].min-w-0.flex-1,
+html[data-t3x-onerow] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) > div.relative.z-10 > div:nth-child(2) > span[aria-hidden][data-t3x="sfx"] {
+  display: block;
+  -webkit-line-clamp: none;
+  white-space: nowrap;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+}
+.t3x-sfx { flex: 0 1 auto; min-width: 0; max-width: 55%; padding-left: .1875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* a long "(GPT-6-Astra)" shrinks too */
+html[data-t3x-onerow] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) > div.relative.z-10 > div:nth-child(2) > span[aria-hidden][data-t3x="sfx"][hidden],
+.t3x-sfx[hidden] { display: none; }
+.t3x-sfx.t3x-sfx-n { flex: none; max-width: 100%; } /* whole unless the title column is narrower than the number itself */
+
 /* The project tooltip (compact threads): the project name, then the branch or machine. */
 .t3x-ptip {
   position: fixed;
@@ -797,6 +877,7 @@ html[data-t3x-fpaths] :is([data-message-role="assistant"] .chat-markdown .chat-m
 /* thread titles */
 html[data-t3x-fthreadtitles] [data-testid="sidebar-row-card"] span[data-testid^="thread-title-"],
 html[data-t3x-fthreadtitles] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) span[aria-hidden].min-w-0.flex-1.text-start,
+html[data-t3x-fthreadtitles] [data-t3x="sfx"],
 html[data-t3x-fthreadtitles] [data-slot="sidebar-menu-sub-button"] span[data-testid^="thread-title-"],
 html[data-t3x-fthreadtitles] [data-t3x="grouping-root"] span.t3x-g-title {
   font-family: "T3X Thread titles", var(--t3x-base-fthreadtitles, var(--font-sans));
