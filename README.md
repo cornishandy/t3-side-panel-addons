@@ -31,7 +31,8 @@ Turn things off from the ✦ panel switches, or: `t3-extras/install.sh --uninsta
 - [x] Keeper units: wrap, minWidth, rule, fit, titleGuide, extras, firstClick, geminiQuota
 - [ ] Keeper `minWidth` unit fails on T3 0.1.3 builds (sidebar width clamp changed shape); 7 keeper tests fail because of it
 - [x] Compact sidebar usage in a short window (under 800 px tall)
-- [x] All 196 add-on tests pass (browser tests use the newest installed headless Chrome)
+- [x] Find fonts on screen: hover names the font area, Shift labels every area, a click opens Fonts beside the text, Show on screen — each with its own switch
+- [x] All 204 add-on tests pass (browser tests use the newest installed headless Chrome)
 - [ ] Delete `geminiQuota` once T3 fixes pingdotgg/t3code#22876
 
 ## Docs
