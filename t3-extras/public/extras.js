@@ -2154,9 +2154,18 @@
       }
       if (sfx.textContent !== want) sfx.textContent = want;
       sfx.classList.toggle("t3x-sfx-n", /^\(\d+\)$/.test(want)); // a chain number never shrinks; a model name can
+      if (!sfx.hidden || sfx.__t3xW === undefined || sfx.__t3xFor !== want) {
+        const was = sfx.hidden;
+        sfx.hidden = false;
+        sfx.__t3xW = sfx.scrollWidth; // the copy's natural width
+        sfx.__t3xFor = want;
+        sfx.hidden = was;
+      }
       const room = t.clientWidth + (sfx.hidden ? 0 : sfx.offsetWidth);
-      const cut = t.scrollWidth > room + 1;
-      if (sfx.hidden === cut) sfx.hidden = !cut;
+      // Show the copy only when the title is cut and at least a letter of it still fits beside a
+      // whole copy; in a column too narrow for that, the title's own start ("Th…") says more.
+      const show = t.scrollWidth > room + 1 && room - sfx.__t3xW >= 10;
+      if (sfx.hidden === show) sfx.hidden = !show;
     }
   }
 
