@@ -3672,6 +3672,25 @@
     p.set("fh", String(D.documentElement.hasAttribute("data-t3x-fh")));
     p.set("fb", String(D.documentElement.hasAttribute("data-t3x-fb")));
     p.set("fm", String(D.documentElement.hasAttribute("data-t3x-fm")));
+    // Font chain, flags only: is the face loaded and in the document, does the CSS name it, does it render.
+    const faceState = (role) => roleFaces[role]?.face ? roleFaces[role].face.status : "none";
+    const cssNames = (sel, alias) => { const el = D.querySelector(sel); return !el ? "none" : String(getComputedStyle(el).fontFamily.split(",")[0].trim().replace(/^["']|["']$/g, "") === alias); };
+    const renders = (alias) => { try { const c = D.createElement("canvas").getContext("2d"), t = "Handwriting mmmWWW iii"; c.font = "32px monospace"; const a = c.measureText(t).width; c.font = `32px "${alias}", monospace`; return String(Math.abs(c.measureText(t).width - a) > 0.5); } catch { return "false"; } };
+    p.set("fmFace", faceState("main"));
+    p.set("fmSet", String(Boolean(roleFaces.main?.face && D.fonts.has(roleFaces.main.face))));
+    p.set("fmCss", cssNames('[data-message-role="assistant"] .chat-markdown p', "T3X Main"));
+    p.set("fmDraw", renders("T3X Main"));
+    p.set("ftReplies", String(D.documentElement.hasAttribute("data-t3x-ft-replies")));
+    p.set("fc", String(D.documentElement.hasAttribute("data-t3x-fc")));
+    p.set("fcFace", faceState("composer"));
+    p.set("fcCss", cssNames('[data-testid="composer-editor"]', "T3X Composer"));
+    p.set("fcDraw", renders("T3X Composer"));
+    p.set("fq", String(D.documentElement.hasAttribute("data-t3x-fquestions")));
+    p.set("fqCss", cssNames('[data-slot="collapsible"]:has(> [data-pending-user-input-toggle]) > [data-slot="collapsible-panel"] .chat-markdown p', "T3X Questions"));
+    p.set("fr", String(D.documentElement.hasAttribute("data-t3x-fr")));
+    p.set("frCss", cssNames('.cursor-auto.ms-7.max-h-96.select-text .chat-markdown p', "T3X Reasoning"));
+    p.set("faces", String([...D.fonts].filter((f) => f.family.replace(/^["']|["']$/g, "").startsWith("T3X ")).length));
+    p.set("fontsReady", D.fonts.status);
     p.set("owned", String(D.querySelectorAll(`[${OWN}]`).length));
     p.set("errors", String(errors.length));
     p.set("paused", String(paused));

@@ -281,6 +281,21 @@ const DIAG_KEYS = {
   fh: BOOL,
   fb: BOOL,
   fm: BOOL,
+  fmFace: oneOf("unloaded", "loading", "loaded", "error", "none"), // the Replies face's FontFace status
+  fmSet: BOOL, // that face is in document.fonts
+  fmCss: oneOf("true", "false", "none"), // a reply paragraph's computed font names it ("none": no reply on screen)
+  fmDraw: BOOL, // text measured in that face differs from the fallback
+  ftReplies: BOOL,
+  fc: BOOL,
+  fcFace: oneOf("unloaded", "loading", "loaded", "error", "none"),
+  fcCss: oneOf("true", "false", "none"),
+  fcDraw: BOOL,
+  fq: BOOL,
+  fqCss: oneOf("true", "false", "none"), // an open question card's prose ("none": no card on screen)
+  fr: BOOL,
+  frCss: oneOf("true", "false", "none"), // expanded reasoning prose ("none": none expanded)
+  faces: COUNT, // add-on FontFaces in document.fonts
+  fontsReady: oneOf("loading", "loaded"),
   burnN: COUNT, // threads with a burn tier
   burnHot: COUNT, // of those: warm, hot or blazing
   burnEmber: COUNT, // of those: bursts (embers)
