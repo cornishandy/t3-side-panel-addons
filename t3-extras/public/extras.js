@@ -63,8 +63,9 @@
     workingHeader: true,
     compactThreads: true,
     pinnedLabel: true, // a small "Pinned" label above pinned threads and a line below them
-    foldOlder: true, // older active threads fold under one "Show N older" row
-    olderOpen: false, // that row's remembered state
+    foldOlder: true, // active threads older than olderAfter fold under one "Older than 2 days" header
+    olderOpen: false, // that header's remembered state
+    olderAfter: "2d", // OLDER_AFTER: from what age a thread counts as older ("auto" = by gaps)
     oneRowTitles: true, // one line per title; a trailing (N) or (Model) stays visible
     timeGaps: true, // a gap between active threads last active 25+ min apart, instead of lines
     marker: "bar", // bar | outline | off
@@ -102,6 +103,15 @@
   });
   const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "printOnly", "showPartly", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen"];
   const MARKERS = ["bar", "outline", "off"];
+  // The Older section's choices: value, hours (null = by gaps, olderCutoff), panel label, header words.
+  const OLDER_AFTER = Object.freeze([
+    ["12h", 12, "12 hours", "12 hours"],
+    ["1d", 24, "1 day", "1 day"],
+    ["2d", 48, "2 days", "2 days"],
+    ["3d", 72, "3 days", "3 days"],
+    ["1w", 168, "1 week", "a week"],
+    ["auto", null, "Auto", null],
+  ]);
   const FOOTER_TEAM = [
     ["always-show", "Always show"],
     ["start-open", "Start open, click to fold"],
@@ -252,6 +262,7 @@
     for (const k of BOOL_KEYS) if (typeof s[k] === "boolean") out[k] = s[k];
     if (MARKERS.includes(s.marker)) out.marker = s.marker;
     if (FOOTER_TEAM.some(([v]) => v === s.footerTeam)) out.footerTeam = s.footerTeam;
+    if (OLDER_AFTER.some(([v]) => v === s.olderAfter)) out.olderAfter = s.olderAfter;
     if (s.fontHead || s.fontBody) {
       out.fontHead = fontPick(s.fontHead);
       out.fontBody = fontPick(s.fontBody);
@@ -1089,6 +1100,20 @@
     return a.length - i >= 2 ? a[i] : null;
   }
 
+  /** Which active threads go in the Older section: for each row's age (hours; null = a status, the
+   *  open thread or unknown, never older), whether it's older. A set age compares with T3's own
+   *  rounded-down age, so "2d" and up is older than 2 days; "auto" is olderCutoff. */
+  function olderRows(ages, after) {
+    const o = OLDER_AFTER.find(([v]) => v === after) ?? OLDER_AFTER.find(([v]) => v === DEFAULTS.olderAfter);
+    const cut = o[1] ?? olderCutoff(ages);
+    return ages.map((x) => cut !== null && typeof x === "number" && Number.isFinite(x) && x >= cut);
+  }
+  /** The Older section header's words for a choice: "Older than 2 days", or "Older" for auto. */
+  const olderTitle = (after) => {
+    const o = OLDER_AFTER.find(([v]) => v === after);
+    return o?.[3] ? `Older than ${o[3]}` : "Older";
+  };
+
   /** Gaps by time: for neighbouring rows' age times (ms, newest first; null = unknown), whether a
    *  gap goes before each row. Only where both times are known and the older row was last active
    *  at least GAP_MIN minutes before the newer one; a fixed threshold, so unchanged threads never
@@ -1105,7 +1130,7 @@
   }
 
   const core = {
-    rowAgeHours, olderCutoff, titleSuffix, gapsBefore,
+    rowAgeHours, olderCutoff, olderRows, olderTitle, OLDER_AFTER, titleSuffix, gapsBefore,
     DEFAULTS, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, usagePageHash, usageContainerMatches,
     FOOTER_TEAM, FOOTER_DETAILS, footerPass, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
@@ -2064,9 +2089,10 @@
 
   // ---------- sidebar sections: fold older active threads ----------
   // T3's active threads sit between its active-placeholder marker and the next marker (Working,
-  // Snoozed or Settled). Older ones (olderCutoff, from each row's own age) get an attribute that
-  // CSS hides; one owned row, just above the first of them, shows or hides them again, so the
-  // threads open below the clicked row and it never moves. The open thread, and any row showing a
+  // Snoozed or Settled). Older ones (olderRows: past the age chosen in the panel, from each row's
+  // own age) get an attribute that CSS hides; one owned header, drawn like T3's own Settled shelf
+  // header and just above the first of them, shows or hides them again, so the threads open below
+  // the clicked header and it never moves. The open thread, and any row showing a
   // status (Working, Done, Approval, Failed...) instead of an age, always stays visible.
   const isMarker = (li) => li.matches('li[data-testid^="sidebar-"]:not([data-thread-item])');
   function activeRows(list) {
@@ -2095,9 +2121,9 @@
     },
     build() {
       const label = h("span", { class: "t3x-older-label" });
-      const range = h("span", { class: "t3x-older-range" });
+      const count = h("span", { class: "t3x-older-count", "aria-hidden": "true" });
       const btn = h("button", { type: "button", class: "t3x-older-btn", "aria-expanded": "false", onclick: () => change({ olderOpen: !settings.olderOpen }) },
-        h("span", { class: "t3x-older-chev", "aria-hidden": "true" }), label, range);
+        label, count, h("span", { class: "t3x-older-chev", "aria-hidden": "true" }));
       return h("li", { [OWN]: "older", class: "t3x-older", hidden: true }, btn);
     },
     mount: (list, node) => list.append(node),
@@ -2107,8 +2133,8 @@
       if (list.querySelector(':scope > li:is([data-testid="sidebar-pinned-header"], [data-testid="sidebar-pinned-divider"], [data-testid="sidebar-active-placeholder"]):has(> *)')) return;
       const rows = activeRows(list);
       const ages = rows.map(rowAge);
-      const cut = olderCutoff(ages);
-      const older = cut === null ? [] : rows.filter((_, i) => ages[i] !== null && ages[i] >= cut);
+      const isOlder = olderRows(ages, settings.olderAfter);
+      const older = rows.filter((_, i) => isOlder[i]);
       const set = new Set(older);
       for (const li of list.querySelectorAll(":scope > li[data-t3x-older]")) if (!set.has(li)) li.removeAttribute("data-t3x-older");
       for (const li of older) if (!li.hasAttribute("data-t3x-older")) li.setAttribute("data-t3x-older", "");
@@ -2119,13 +2145,15 @@
       const olderAges = older.map((li) => ages[rows.indexOf(li)]);
       const lo = ageText(Math.min(...olderAges)), hi = ageText(Math.max(...olderAges));
       const [btn] = node.children;
-      const [, label, range] = btn.children;
-      const text = open ? "Show fewer" : `Show ${older.length} older`;
-      if (label.textContent !== text) label.textContent = text;
-      const r = lo === hi ? lo : `${lo}–${hi}`;
-      if (range.textContent !== r) range.textContent = r;
+      const [label, count] = btn.children;
+      const title = olderTitle(settings.olderAfter);
+      if (label.textContent !== title) label.textContent = title;
+      if (count.textContent !== String(older.length)) count.textContent = String(older.length);
+      const n = older.length === 1 ? "1 thread" : `${older.length} threads`;
+      const idle = lo === hi ? `idle ${lo}` : `idle ${lo} to ${hi}`;
       btn.setAttribute("aria-expanded", open ? "true" : "false");
-      btn.setAttribute("aria-label", open ? `Hide the ${older.length} older threads` : `Show ${older.length} older threads, idle ${lo} to ${hi}`);
+      btn.setAttribute("aria-label", `${title}: ${n}, ${idle}`);
+      btn.title = `${n}, ${idle}. Click to ${open ? "fold" : "show"} them.`;
     },
   };
 
@@ -3107,7 +3135,13 @@
         sw("One-row titles", "oneRowTitles", "Long titles end in \u2026 but keep a trailing number like (2). Off: titles wrap (two lines at most with compact threads)."),
         sw("Pinned label and line", "pinnedLabel", "A small \u201cPinned\u201d label above pinned threads and a line below them."),
         sw("Gaps by time", "timeGaps", "A small gap between threads last active 25+ min apart, instead of lines between rows."),
-        sw("Fold older threads", "foldOlder", "Threads idle well past your newest few fold under \u201cShow N older\u201d."),
+        sw("Older threads section", "foldOlder", (settings.olderAfter === "auto"
+          ? "Auto: threads idle well past your newest few (by gaps in activity) fold under one \u201cOlder\u201d header."
+          : `Threads last active more than ${OLDER_AFTER.find(([v]) => v === settings.olderAfter)[3]} ago fold under one \u201c${olderTitle(settings.olderAfter)}\u201d header. Auto groups by gaps in activity instead.`)
+          + " The open thread and rows showing a status (Working, Done\u2026) stay out."),
+        settings.foldOlder ? h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label t3x-indent-label", text: "Older than" }),
+          h("div", { class: "t3x-radios", role: "radiogroup", "aria-label": "Older than" },
+            OLDER_AFTER.map(([value, , label]) => radio("olderAfter", value, settings.olderAfter, label, (v) => change({ olderAfter: v }))))) : null,
         settings.compactThreads ? null : [
           sw("Tighter rows", "tighter"),
           sw("Model icon beside the title", "inlineIcon", "Only on rows whose last line held nothing else."),
@@ -3531,7 +3565,7 @@
     s.on("scroll", moved);
     s.on("resize", moved);
   }
-  if (W.__T3X_PICK_TEST__) Object.assign(W.__T3X_PICK_TEST__, { areaOwners, roleAttrs, roleOfFamily, startFontPick, showAreaOnScreen, endInspector, openFontsAt, active: () => inspector, workspace: () => fontWorkspace });
+  if (W.__T3X_PICK_TEST__) Object.assign(W.__T3X_PICK_TEST__, { areaOwners, roleAttrs, roleOfFamily, startFontPick, showAreaOnScreen, endInspector, openFontsAt, openPanel, active: () => inspector, workspace: () => fontWorkspace });
   function stepAreaFont(id, dir) {
     const r = ROLE[id], cur = settings[r.key].family;
     const next = fontNeighbor(catalog, settings, cur, dir, nativeAvailable, id);

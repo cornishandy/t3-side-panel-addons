@@ -818,6 +818,27 @@ test("sidebar sections: older threads start after the newest run of activity", (
   assert.equal(C.olderCutoff([24, null, 0.5, 13, 1, null, 0.2, 12]), 12);
 });
 
+test("sidebar sections: the Older section starts at the age picked in the panel (default 2 days)", () => {
+  assert.equal(C.readSettings(null).olderAfter, "2d");
+  for (const v of ["12h", "1d", "3d", "1w", "auto"]) assert.equal(C.readSettings(JSON.stringify({ olderAfter: v })).olderAfter, v);
+  for (const bad of ["2 days", 48, "", null, "0h"]) assert.equal(C.readSettings(JSON.stringify({ olderAfter: bad })).olderAfter, "2d");
+  // T3's ages are rounded down, so "1d" (24-47 h) stays and "2d" (48 h or more) is older than 2 days.
+  const ages = ["now", "5h", "23h", "1d", "2d", "9d"].map(C.rowAgeHours);
+  assert.deepEqual(C.olderRows(ages, "2d"), [false, false, false, false, true, true]);
+  assert.deepEqual(C.olderRows(ages, "1d"), [false, false, false, true, true, true]);
+  assert.deepEqual(C.olderRows(ages, "12h"), [false, false, true, true, true, true]);
+  assert.deepEqual(C.olderRows(ages, "1w"), [false, false, false, false, false, true]);
+  // One thread past the age still gets the section (unlike auto, which folds 2 or more).
+  assert.deepEqual(C.olderRows([0, 1, 50], "2d"), [false, false, true]);
+  // The open thread and rows showing a status (null) never fold.
+  assert.deepEqual(C.olderRows([0, null, 72, null], "2d"), [false, false, true, false]);
+  // Auto is the old by-gaps cut.
+  assert.deepEqual(C.olderRows([0, 0.4, 1, 2, 12, 13, 14], "auto"), [false, false, false, false, true, true, true]);
+  assert.deepEqual(C.olderRows([1, 2, 3, 10], "auto"), [false, false, false, false]);
+  assert.deepEqual(C.olderRows(ages, "bogus"), C.olderRows(ages, "2d"));
+  assert.deepEqual(["12h", "1d", "2d", "3d", "1w", "auto"].map(C.olderTitle), ["Older than 12 hours", "Older than 1 day", "Older than 2 days", "Older than 3 days", "Older than a week", "Older"]);
+});
+
 test("one-row titles: only a short trailing (N) or (Model) is kept", () => {
   assert.deepEqual(["Thread health watch (48)", "Sidebar sections and titles (2)", "Review: plan (Astra)", "Good Boy (2026) film podcast", "(2)", "x (a very long parenthetical that is not a chain number)", "Ends with (nested (x))"].map(C.titleSuffix),
     ["(48)", "(2)", "(Astra)", "", "", "", ""]);

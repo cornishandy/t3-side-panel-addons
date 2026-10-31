@@ -8,6 +8,7 @@
 - 21–22 Oct: sidebar grouping experiments; 18-area Fonts workspace.
 - 24 Oct: "Your fonts" list in the ✦ panel.
 - 25 Oct: compact threads, T3's own fonts in font menus, grouping bar removed, keeper `geminiQuota` unit (KEEPER_VERSION 12). Moved from a scratch folder into this repo. Sidebar sections (pinned label, fold older, one-row titles, gaps by time). Find fonts on screen (hover, Shift labels, docked Fonts card, Show on screen).
+- 31 Oct: the Older threads section folds by a set age (default 2 days; 12 hours to 1 week or Auto in the ✦ panel), under an "Older than 2 days" header shaped like T3's shelf headers.
 
 ## Where things live
 

@@ -295,6 +295,7 @@ header[data-chat-header]:has([data-t3x="hdr"]) > div:not([data-workspace-titleba
 .t3x-radios.t3x-col { display: block; margin-left: 0; }
 .t3x-radios.t3x-col .t3x-radio { width: 100%; }
 .t3x-radios.t3x-col.t3x-indent { margin-left: 0; padding-left: 2px; }
+.t3x-set-label.t3x-indent-label { margin-left: 38px; font-size: 12px; } /* a switch's own choice, under its label */
 .t3x-targets { display: grid; grid-template-columns: 1fr 1fr; margin: 6px 0 2px; }
 @media (prefers-reduced-motion: reduce) { .t3x-knob, .t3x-knob::after { transition: none; } }
 
@@ -493,42 +494,43 @@ html[data-t3x-pinned-label] li[data-testid="sidebar-pinned-header"]:not(:has(+ l
   border-top: 1px solid color-mix(in oklab, var(--sidebar-foreground, currentColor) 16%, transparent);
 }
 
-/* ---------- sidebar sections: fold older threads ----------
- * Older active threads (extras.js) are hidden until "Show N older" is opened. That row sits just
- * above the first of them, its label on the titles' left edge and the age range on the right. */
+/* ---------- sidebar sections: the Older section ----------
+ * Active threads older than the age picked in the panel (extras.js) are hidden until the
+ * "Older than 2 days" header above them is opened. It's drawn like T3's own Working, Snoozed and
+ * Settled shelf headers: muted label on the left, the count and a chevron on the right. */
 
 html[data-t3x-fold]:not([data-t3x-older-open], [data-t3x-selecting]) li[data-t3x-older] { display: none; }
 html[data-t3x-selecting] .t3x-older { display: none; } /* a multi-selection is open: every thread shows */
-.t3x-older { list-style: none; margin: .125rem .125rem 0; container-type: inline-size; }
+.t3x-older { list-style: none; margin: .125rem .125rem 0; }
 .t3x-older-btn {
   display: flex;
   align-items: center;
-  gap: .375rem;
+  gap: .5rem;
   width: 100%;
-  height: 1.625rem;
-  padding: 0 var(--sidebar-row-content-inset, .5rem);
+  height: 2rem;
+  padding: 0 .5rem;
   border: 0;
   border-radius: .375rem;
   background: transparent;
-  color: var(--sidebar-foreground, var(--foreground));
-  font: 400 .75rem/1 var(--font-sans);
+  color: var(--sidebar-muted-foreground, var(--muted-foreground, currentColor));
+  font: 500 .75rem/1 var(--font-sans);
   text-align: left;
   cursor: pointer;
-  &:hover { background: var(--sidebar-row-hover, color-mix(in oklab, currentColor 8%, transparent)); }
+  &:hover { color: var(--sidebar-foreground, var(--foreground)); }
   &:focus-visible { outline: 2px solid var(--ring, currentColor); outline-offset: -2px; }
 }
+.t3x-older-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t3x-older-count { flex: none; margin-left: auto; font-weight: 400; font-variant-numeric: tabular-nums; }
 .t3x-older-chev {
   flex: none;
-  width: 1rem;
-  height: 1rem;
+  width: .75rem;
+  height: .75rem;
   background: currentColor;
-  opacity: .55;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 6.5l3 3 3-3' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 1rem no-repeat;
-  [aria-expanded="true"] > & { transform: rotate(180deg); }
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / .75rem no-repeat;
+  transform: rotate(-90deg);
+  transition: transform .15s;
+  [aria-expanded="true"] > & { transform: none; }
 }
-.t3x-older-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.t3x-older-range { flex: none; margin-left: auto; white-space: nowrap; color: var(--muted-foreground, currentColor); font-size: .6875rem; font-variant-numeric: tabular-nums; }
-@container (max-width: 11rem) { .t3x-older-range { display: none; } } /* a narrow sidebar: the label alone */
 
 /* ---------- gaps by time ----------
  * No lines between rows; extras.js marks a row last active 25+ min after the one above it, and
