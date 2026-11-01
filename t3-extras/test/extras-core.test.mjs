@@ -873,6 +873,21 @@ test("Claude AG: listed with no percentage shows a dash; not listed at all adds 
   assert.equal(C.mostConstrained(offSaved).id === "agclaude", false);
 });
 
+test("a provider turned off in T3 shows no reading: neither its saved one nor lab-usage's (Astra, final OK)", () => {
+  const rec = JSON.parse(t3Record());
+  for (const p of rec.config.providers) if (p.driver === "claudeAgent" || p.driver === "codex") p.enabled = false;
+  const vs = C.views(C.mergeLabs(C.labsFromT3(C.projectT3Config(rec, ENV), NOW), serverLabs), NOW, {});
+  for (const id of ["claude", "codex"]) {
+    const v = vs.find((x) => x.id === id);
+    assert.equal(v.hasData, false, id);
+    assert.equal(v.showUnknown, false, id);
+    assert.equal(v.noMeter, "turned off in T3", id);
+  }
+  assert.ok(!C.visibleLabs(vs).some((v) => v.id === "claude" || v.id === "codex"));
+  // With no T3 reading at all, lab-usage still stands in (unchanged).
+  assert.equal(C.mergeLabs(null, serverLabs).find((l) => l.id === "claude").source, "lab-usage");
+});
+
 test("two Antigravity instances: the one whose weekly window has a reading wins, in either order (Astra, pre-OK)", () => {
   const rec = (first, second, otherFirst = false) => {
     const r = JSON.parse(t3Record());
@@ -884,7 +899,8 @@ test("two Antigravity instances: the one whose weekly window has a reading wins,
     return C.views(C.mergeLabs(C.labsFromT3(C.projectT3Config(r, ENV), NOW), serverLabs), NOW, {});
   };
   // The canonical instance has only the 5-hour window; the other has the week.
-  for (const vs of [rec([AG5({ usedPercent: 10, resetsAt: iso(NOW + H) })], [AGW(), AG5()]), rec([AGW(), AG5()], [AG5({ usedPercent: 10, resetsAt: iso(NOW + H) })])]) {
+  const shortOnly = [AG5({ usedPercent: 10, resetsAt: iso(NOW + H) })];
+  for (const vs of [rec(shortOnly, [AGW(), AG5()]), rec(shortOnly, [AGW(), AG5()], true), rec([AGW(), AG5()], shortOnly), rec([AGW(), AG5()], shortOnly, true)]) {
     const ag = vs.find((v) => v.id === "agclaude");
     assert.equal(ag.hasData, true);
     assert.equal(ag.lp.left, 43);

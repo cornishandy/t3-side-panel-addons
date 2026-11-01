@@ -619,7 +619,8 @@
         });
         return { ...t, windows, verdict: s?.verdict ?? null, verdictLive: s?.live ?? null, verdictAt: s?.fetchedAt ?? null };
       }
-      if (s && (s.windows ?? []).some((w) => w.role === "long" && known(w.usedPct))) {
+      // lab-usage stands in when T3 has no reading, but never for a provider turned off in T3.
+      if (s && t?.enabled !== false && (s.windows ?? []).some((w) => w.role === "long" && known(w.usedPct))) {
         return { ...info, ...s, hasMeter: true, verdictLive: s.live, verdictAt: s.fetchedAt };
       }
       const why = !t ? "no meter yet"
