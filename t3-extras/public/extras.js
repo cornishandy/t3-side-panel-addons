@@ -416,6 +416,7 @@
 
   const LABS = [
     { id: "claude", name: "Claude", colour: "#d97757" },
+    { id: "agclaude", name: "Claude AG", colour: "#b8664c", note: "Claude and GPT models in Antigravity (Google AI Ultra) share these limits; not your Claude plan." },
     { id: "codex", name: "Codex", colour: "#2fa37a" },
     { id: "gemini", name: "Gemini", colour: "#5b8def" },
     { id: "grok", name: "Grok", colour: "#9a9aa5" },
@@ -425,12 +426,14 @@
     { id: "muse", name: "Muse", colour: "#c0679a" },
   ];
   const DRIVER_LAB = { claudeAgent: "claude", codex: "codex", antigravity: "gemini", grok: "grok", opencode: "opencode", cursor: "cursor", pi: "pi", muse: "muse" };
+  // One provider's reading can hold another lab's windows: Antigravity's shared "Claude & GPT"
+  // windows (3p-*) are their own lab, Claude AG, apart from its Gemini windows and the Claude plan.
+  const SPLIT_LAB = { gemini: { agclaude: ["3p-5h", "3p-weekly"] } };
   // Labs whose windows are known by id; the rest go by kind (first weekly/monthly = long, first session = short).
   // Ids in order of preference. gemini-quota: Google's per-model Gemini quota (no stated window
   // length), T3's fallback when Google's quota summary comes back empty.
-  const LONG_ID = { claude: ["seven_day"], gemini: ["gemini-weekly", "gemini-quota"] };
-  const SHORT_ID = { claude: ["five_hour"], gemini: ["gemini-5h"] };
-  const EXTRA_GROUP = { gemini: { "3p-5h": "Claude/GPT via Antigravity", "3p-weekly": "Claude/GPT via Antigravity" } };
+  const LONG_ID = { claude: ["seven_day"], gemini: ["gemini-weekly", "gemini-quota"], agclaude: ["3p-weekly"] };
+  const SHORT_ID = { claude: ["five_hour"], gemini: ["gemini-5h"], agclaude: ["3p-5h"] };
 
   /** A window's start and end, from its reset and a valid length; as in T3, no valid length means
    *  no pace. The one disclosed inference: a Grok window reporting no length at all
@@ -544,45 +547,58 @@
     const out = {};
     if (projected?.state !== "ok") return out;
     for (const p of projected.providers) {
-      const id = p.lab;
-      if (!LABS.some((l) => l.id === id)) continue;
       const lim = p.limits;
-      const ws = (lim?.windows ?? []).filter((w) => known(w.usedPercent));
-      const prev = out[id];
-      // Several instances of one driver (Codex and its paid API instance): keep the one with a
-      // meter, preferring the instance named like the driver.
-      if (prev?.hasMeter && (!ws.length || prev.canonical)) continue;
-      const byId = (map) => (map[id] ? map[id].map((x) => ws.find((w) => w.id === x)).find(Boolean) ?? null : undefined);
-      const long = byId(LONG_ID) !== undefined ? byId(LONG_ID) : ws.find((w) => w.kind === "weekly") ?? ws.find((w) => w.kind === "monthly") ?? ws.find((w) => w.kind === "other") ?? null;
-      const short = byId(SHORT_ID) !== undefined ? byId(SHORT_ID) : ws.find((w) => w.kind === "session" && w !== long) ?? null;
-      const checkedAt = lim?.checkedAt ?? null;
-      const stale = !known(checkedAt) || now - checkedAt > T3_STALE_MS;
-      const windows = ws.map((w) => ({
-        id: w.id,
-        role: w === long ? "long" : w === short ? "short" : "extra",
-        group: EXTRA_GROUP[id]?.[w.id] ?? null,
-        kind: w.kind,
-        label: w.label,
-        usedPct: Math.max(0, w.usedPercent),
-        resetsAt: w.resetsAt,
-        lengthSec: w.durationMins ? w.durationMins * 60 : null,
-        // Grok reports no window length; only then is one assumed (and said so).
-        assumeLength: id === "grok" && w.durationAbsent,
-        fetchedAt: checkedAt,
-        live: !stale,
-      }));
-      out[id] = {
-        ...LABS.find((l) => l.id === id),
-        source: "t3",
-        canonical: p.canonical,
-        enabled: p.enabled,
-        fetchedAt: checkedAt,
-        live: !stale,
-        windows,
-        resetCredits: lim?.resetCredits ?? null,
-        unavailable: lim?.unavailable ?? null,
-        hasMeter: Boolean(long),
-      };
+      const listed = lim?.windows ?? [];
+      const split = SPLIT_LAB[p.lab] ?? {};
+      const moved = new Set(Object.values(split).flat());
+      // The provider's own lab keeps the rest. A split-off lab appears only when the reading lists
+      // its windows (a percentage may still be missing: then it shows "—"), or when the reading has
+      // no windows at all (not known yet, so it can't be ruled out).
+      const parts = [[p.lab, listed.filter((w) => !moved.has(w.id))]];
+      for (const [lab, ids] of Object.entries(split)) {
+        const own = listed.filter((w) => ids.includes(w.id));
+        if (own.length || !listed.length) parts.push([lab, own]);
+      }
+      for (const [id, mine] of parts) {
+        if (!LABS.some((l) => l.id === id)) continue;
+        const ws = mine.filter((w) => known(w.usedPercent));
+        const byId = (map) => (map[id] ? map[id].map((x) => ws.find((w) => w.id === x)).find(Boolean) ?? null : undefined);
+        const long = byId(LONG_ID) !== undefined ? byId(LONG_ID) : ws.find((w) => w.kind === "weekly") ?? ws.find((w) => w.kind === "monthly") ?? ws.find((w) => w.kind === "other") ?? null;
+        const short = byId(SHORT_ID) !== undefined ? byId(SHORT_ID) : ws.find((w) => w.kind === "session" && w !== long) ?? null;
+        const checkedAt = lim?.checkedAt ?? null;
+        const stale = !known(checkedAt) || now - checkedAt > T3_STALE_MS;
+        const windows = ws.map((w) => ({
+          id: w.id,
+          role: w === long ? "long" : w === short ? "short" : "extra",
+          kind: w.kind,
+          label: w.label,
+          usedPct: Math.max(0, w.usedPercent),
+          resetsAt: w.resetsAt,
+          lengthSec: w.durationMins ? w.durationMins * 60 : null,
+          // Grok reports no window length; only then is one assumed (and said so).
+          assumeLength: id === "grok" && w.durationAbsent,
+          fetchedAt: checkedAt,
+          live: !stale,
+        }));
+        const entry = {
+          ...LABS.find((l) => l.id === id),
+          source: "t3",
+          canonical: p.canonical,
+          enabled: p.enabled,
+          fetchedAt: checkedAt,
+          live: !stale,
+          windows,
+          // Banked resets belong to the provider's own lab (Codex), never a split-off one.
+          resetCredits: id === p.lab ? lim?.resetCredits ?? null : null,
+          unavailable: lim?.unavailable ?? null,
+          hasMeter: Boolean(long),
+        };
+        // Several instances of one driver (Codex and its paid API instance, or two Antigravity
+        // instances): keep a turned-on one, then one whose own long window has a reading, then the
+        // instance named like the driver. Ties keep the first.
+        const rank = (l) => (l.enabled !== false ? 4 : 0) + (l.hasMeter ? 2 : 0) + (l.canonical ? 1 : 0);
+        if (!out[id] || rank(entry) > rank(out[id])) out[id] = entry;
+      }
     }
     return out;
   }
@@ -593,7 +609,7 @@
     return LABS.map((info) => {
       const t = t3labs?.[info.id];
       const s = (Array.isArray(serverLabs) ? serverLabs : []).find((l) => l && l.id === info.id);
-      if (t?.hasMeter) {
+      if (t?.hasMeter && t.enabled !== false) {
         // lab-usage's projection, with what's needed to check it belongs to this reading (labView).
         const windows = t.windows.map((w) => {
           const sw = w.role === "extra" ? null : s?.windows?.find((x) => x.role === w.role);
@@ -613,7 +629,7 @@
         : `${info.name} did not report a usage percentage`;
       // A configured quota provider remains visible when its response has no number.
       // Keep unknown separate from measured zero, and do not add disabled/unconfigured labs.
-      const showUnknown = Boolean(t && t.enabled !== false && ["claude", "codex", "gemini", "grok"].includes(info.id));
+      const showUnknown = Boolean(t && t.enabled !== false && ["claude", "agclaude", "codex", "gemini", "grok"].includes(info.id));
       return { ...info, ...t, hasMeter: false, showUnknown, windows: [], noMeter: why };
     });
   }
@@ -751,7 +767,8 @@
 
   /** B's tooltip (Astra round 2, exact wording; "Week" becomes "Month" for monthly plans). */
   function bTooltip(v, now) {
-    if (!v?.hasData) return `${v?.name ?? "Lab"} · This Mac. Usage unavailable: ${v?.noMeter ?? "no reading yet"}.${known(v?.age) ? ` Last checked ${fmtAge(v.age)}${v.stale ? " (stale)" : ""}.` : ""}`;
+    const note = v?.note ? ` ${v.note}` : "";
+    if (!v?.hasData) return `${v?.name ?? "Lab"} · This Mac.${note} Usage unavailable: ${v?.noMeter ?? "no reading yet"}.${known(v?.age) ? ` Last checked ${fmtAge(v.age)}${v.stale ? " (stale)" : ""}.` : ""}`;
     const lp = v.lp;
     const out = [];
     // Running low: lead with the refill time.
@@ -759,7 +776,7 @@
       if (r.which === "short") out.push(`${v.shortWord}: ${fmtPct(v.sp.left)} left, refills ${fmtClock(r.at, now)}.`);
       else out.push(`${v.longWord}: ${fmtPct(lp.left)} left${v.blocked ? ` (${v.shortWord} blocked too)` : ""}, refills ${fmtClock(r.at, now)}.`);
     }
-    out.push(`${v.name} · This Mac.`);
+    out.push(`${v.name} · This Mac.${note}`);
     out.push(`${v.longWord}: ${fmtPct(lp.left)} left; even pace ${known(lp.timeLeft) ? `${lp.timeLeft}% left` : "unknown"}; resets ${fmtWhen(v.long.resetsAt)}.`);
     if (v.short) {
       if (v.blocked) out.push(`${v.shortWord}: blocked by the ${v.longAdj} limit until ${fmtWhen(v.long.resetsAt)}.`);
@@ -1891,16 +1908,8 @@
           vd && vFresh && known(vd.resetsAtRisk) ? (vd.resetsAtRisk ? ` · ${vd.resetsAtRisk} at risk` : " · none at risk") : ""));
       }
       const extras = v.windows.filter((w) => w.role === "extra" && known(w.usedPct));
-      if (extras.length) {
-        // Grouped: "Claude/GPT via Antigravity: 5-hour 100% left, Weekly 100% left".
-        const groups = new Map();
-        for (const w of extras) {
-          const g = w.group ?? "";
-          if (!groups.has(g)) groups.set(g, []);
-          groups.get(g).push(`${w.group ? String(w.label ?? "").replace(/^.*·\s*/, "") : w.label ?? w.id} ${Math.round(100 - clamp(w.usedPct, 0, 100))}% left`);
-        }
-        rows.push(h("div", { class: "t3x-muted" }, `Also: ${[...groups].map(([g, list]) => (g ? `${g}: ${list.join(", ")}` : list.join(" · "))).join(" · ")}`));
-      }
+      if (extras.length) rows.push(h("div", { class: "t3x-muted" }, `Also: ${extras.map((w) => `${w.label ?? w.id} ${Math.round(100 - clamp(w.usedPct, 0, 100))}% left`).join(" · ")}`));
+      if (v.note) rows.push(h("div", { class: "t3x-muted", text: v.note }));
       return h("section", { class: `t3x-lab${v.stale ? " t3x-stale" : ""}` },
         h("h3", {}, h("span", { class: "t3x-swatch", style: `background:${v.colour}` }), v.name, v.stale ? h("span", { class: "t3x-tag", text: "stale" }) : null),
         h("div", { class: "t3x-b-big", title: bTooltip(v, now) }, bSvg(v, width, 22, "lg")),
@@ -1929,6 +1938,7 @@
         h("h3", {}, h("span", { class: "t3x-swatch", style: `background:${v.colour}` }), v.name, v.stale ? h("span", { class: "t3x-tag", text: "stale" }) : null),
         h("div", { text: "— · Usage unavailable" }),
         h("div", { class: "t3x-muted", text: v.noMeter }),
+        v.note ? h("div", { class: "t3x-muted", text: v.note }) : null,
         h("div", { class: "t3x-muted", text: known(v.age) ? `T3 last checked ${fmtAge(v.age)}` : "Last check unknown" }))),
       without.length ? h("section", { class: "t3x-lab" }, h("h3", { text: "No meter yet" }),
         h("div", { class: "t3x-muted", text: without.map((v) => `${v.name} (${v.noMeter ?? "no meter yet"})`).join(" · ") })) : null,
@@ -2071,11 +2081,15 @@
       const width = Math.max(80, Math.round((node.clientWidth || 226) - 16));
       const compact = barsCompact();
       node.classList.toggle("t3x-bars-c", compact);
+      // The 3.6em name column fits "Gemini"; a longer name ("Claude AG") widens it by 1.8em
+      // (about 20 px at 11 px), and the glyphs give up the same width.
+      const wide = compact && labs.some((v) => v.name.length > 6);
+      node.classList.toggle("t3x-bars-wide", wide);
       if (sig(node, `${compact ? "c" : ""}${width}#${labs.map((v) => `${viewKey(v)}|${compactLabel(v, now)}`).join(";")}`)) {
         node.replaceChildren(...(labs.length
           ? compact ? labs.map((v) => h("span", { class: `t3x-bar${v.stale ? " t3x-dim" : ""}`, title: bTooltip(v, now) },
             h("span", { class: "t3x-bar-label" }, h("span", { class: "t3x-lab-name", text: v.name })),
-            h("span", { class: "t3x-bar-glyph" }, bSvg(v, Math.max(28, width - 136), 12, "sm")),
+            h("span", { class: "t3x-bar-glyph" }, bSvg(v, Math.max(28, width - (wide ? 156 : 136)), 12, "sm")),
             h("span", { class: "t3x-bar-val", text: shortBarText(v, now) })))
           : labs.map((v) => h("span", { class: `t3x-bar${v.stale ? " t3x-dim" : ""}`, title: bTooltip(v, now) },
             h("span", { class: "t3x-bar-label" }, h("span", { class: "t3x-lab-name", text: v.name })),

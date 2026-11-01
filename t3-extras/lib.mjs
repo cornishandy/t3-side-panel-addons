@@ -110,6 +110,7 @@ export function usageView(raw, fetchedAt) {
 /** Every lab the add-ons know. Labs without a meter are listed in the detail only. */
 export const LAB_INFO = [
   { id: "claude", name: "Claude", colour: "#d97757" },
+  { id: "agclaude", name: "Claude AG", colour: "#b8664c" }, // Antigravity's shared Claude & GPT windows; only the T3 window reads them
   { id: "codex", name: "Codex", colour: "#2fa37a" },
   { id: "gemini", name: "Gemini", colour: "#5b8def" },
   { id: "grok", name: "Grok", colour: "#9a9aa5" },

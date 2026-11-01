@@ -255,15 +255,18 @@ test("T3's record fails closed: another schema, another environment, bad JSON, w
 
 const t3labs = () => C.labsFromT3(C.projectT3Config(t3Record(), ENV), NOW);
 
-test("labs from T3: Claude, Codex (not its paid API instance), Gemini with shared windows as extras, Grok", () => {
+test("labs from T3: Claude, Claude AG (Antigravity's shared windows), Codex (not its paid API instance), Gemini, Grok", () => {
   const L = t3labs();
   const roles = (id) => L[id].windows.map((w) => [w.id, w.role]);
   assert.deepEqual(plain(roles("claude")), [["five_hour", "short"], ["seven_day", "long"], ["seven_day_fable", "extra"]]);
   assert.deepEqual(plain(roles("codex")), [["primary", "long"]], "no made-up 5-hour row");
   assert.equal(L.codex.canonical, true, "the codex instance, not codex_openai_api");
   assert.equal(L.codex.resetCredits.availableCount, 3);
-  assert.deepEqual(plain(roles("gemini")), [["3p-5h", "extra"], ["gemini-5h", "short"], ["3p-weekly", "extra"], ["gemini-weekly", "long"]]);
-  assert.equal(L.gemini.windows[0].group, "Claude/GPT via Antigravity");
+  assert.deepEqual(plain(roles("gemini")), [["gemini-5h", "short"], ["gemini-weekly", "long"]], "Gemini keeps only its own windows");
+  assert.deepEqual(plain(roles("agclaude")), [["3p-5h", "short"], ["3p-weekly", "long"]]);
+  assert.equal(L.agclaude.name, "Claude AG");
+  assert.equal(L.agclaude.hasMeter, true);
+  assert.equal(L.agclaude.resetCredits, null);
   assert.deepEqual(plain(roles("grok")), [["subscription", "long"]]);
   assert.equal(L.opencode.hasMeter, false);
   assert.equal(L.cursor.enabled, false);
@@ -284,21 +287,25 @@ const serverLabs = [
 
 test("merge: T3's numbers in the bars, lab-usage's projection and verdict beside them; every lab listed once", () => {
   const m = C.mergeLabs(t3labs(), serverLabs);
-  assert.deepEqual(plain(m.map((l) => l.id)), ["claude", "codex", "gemini", "grok", "opencode", "cursor", "pi", "muse"]);
+  assert.deepEqual(plain(m.map((l) => l.id)), ["claude", "agclaude", "codex", "gemini", "grok", "opencode", "cursor", "pi", "muse"]);
+  const lab = (labs, id) => labs.find((l) => l.id === id);
   const claude = m[0];
   assert.equal(claude.source, "t3");
   assert.equal(claude.windows.find((w) => w.role === "long").usedPct, 37, "T3's number, not lab-usage's 36");
   assert.equal(claude.windows.find((w) => w.role === "long").projection, 210);
   assert.equal(claude.verdict.tier, "T0");
-  assert.equal(m[4].hasMeter, false);
-  assert.equal(m[4].noMeter, "T3 has no meter for it");
-  assert.equal(m[5].noMeter, "turned off in T3");
-  assert.equal(m[6].noMeter, "no meter yet");
+  assert.equal(lab(m, "opencode").hasMeter, false);
+  assert.equal(lab(m, "opencode").noMeter, "T3 has no meter for it");
+  assert.equal(lab(m, "cursor").noMeter, "turned off in T3");
+  assert.equal(lab(m, "pi").noMeter, "no meter yet");
+  assert.equal(lab(m, "agclaude").source, "t3", "Claude AG comes from T3's Antigravity reading only");
+  assert.equal(lab(m, "agclaude").verdict, null, "no lab-usage tier or gate for it");
   // T3's cache unavailable: Claude and Codex fall back to lab-usage; the rest have no meter.
   const fb = C.mergeLabs(null, serverLabs);
   assert.equal(fb[0].source, "lab-usage");
   assert.equal(fb[0].windows.find((w) => w.role === "long").usedPct, 36);
-  assert.equal(fb[2].hasMeter, false);
+  assert.equal(lab(fb, "gemini").hasMeter, false);
+  assert.equal(lab(fb, "agclaude").hasMeter, false, "lab-usage never stands in for Claude AG");
 });
 
 const view = (id, now = NOW, labs = C.mergeLabs(t3labs(), serverLabs)) => C.labView(labs.find((l) => l.id === id), now, {});
@@ -314,7 +321,7 @@ function grokReading(limits = { checkedAt: checked, windows: [] }, enabled = tru
 test("Grok with no percentage stays visible, unknown and separate from measured zero", () => {
   const vs = grokReading();
   const g = vs.find((v) => v.id === "grok");
-  assert.deepEqual(plain(C.visibleLabs(vs).map((v) => v.id)), ["claude", "codex", "gemini", "grok"]);
+  assert.deepEqual(plain(C.visibleLabs(vs).map((v) => v.id)), ["claude", "agclaude", "codex", "gemini", "grok"]);
   assert.equal(g.hasData, false);
   assert.equal(g.minLeft, null);
   assert.equal(g.windows.length, 0);
@@ -358,7 +365,7 @@ test("the composer can show Grok unavailable even when no numeric meters exist",
 
 test("lab views: stale by source, the composer's lab counts short windows too", () => {
   const vs = C.views(C.mergeLabs(t3labs(), serverLabs), NOW, {});
-  assert.deepEqual(plain(vs.filter((v) => v.hasData).map((v) => v.id)), ["claude", "codex", "gemini", "grok"]);
+  assert.deepEqual(plain(vs.filter((v) => v.hasData).map((v) => v.id)), ["claude", "agclaude", "codex", "gemini", "grok"]);
   const g = vs.find((v) => v.id === "grok");
   assert.equal(C.mostConstrained(vs).id, "grok", "Grok has 27% left, the least");
   // Make Gemini's 5-hour window the tightest limit of all.
@@ -447,7 +454,7 @@ test("a Codex manual reset counts: 70% used, 1 day before the reset, runs out (n
   const t = NOW - MIN;
   const lu = [{ ...serverLabs[1], windows: [{ ...serverLabs[1].windows[0], usedPct: 70, resetsAt: NOW + DAY, projection: 70 * ((NOW + DAY - (t - 12 * H)) / (12 * H)), projectionAt: t, projectionUsed: 70 }] }];
   const labs = C.mergeLabs(t3labs(), lu).map((l) => (l.id === "codex" ? { ...l, windows: l.windows.map((w) => ({ ...w, usedPct: 70, resetsAt: NOW + DAY })) } : l));
-  const v = C.labView(labs[1], NOW, {});
+  const v = C.labView(labs.find((l) => l.id === "codex"), NOW, {});
   assert.ok(70 * 7 / 6 < 100, "the plain average would say it lasts");
   const f = C.forecast(v, NOW);
   assert.equal(f.state, "out");
@@ -561,7 +568,7 @@ test("forecast boundary states: no usage, zero elapsed, limit reached, stale, ex
   assert.equal(avg.source, "average");
   assert.ok(Math.abs(avg.rate - 37 / (NOW - 2 * MIN - base.epochStart)) < 1e-15);
   // Codex without lab-usage: its epoch can move (manual resets), so no estimate.
-  const codexOnlyT3 = C.labView(C.mergeLabs(t3labs(), [])[1], NOW, {});
+  const codexOnlyT3 = C.labView(C.mergeLabs(t3labs(), []).find((l) => l.id === "codex"), NOW, {});
   assert.equal(C.forecast(codexOnlyT3, NOW).state, "unavailable");
   // Lasting: the words never promise a crossing.
   const lasts = with_({ usedPct: 5 });
@@ -788,12 +795,105 @@ test("Gemini falls back to Google's per-model quota (T3's fallback) when there i
     { id: "gemini-quota", kind: "other", label: "Gemini · Reported quota", usedPercent: 5.911773, resetsAt: iso(NOW + 4 * H) },
   ];
   const L = C.labsFromT3(C.projectT3Config(rec, ENV), NOW);
-  assert.deepEqual(plain(L.gemini.windows.map((w) => [w.id, w.role, w.label])), [["3p-weekly", "extra", "Weekly"], ["3p-5h", "extra", "5-hour"], ["gemini-quota", "long", "Quota"]]);
+  assert.deepEqual(plain(L.gemini.windows.map((w) => [w.id, w.role, w.label])), [["gemini-quota", "long", "Quota"]]);
+  assert.deepEqual(plain(L.agclaude.windows.map((w) => [w.id, w.role])), [["3p-weekly", "long"], ["3p-5h", "short"]]);
   assert.equal(L.gemini.hasMeter, true);
   const v = C.labView(C.mergeLabs(L, []).find((l) => l.id === "gemini"), NOW);
   assert.equal(v.hasData, true);
   assert.equal(Math.round(v.lp.left), 94);
   assert.equal(v.lp.pace ?? null, null, "no window length, so no made-up pace");
+});
+
+// Claude AG: Antigravity's shared "Claude & GPT" windows (3p-*), its own item, apart from Gemini and the Claude plan.
+function agReading(windows, { enabled = true, unavailable = null } = {}) {
+  const rec = JSON.parse(t3Record());
+  const p = rec.config.providers.find((x) => x.driver === "antigravity");
+  p.enabled = enabled;
+  p.usageLimits = { checkedAt: checked, windows, ...(unavailable ? { unavailable } : {}) };
+  return C.views(C.mergeLabs(C.labsFromT3(C.projectT3Config(rec, ENV), NOW), serverLabs), NOW, {});
+}
+const AG5 = (o = {}) => ({ id: "3p-5h", kind: "session", label: "Claude & GPT (shared) · 5-hour", usedPercent: 0, windowDurationMins: 300, ...o });
+const AGW = (o = {}) => ({ id: "3p-weekly", kind: "weekly", label: "Claude & GPT (shared) · Weekly", usedPercent: 56.978023, resetsAt: iso(NOW + 6.75 * DAY), windowDurationMins: 10080, ...o });
+const GEMW = { id: "gemini-weekly", kind: "weekly", label: "Gemini · Weekly", usedPercent: 3.05459, resetsAt: iso(NOW + 6.5 * DAY), windowDurationMins: 10080 };
+
+test("Claude AG: its week is the bar, its 5-hour window the tank; the tooltip says whose limits they are", () => {
+  // Today's real shape: the 5-hour window unused, with no reset time yet.
+  const vs = agReading([AG5(), GEMW, AGW()]);
+  const ag = vs.find((v) => v.id === "agclaude");
+  assert.equal(ag.hasData, true);
+  assert.equal(ag.lp.left, 43);
+  assert.equal(ag.sp.left, 100);
+  assert.equal(ag.sp.pace, null, "no reset time, so no pace for the 5-hour window");
+  assert.equal(ag.lp.pace, "ahead", "57% used a quarter into the week");
+  assert.equal(C.compactLabel(ag, NOW), "43% left · 5h 100%");
+  const tip = C.bTooltip(ag, NOW);
+  assert.match(tip, /^Claude AG · This Mac\. Claude and GPT models in Antigravity \(Google AI Ultra\) share these limits; not your Claude plan\./);
+  assert.match(tip, /Week: 43% left/);
+  const gem = vs.find((v) => v.id === "gemini");
+  assert.equal(Math.round(gem.lp.leftExact), 97, "Gemini's own week, untouched by the shared windows");
+  assert.ok(!gem.windows.some((w) => w.id.startsWith("3p-")));
+  assert.equal(C.forecast(ag, NOW).source, "average", "no lab-usage projection: the average since the week started");
+});
+
+test("Claude AG: the tightest limit takes the composer like any lab", () => {
+  const vs = agReading([AG5({ usedPercent: 40, resetsAt: iso(NOW + 2 * H) }), GEMW, AGW({ usedPercent: 92 })]);
+  assert.equal(C.mostConstrained(vs).id, "agclaude");
+  assert.match(C.composerSummary(vs, NOW).main, /^Claude AG 8%/);
+});
+
+test("Claude AG: listed with no percentage shows a dash; not listed at all adds no item; off in T3 hides it", () => {
+  const unknown = agReading([AG5({ usedPercent: undefined }), GEMW, AGW({ usedPercent: undefined })]);
+  const ag = unknown.find((v) => v.id === "agclaude");
+  assert.equal(ag.hasData, false);
+  assert.equal(ag.showUnknown, true);
+  assert.equal(C.compactLabel(ag, NOW), "— · unavailable");
+  assert.match(C.bTooltip(ag, NOW), /Claude AG did not report a usage percentage/);
+  assert.notEqual(C.mostConstrained(unknown).id, "agclaude", "missing usage never looks like a tightest limit");
+  assert.match(C.composerSummary(unknown, NOW).main, / · Claude AG —/);
+  assert.equal(unknown.find((v) => v.id === "gemini").hasData, true);
+  // An account whose reading has Gemini windows but no shared ones: nothing to show, nothing invented.
+  const none = agReading([GEMW]);
+  assert.ok(!C.visibleLabs(none).some((v) => v.id === "agclaude"));
+  assert.equal(none.find((v) => v.id === "gemini").hasData, true);
+  // T3 couldn't read Antigravity at all: both are unknown, neither is zero.
+  const failed = agReading([], { unavailable: { reason: "probeFailed" } });
+  for (const id of ["gemini", "agclaude"]) {
+    const v = failed.find((x) => x.id === id);
+    assert.equal(v.hasData, false, id);
+    assert.equal(v.showUnknown, true, id);
+    assert.equal(v.noMeter, "T3 couldn't read it", id);
+  }
+  // Turned off in T3, with no reading: neither shows a dash (as for every lab).
+  const off = agReading([], { enabled: false });
+  assert.ok(!C.visibleLabs(off).some((v) => v.id === "agclaude" || v.id === "gemini"));
+  // Turned off with an old reading still saved: never shown as a live number (Astra, pre-OK).
+  const offSaved = agReading([AG5(), GEMW, AGW()], { enabled: false });
+  assert.ok(!C.visibleLabs(offSaved).some((v) => v.id === "agclaude" || v.id === "gemini"));
+  assert.equal(offSaved.find((v) => v.id === "agclaude").noMeter, "turned off in T3");
+  assert.equal(C.mostConstrained(offSaved).id === "agclaude", false);
+});
+
+test("two Antigravity instances: the one whose weekly window has a reading wins, in either order (Astra, pre-OK)", () => {
+  const rec = (first, second, otherFirst = false) => {
+    const r = JSON.parse(t3Record());
+    const ag = r.config.providers.find((x) => x.driver === "antigravity");
+    const other = { ...ag, instanceId: "antigravity_work" };
+    ag.usageLimits = { checkedAt: checked, windows: first };
+    other.usageLimits = { checkedAt: checked, windows: second };
+    r.config.providers.splice(otherFirst ? r.config.providers.indexOf(ag) : r.config.providers.length, 0, other);
+    return C.views(C.mergeLabs(C.labsFromT3(C.projectT3Config(r, ENV), NOW), serverLabs), NOW, {});
+  };
+  // The canonical instance has only the 5-hour window; the other has the week.
+  for (const vs of [rec([AG5({ usedPercent: 10, resetsAt: iso(NOW + H) })], [AGW(), AG5()]), rec([AGW(), AG5()], [AG5({ usedPercent: 10, resetsAt: iso(NOW + H) })])]) {
+    const ag = vs.find((v) => v.id === "agclaude");
+    assert.equal(ag.hasData, true);
+    assert.equal(ag.lp.left, 43);
+  }
+  // Both complete: the canonical instance (named like the driver) wins, whichever comes first.
+  for (const otherFirst of [false, true]) {
+    const both = rec([AGW({ usedPercent: 10 }), AG5()], [AGW({ usedPercent: 80 }), AG5()], otherFirst);
+    assert.equal(both.find((v) => v.id === "agclaude").lp.left, 90, `other instance first: ${otherFirst}`);
+  }
 });
 
 test("sidebar sections: T3's row ages read as hours; statuses read as null", () => {
