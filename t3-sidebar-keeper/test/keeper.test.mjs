@@ -86,6 +86,9 @@ function legacyFit(text) {
   return K.finishBinCli(patched.replace(K.FIT_TITLE, K.FIT_TITLE_V9).replace(newWrapper, oldWrapper), Buffer.byteLength(text), true);
 }
 
+const statesOf = (out) => Object.fromEntries(Object.entries(out.results).map(([name, r]) => [name, r.state]));
+const freshStates = { wrap: "patched", minWidth: "patched", rule: "patched", fit: "patched", titleGuide: "patched", geminiQuota: K.unitGeminiQuota(binCliOf(pristine)).state, extras: "patched", firstClick: "patched" };
+
 // ---------- parser-based room making (Astra round 1 fixtures) ----------
 
 test("wrap keeps // lines that are template-literal content", () => {
@@ -143,17 +146,16 @@ test("binCli balance keeps a line break in the replaced comment (ASI)", () => {
 
 test("the test copy starts unpatched (rebuilt from the keeper's backup when the app is patched)", () => {
   fresh();
-  const states = Object.values(K.inspect(asar).results).map((r) => r.state);
-  assert.deepEqual(states, ["patched", "patched", "patched", "patched", "patched", "patched", "patched"], "pristine copy is not a fresh build");
+  assert.deepEqual(statesOf(K.inspect(asar)), freshStates, "pristine copy is not a fresh build");
 });
 
 test("all units apply to the installed build; a second pass finds nothing to do", () => {
   fresh();
   const first = K.apply({ reason: "test" });
-  assert.deepEqual(Object.values(first.results).map((r) => r.state), ["patched", "patched", "patched", "patched", "patched", "patched", "patched"]);
+  assert.deepEqual(statesOf(first), freshStates);
   const again = K.apply({ reason: "test" });
   assert.equal(again.wrote, false);
-  assert.deepEqual(Object.values(again.results).map((r) => r.state), ["already", "already", "already", "already", "already", "already", "already"]);
+  assert.ok(Object.values(again.results).every((r) => r.state === "already"));
 });
 
 // ---------- title guide and already-patched upgrades ----------
@@ -210,7 +212,7 @@ test("an already-patched v9 archive upgrades fit and titleGuide in place and is 
   for (const name of ["reminders.json", "reminder-journal.json"]) fs.rmSync(path.join(process.env.T3_KEEPER_HOME, name), { force: true });
   const archiveBytes = fs.statSync(asar).size;
   const result = K.apply({ reason: "v9 upgrade" });
-  assert.deepEqual(Object.values(result.results).map((r) => r.state), ["already", "already", "already", "patched", "patched", "already", "already"]);
+  assert.deepEqual(statesOf(result), { wrap: "already", minWidth: "already", rule: "already", fit: "patched", titleGuide: "patched", geminiQuota: "already", extras: "already", firstClick: "already" });
   const after = binCliOf();
   assert.equal(Buffer.byteLength(after), Buffer.byteLength(legacy));
   assert.equal(fs.statSync(asar).size, archiveBytes);
@@ -549,6 +551,15 @@ function patchedTitleFunctions() {
 }
 
 function titleFunctions(patched) {
+  if (!patched.includes("function threadTitle(")) {
+    const fd = fs.openSync(pristine, "r");
+    try {
+      const layout = K.readLayout(fd), target = K.findTargets(fd, layout).delegatedTitles;
+      const child = K.unitFit(K.readEntry(fd, layout, target).toString(), { wrappers: [["threadTitle", 42, true]] }).text;
+      const childAst = acorn.parse(child, { ecmaVersion: "latest", sourceType: "module" });
+      patched += "\n" + childAst.body.filter((n) => n.type === "FunctionDeclaration" && ["threadTitle", "threadTitle$t3orig"].includes(n.id.name)).map((n) => child.slice(n.start, n.end)).join("\n");
+    } finally { fs.closeSync(fd); }
+  }
   const ast = acorn.parse(patched, { ecmaVersion: "latest", sourceType: "module" });
   const names = ["t3KeeperFitTitle", "subagentThreadTitle", "subagentThreadTitle$t3orig", "threadTitle", "threadTitle$t3orig", "sanitizeThreadTitle", "sanitizeThreadTitle$t3orig", "trimmed$1"];
   const code = ast.body.filter((n) => n.type === "FunctionDeclaration" && names.includes(n.id.name)).map((n) => patched.slice(n.start, n.end)).join("\n");
@@ -831,10 +842,74 @@ for (const boundary of ['afterArchiveRename', 'beforeReminderFinalize']) {
 test("geminiQuota: the Antigravity probe sends a version Google returns Gemini buckets for", () => {
   const before = binCliOf(pristine);
   const out = K.unitGeminiQuota(before);
-  assert.equal(out.state, "patched");
+  assert.equal(out.state, before.includes("`antigravity/hub/2.24.0") ? "already" : "patched");
   assert.ok(out.text.includes("`antigravity/hub/2.24.0 (aidev_client;") && !out.text.includes("antigravity/hub/1.0.0"));
   assert.equal(K.unitGeminiQuota(out.text).state, "already");
   const balanced = K.finishBinCli(out.text, Buffer.byteLength(before), false);
   assert.equal(Buffer.byteLength(balanced), Buffer.byteLength(before));
   assert.throws(() => K.unitGeminiQuota("const ua = `other`;"), /found 0 times/);
+});
+
+test("shared minimum clamp keeps all clamps bound to one minimum and refuses drift", () => {
+  const source = 'var a=`chat_thread_sidebar_width`,b=256,c=208;function d(e){return Math.max(c,Math.ceil(e))}function f(e,t=c){return Math.max(t,Math.floor(e)-640)}function g(e,t){return Math.min(e===null?b:Math.max(c,e),f(t))}';
+  const out = K.unitMinWidth(source);
+  assert.equal(out.text, source.replace('c=208', 'c=140'));
+  assert.equal(K.unitMinWidth(out.text).state, 'already');
+  assert.throws(() => K.unitMinWidth(source.replace('Math.max(c,e)', 'Math.max(208,e)')), /changed shape/);
+});
+
+test("server byte balancing preserves templates, line breaks and exact fitter on a comment-poor bundle", () => {
+  const original = 'const template = `start\n    keep this indentation\nend`;\n' + Array.from({length: 1500}, (_, i) => `function padding${i}(){\n        return ${i};\n}\n`).join('');
+  const added = K.FIT_TITLE + original;
+  const out = K.finishBinCli(added, Buffer.byteLength(original), false);
+  assert.equal(Buffer.byteLength(out), Buffer.byteLength(original));
+  assert.ok(out.includes(K.FIT_TITLE));
+  assert.ok(out.includes('`start\n    keep this indentation\nend`'));
+  assert.equal(out.split('\n').length, added.split('\n').length);
+});
+
+test("split fit patches and disables both title bundles together", () => {
+  fresh();
+  const before = K.inspect(asar);
+  assert.ok(before.targets.delegatedTitles, 'current nightly has a split delegate title bundle');
+  const out = K.apply({ reason: 'split fitter' });
+  assert.equal(out.results.fit.state, 'patched');
+  const fd = fs.openSync(asar, 'r');
+  try {
+    const layout = K.readLayout(fd);
+    const child = K.readEntry(fd, layout, before.targets.delegatedTitles).toString();
+    const T = titleFunctions(binCliOf());
+    assert.ok(child.includes('function threadTitle$t3orig('));
+    assert.ok(child.includes(K.FIT_TITLE));
+    assert.equal(T.threadTitle({title: 'a '.repeat(100) + '(Grok)', parentTitle: 'Parent', index: 0}).endsWith('(Grok)'), true);
+  } finally { fs.closeSync(fd); }
+  fresh(); setDisabled(['fit']);
+  const disabled = K.inspect(asar);
+  assert.equal(disabled.results.fit.state, 'disabled');
+  assert.equal(disabled.files.delegatedTitles, undefined);
+});
+
+test("split fit refuses a missing delegate formatter without publishing half a fitter", () => {
+  fresh();
+  const fd = fs.openSync(asar, 'r+');
+  try {
+    const layout = K.readLayout(fd), target = K.findTargets(fd, layout).delegatedTitles;
+    const original = K.readEntry(fd, layout, target);
+    const changed = Buffer.from(original.toString().replace('function threadTitle(', 'function otherTitlex('));
+    assert.equal(changed.length, original.length);
+    K.writeEntries(fd, layout, [{rel: target, buf: changed}]);
+  } finally { fs.closeSync(fd); }
+  const out = K.inspect(asar);
+  assert.equal(out.results.fit.state, 'failed');
+  assert.equal(out.files.delegatedTitles, undefined);
+  assert.ok(!out.files.binCli.buf.toString().includes('function t3KeeperFitTitle('));
+});
+
+test("shared minimum ignores string scaffolds and rejects suffix identifiers", () => {
+  const source = 'var a=`chat_thread_sidebar_width`,b=256,c=208;function d(e){return Math.max(c,Math.ceil(e))}function f(e,t=c){return Math.max(t,Math.floor(e)-640)}function g(e,t){return Math.min(e===null?b:Math.max(c,e),f(t))}';
+  const fixture = 'const fixture=' + JSON.stringify(source) + ';\n';
+  assert.equal(K.unitMinWidth(fixture + source).text, fixture + source.replace('c=208', 'c=140'));
+  assert.throws(() => K.unitMinWidth('const abc=208;' + source.replace('t=c)', 't=abc)')), /changed shape/);
+  const fakeClamp = 'const fixture="function f(e,t=c){return Math.max(t,Math.floor(e)-640)}";';
+  assert.throws(() => K.unitMinWidth(source.replace('function f(e,t=c){return Math.max(t,Math.floor(e)-640)}', fakeClamp)), /changed shape/);
 });

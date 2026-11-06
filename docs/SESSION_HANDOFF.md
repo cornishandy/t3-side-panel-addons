@@ -10,6 +10,8 @@
 - 25 Oct: compact threads, T3's own fonts in font menus, grouping bar removed, keeper `geminiQuota` unit (KEEPER_VERSION 12). Moved from a scratch folder into this repo. Sidebar sections (pinned label, fold older, one-row titles, gaps by time). Find fonts on screen (hover, Shift labels, docked Fonts card, Show on screen).
 - 31 Oct: the Older threads section folds by a set age (default 2 days; 12 hours to 1 week or Auto in the ✦ panel), under an "Older than 2 days" header shaped like T3's shelf headers.
 
+- 6 Nov: keeper v14 supports Nightly .4247: runtimeLayer/server split, shared sidebar minimum, server indentation reclaim. Native title setting compared; Andy chose to keep rule/fit/titleGuide in the keeper and leave native threadTitleInstructions unset. Gemini version is already 2.24.0 upstream in this build.
+
 ## Where things live
 
 - Source: this repo. Installed copies: `~/.local/share/t3-extras/` and `~/.local/share/t3-sidebar-keeper/` (re-run each `install.sh` after editing).
