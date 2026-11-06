@@ -67,6 +67,7 @@
     olderOpen: false, // that header's remembered state
     olderAfter: "2d", // OLDER_AFTER: from what age a thread counts as older ("auto" = by gaps)
     oneRowTitles: true, // one line per title; a trailing (N) or (Model) stays visible
+    titleLines: 2, // TITLE_LINES: with one-row titles off (compact threads), lines at most, used only as needed
     timeGaps: true, // a gap between active threads last active 25+ min apart, instead of lines
     marker: "bar", // bar | outline | off
     fontHead: Object.freeze({ family: "off", size: null }), // size null = the font's own default
@@ -103,6 +104,7 @@
   });
   const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "printOnly", "showPartly", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen"];
   const MARKERS = ["bar", "outline", "off"];
+  const TITLE_LINES = Object.freeze([2, 3]);
   // The Older section's choices: value, hours (null = by gaps, olderCutoff), panel label, header words.
   const OLDER_AFTER = Object.freeze([
     ["12h", 12, "12 hours", "12 hours"],
@@ -263,6 +265,7 @@
     if (MARKERS.includes(s.marker)) out.marker = s.marker;
     if (FOOTER_TEAM.some(([v]) => v === s.footerTeam)) out.footerTeam = s.footerTeam;
     if (OLDER_AFTER.some(([v]) => v === s.olderAfter)) out.olderAfter = s.olderAfter;
+    if (TITLE_LINES.includes(s.titleLines)) out.titleLines = s.titleLines;
     if (s.fontHead || s.fontBody) {
       out.fontHead = fontPick(s.fontHead);
       out.fontBody = fontPick(s.fontBody);
@@ -1056,6 +1059,7 @@
       "data-t3x-fold": st.foldOlder ? "" : null,
       "data-t3x-older-open": st.foldOlder && st.olderOpen ? "" : null,
       "data-t3x-onerow": st.oneRowTitles ? "" : null,
+      "data-t3x-title-lines": st.oneRowTitles ? null : String(st.titleLines),
       "data-t3x-gaps": st.timeGaps ? "" : null,
       "data-t3x-inline-icon": st.inlineIcon ? "" : null,
       "data-t3x-project-full": st.projectFull ? "" : null,
@@ -1148,7 +1152,7 @@
   }
 
   const core = {
-    rowAgeHours, olderCutoff, olderRows, olderTitle, OLDER_AFTER, titleSuffix, gapsBefore,
+    rowAgeHours, olderCutoff, olderRows, olderTitle, OLDER_AFTER, TITLE_LINES, titleSuffix, gapsBefore,
     DEFAULTS, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, usagePageHash, usageContainerMatches,
     FOOTER_TEAM, FOOTER_DETAILS, footerPass, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
@@ -3147,7 +3151,11 @@
         sw("Handover chain pill", "chainPill", toolGates(lastState).handover ? (mode ? `Handover mode: ${mode}` : null) : "needs the handover tool")),
       h("section", {}, h("h3", { text: "Sidebar" }),
         sw("Compact threads", "compactThreads", "Project icon and title on one line; hover the icon for the project and branch."),
-        sw("One-row titles", "oneRowTitles", "Long titles end in \u2026 but keep a trailing number like (2). Off: titles wrap (two lines at most with compact threads)."),
+        sw("One-row titles", "oneRowTitles", "Long titles end in \u2026 but keep a trailing number like (2). Off: titles wrap only as needed, "
+          + (settings.compactThreads ? "up to the lines picked below." : "in full (pick a limit with compact threads on).")),
+        settings.compactThreads && !settings.oneRowTitles ? h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label t3x-indent-label", text: "Lines at most" }),
+          h("div", { class: "t3x-radios", role: "radiogroup", "aria-label": "Lines at most" },
+            TITLE_LINES.map((n) => radio("titleLines", n, settings.titleLines, `${n} lines`, (v) => change({ titleLines: v }))))) : null,
         sw("Pinned label and line", "pinnedLabel", "A small \u201cPinned\u201d label above pinned threads and a line below them."),
         sw("Gaps by time", "timeGaps", "A small gap between threads last active 25+ min apart, instead of lines between rows."),
         sw("Older threads section", "foldOlder", (settings.olderAfter === "auto"

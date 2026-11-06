@@ -418,13 +418,14 @@ html[data-t3x-working] [data-testid="sidebar-working-shelf-toggle"] {
 }
 
 /* ---------- sidebar polish: compact threads ----------
- * One line per thread: the project icon, the title (two lines at most), then the status.
+ * One line per thread: the project icon, the title (2 or 3 lines at most, picked in the panel), then the status.
  * The project name and the branch line are hidden; hovering the project icon shows them in a
  * small tooltip (extras.js). A short rule separates neighbouring threads. CSS grid on T3's own
  * row; T3's nodes are not moved. The hover actions (Settle, snooze) sit over the end of the
  * title instead of pushing it, so a row never re-wraps under the pointer. */
 
 html[data-t3x-compact] li[data-thread-item] { padding-block: 2px; contain-intrinsic-size: auto 40px; }
+html[data-t3x-title-lines="3"] { --t3x-title-lines: 3; } /* "Lines at most: 3" (one-row titles off) */
 html[data-t3x-compact] li[data-thread-item] + li[data-thread-item] {
   --t3x-thread-rule: color-mix(in oklab, var(--sidebar-foreground, currentColor) 22%, transparent);
   background: linear-gradient(var(--t3x-thread-rule), var(--t3x-thread-rule)) no-repeat;
@@ -452,7 +453,7 @@ html[data-t3x-compact] [data-testid="sidebar-row-card"] {
   & > div.relative.z-10 > div:nth-child(2) > span[aria-hidden] {
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: var(--t3x-title-lines, 2);
     overflow: hidden;
     white-space: normal;
     text-overflow: clip;
@@ -542,7 +543,7 @@ html[data-t3x-gaps] li[data-thread-item] + li[data-thread-item] { background: no
 html[data-t3x-gaps] li[data-thread-item][data-t3x-gap] { margin-top: .625rem; }
 
 /* ---------- one-row titles ----------
- * Undo the wrap (the keeper's and compact threads' two-line clamp): one line ending in "…".
+ * Undo the wrap (the keeper's and compact threads' 2- or 3-line clamp): one line ending in "…".
  * A trailing "(2)" or "(Opus)" is repeated beside a cut title by an owned aria-hidden span. */
 
 html[data-t3x-onerow] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) span[aria-hidden].min-w-0.flex-1,

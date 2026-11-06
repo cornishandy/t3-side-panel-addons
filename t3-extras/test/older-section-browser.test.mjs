@@ -156,6 +156,19 @@ test("older section: threads past the picked age fold under one header (default 
     assert.equal(await ev(`document.querySelector('[role="radiogroup"][aria-label="Older than"]')`), null, "the choice hides with the switch off");
     assert.equal(await ev(`[...document.querySelectorAll("#side li[data-thread-item]")].filter((li) => li.checkVisibility()).length`), 7);
     assert.equal(await ev(`Boolean(document.querySelector(".t3x-older")?.checkVisibility())`), false);
+
+    // Title lines: "Lines at most: 2 · 3" shows under One-row titles once it is off, and sets <html>.
+    const lines = () => ev(`(() => { const g = document.querySelector('[role="radiogroup"][aria-label="Lines at most"]');
+      return { radios: g && [...g.querySelectorAll('[role="radio"]')].map((r) => r.textContent + (r.getAttribute("aria-checked") === "true" ? "*" : "")),
+        attr: document.documentElement.getAttribute("data-t3x-title-lines"), onerow: document.documentElement.hasAttribute("data-t3x-onerow") }; })()`);
+    assert.deepEqual(await lines(), { radios: null, attr: null, onerow: true }, "one-row titles (the default) needs no line choice");
+    await ev(`document.querySelector('[data-focus="sw-oneRowTitles"]').click(), 1`); await frames(); await frames();
+    assert.deepEqual(await lines(), { radios: ["2 lines*", "3 lines"], attr: "2", onerow: false });
+    await ev(`document.querySelector('[data-focus="r-titleLines-3"]').click(), 1`); await frames(); await frames();
+    assert.deepEqual(await lines(), { radios: ["2 lines", "3 lines*"], attr: "3", onerow: false });
+    assert.equal(await ev(`JSON.parse(localStorage.getItem("t3x:settings:v1")).titleLines`), 3);
+    await ev(`document.querySelector('[role="radiogroup"][aria-label="Lines at most"]').scrollIntoView({ block: "center" }), 1`); await frames();
+    await shot("title-lines-panel.png");
     assert.deepEqual(exceptions, []);
   } finally {
     clearTimeout(killTimer);
