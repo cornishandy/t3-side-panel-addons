@@ -849,7 +849,7 @@
     const used = w.usedPct;
     const assumed = b?.assumed ? ` (pace assumed: ${v.name} doesn't report its window length)` : "";
     if (known(used) && used >= 100) return { state: "limit", text: `Limit reached (${Math.round(used)}% used)`, anchor: { t: known(w.fetchedAt) ? w.fetchedAt : now, u: used } };
-    if (v.stale) return { state: "stale", text: `Estimate withheld: the reading is ${known(v.age) ? fmtAge(v.age).replace(" ago", " old") : "of unknown age"}` };
+    if (v.stale) return { state: "stale", text: `Estimate withheld: the reading is stale${known(v.age) ? ` (${fmtAge(v.age)})` : " (age unknown)"}` };
     if (!b || !known(b.start) || !known(b.end) || !(b.end > b.start) || b.start > now || b.end <= now || !known(used)) return { state: "unavailable", text: "Estimate unavailable" };
     if (used <= 0) return { state: "none", text: "No usage measured yet" };
     let anchor;
@@ -1043,15 +1043,34 @@
   // its summary button. Only the collapsible right after the footer's verdict table, after a
   // reply's last rule; no other collapsible is touched, and no attribute is set on T3's elements.
   const FOOTER_DETAILS = '.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]) + div > [data-markdown-details]';
+  const footerControls = new WeakMap();
+  let footerControlsActive = true; // Old direct listeners become inert on loader replacement.
+  // Capture before T3's delegated handlers: preventing activation keeps the panel mounted
+  // and its summary focused. A closed list must still accept our restoration click.
+  function footerControl(el, btn, mode) {
+    let state = footerControls.get(btn);
+    if (!state) {
+      state = { mode };
+      const guard = (event) => {
+        if (!footerControlsActive || state.mode !== "always-show" || el.getAttribute("data-markdown-details-open") !== "true") return;
+        if (event.type !== "click" && event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      };
+      for (const type of ["click", "keydown", "keyup"]) btn.addEventListener(type, guard, true);
+      footerControls.set(btn, state);
+    }
+    state.mode = mode;
+  }
   /** start-folded: fold each footer list once, the first time it's seen open (remembered in
-   *  `seen`, a WeakSet), so Andy's own clicks are never undone. opening = the moment "always-show"
-   *  is picked: open any folded one. Returns how many it clicked. */
-  function footerPass(root, mode, seen, opening = false) {
-    if (mode !== "start-folded" && !(mode === "always-show" && opening)) return 0;
+   *  `seen`, a WeakSet), so Andy's own clicks are never undone. always-show: open any folded
+   *  footer list on every pass, including saved settings and newly rendered replies. Returns how many it clicked. */
+  function footerPass(root, mode, seen) {
     let clicks = 0;
     for (const el of root.querySelectorAll(FOOTER_DETAILS)) {
       const open = el.getAttribute("data-markdown-details-open") === "true";
       const btn = el.querySelector(":scope > [data-markdown-details-summary]");
+      if (btn) footerControl(el, btn, mode);
       if (mode === "start-folded") {
         if (seen.has(el)) continue;
         seen.add(el);
@@ -1059,7 +1078,7 @@
           btn.click();
           clicks++;
         }
-      } else if (!open && btn) {
+      } else if (mode === "always-show" && !open && btn) {
         btn.click();
         clicks++;
       }
@@ -1945,16 +1964,16 @@
     const without = vs.filter((v) => !v.hasData && !v.showUnknown);
     const t3Note = t3.state === "ok" || t3.state === "waiting" ? null
       : t3.state === "absent" || t3.state === "missing" ? "T3 hasn't saved any quota readings on this Mac yet."
-      : t3.state === "schema" ? "T3's saved quota readings are in a shape these add-ons don't know; showing lab-usage only."
+      : t3.state === "schema" ? "T3's saved quota readings are in a shape these add-ons don't know."
       : t3.state === "noenv" ? "Waiting for the add-ons service to say which T3 environment is this Mac."
       : "Couldn't read T3's saved quota readings just now.";
     return [
       h("header", { class: "t3x-pop-head" }, h("strong", { text: "Usage · This Mac" }),
-        h("span", { class: "t3x-muted", text: t3.readAt ? `read ${fmtAge(now - t3.readAt)}` : lu.fetchedAt ? `updated ${fmtAge(now - lu.fetchedAt)}` : "not read yet" })),
+        h("span", { class: "t3x-muted", text: t3.readAt ? `T3 cache read ${fmtAge(now - t3.readAt)}` : lu.fetchedAt ? `lab-usage updated ${fmtAge(now - lu.fetchedAt)}` : "not read yet" })),
       h("div", { class: "t3x-legend" }, h("div", { text: bLegend(withData) }), h("div", { text: `Strip: time across the window, height = % used. Dashed diagonal = even pace; solid = measured; faint dashes = estimated before logging; dots = projection; ✕ = estimated run-out.${withData.some((v) => v.short) ? ` Lane below: the ${[...new Set(withData.filter((v) => v.short).map((v) => v.shortWord))].join(" or ")} window at its real time, filled to its own % used.` : ""}` })),
       lastState?.transportFailedAt ? h("div", { class: "t3x-warn", text: `Couldn't reach the add-ons service ${fmtAge(now - lastState.transportFailedAt)}; its numbers are marked stale.` })
         : luFailed ? h("div", { class: "t3x-warn", text: `lab-usage's last refresh failed ${fmtAge(now - luFailed)}; its numbers are marked stale.` }) : null,
-      t3Note ? h("div", { class: "t3x-warn", text: t3Note }) : null,
+      t3Note ? h("div", { class: "t3x-warn", text: t3Note + (withData.some((v) => v.source === "lab-usage") ? " Showing lab-usage readings." : "") }) : null,
       withData.length ? withData.map(section) : h("div", { class: "t3x-muted", text: "No usage readings yet." }),
       unknown.map((v) => h("section", { class: `t3x-lab${v.stale ? " t3x-stale" : ""}` },
         h("h3", {}, h("span", { class: "t3x-swatch", style: `background:${v.colour}` }), v.name, v.stale ? h("span", { class: "t3x-tag", text: "stale" }) : null),
@@ -2032,7 +2051,7 @@
       if (sig(usage, labs.map(viewKey).join(";"))) {
         usage.replaceChildren(...(labs.length
           ? labs.map((v) => h("span", { class: "t3x-glyph", title: bTooltip(v, now) }, bSvg(v, 34, 14, "sm")))
-          : [h("span", { class: "t3x-dim", text: "Usage —" })]));
+          : [h("span", { text: "Usage —" })]));
       }
       usage.setAttribute("aria-label", labs.length ? `Usage on this Mac: ${labs.map((v) => `${v.name} ${compactLabel(v, now)}${v.stale ? " (stale)" : ""}`).join("; ")}. Click for details.` : "Usage on this Mac: no readings yet. Click for details.");
       usage.title = labs.length ? "" : "Usage on this Mac: no readings yet. Click for details.";
@@ -2117,7 +2136,7 @@
             h("span", { class: "t3x-bar-label" }, h("span", { class: "t3x-lab-name", text: v.name })),
             h("span", { class: "t3x-bar-val" }, compactParts(v, now).map((p) => (p.rw ? h("span", { class: "t3x-rw", text: p.t }) : p.t))),
             h("span", { class: "t3x-bar-glyph" }, bSvg(v, width, 17, "md"))))
-          : [h("span", { class: "t3x-bar t3x-dim" }, h("span", { class: "t3x-bar-label", text: "Usage" }), h("span", { class: "t3x-bar-val", text: "—" }))]));
+          : [h("span", { class: "t3x-bar" }, h("span", { class: "t3x-bar-label", text: "Usage" }), h("span", { class: "t3x-bar-val", text: "—" }))]));
       }
       node.setAttribute("aria-label", labs.length ? `This Mac: ${labs.map((v) => `${v.name} ${compactLabel(v, now)}${v.stale ? " (stale)" : ""}`).join("; ")}. Click for details.` : "Usage: no readings yet. Click for details.");
     },
@@ -2922,7 +2941,7 @@
     {id:"prompts",group:"Your text",label:"Your sent prompts",scope:"Messages you have already sent. The message composer has its own font.",sample:"Can you explain this with a small example? 123"},
     {id:"composer",group:"Your text",label:"Message composer",scope:"The message you type before sending. Sent prompts are a separate area.",sample:"Write your next message here 123",targets:[["composer","Composer text"]]},
     {id:"main",group:"Assistant replies",label:"Replies",scope:"Ordinary assistant reply prose. Headings, quotes, tables, links, file paths, reasoning, plans, questions and the footer have their own choices.",sample:"Here is the explanation, with a small example. 123",targets:[["replies","Reply prose"]]},
-    {id:"head",group:"Assistant replies",label:"Reply headings & project labels",scope:"Reply headings h1–h6, project headings and add-on labels, selected below. Headings inside quotes, reasoning, plans and questions follow those areas.",sample:"A clearer plan for the next step 123",targets:[["headings","Headings in replies"],["projects","Project headings"],["pills","Add-on labels"]]},
+    {id:"head",group:"Assistant replies",label:"Reply headings, project & add-on labels",scope:"Reply headings h1–h6, project headings and add-on labels, selected below. Headings inside quotes, reasoning, plans and questions follow those areas.",sample:"A clearer plan for the next step 123",targets:[["headings","Headings in replies"],["projects","Project headings"],["pills","Add-on labels"]]},
     {id:"quotes",group:"Assistant replies",label:"Quotes in replies",scope:"Quoted passages and their headings inside replies.",sample:"“Keep the explanation close to the example.” 123",targets:[["quotes","Quotes in replies"]]},
     {id:"tables",group:"Assistant replies",label:"Tables in replies",scope:"Text in ordinary assistant tables. The reply footer and its team list use Reply footer instead.",sample:"Step     Owner     Time\nReview   Sol       10 min"},
     {id:"links",group:"Assistant replies",label:"Links in replies",scope:"Ordinary text links in assistant replies. Recognized file links use File paths. Buttons and other controls keep T3’s font.",sample:"Read the supporting source 123"},
@@ -3157,7 +3176,7 @@
     const mode = lastState?.handover?.mode;
     return [
       h("header", { class: "t3x-pop-head" }, h("strong", { text: "✦ Add-ons" }),
-        h("span", { class: "t3x-muted", text: lastState ? "This Mac · service running" : "service not answering" })),
+        h("span", { class: "t3x-muted", text: lastState && !lastState.transportFailedAt ? "This Mac · service running" : "service not answering" })),
       h("button", {type:"button",class:"t3x-font-entry","data-focus":"open-fonts",onclick:e=>openFontWorkspace(e.currentTarget)},h("span",{text:"Fonts…"}),h("span",{class:"t3x-muted",text:fontsCustomized()?`${fontsCustomized()} customized`:"All T3 default"})),
       settings.fontPicker ? h("button", { type: "button", class: "t3x-btn t3x-font-pick-entry", "data-focus": "pick-font", onclick: () => startFontPick() }, "Pick a font from the screen") : null,
       fontPickList(),
@@ -3169,7 +3188,7 @@
         sw("Composer: the tightest lab", "usageComposer", where("composer")),
         sw("Sidebar: one row per lab", "usageSidebar", where("bars")),
         settings.usageSidebar ? sw("Sidebar: compact in a short window", "usageSidebarShort", `One line per lab while the window is under ${SHORT_WINDOW} px tall.`) : null,
-        sw("Thread burn tells", "burnTells", "Gemini threads aren't measured. Estimated API cost equivalent; not your subscription charge.")),
+        sw("Thread burn tells", "burnTells", "Antigravity threads (Gemini and Claude AG) aren't measured. Estimated API cost equivalent; not your subscription charge.")),
       h("section", {}, h("h3", { text: "Handover" }),
         sw("Prepare handover button", "handoverButton", toolGates(lastState).handover ? "Adds a request to your message; you send it." : "needs the handover tool"),
         sw("Handover chain pill", "chainPill", toolGates(lastState).handover ? (mode ? `Handover mode: ${mode}` : null) : "needs the handover tool")),
@@ -3225,7 +3244,7 @@
     settings = patch === null ? readSettings("{}") : readSettings(JSON.stringify({ ...settings, ...patch }));
     if (settings.footerTeam === "always-show" && wasTeam !== "always-show") {
       try {
-        footerPass(D, "always-show", footerSeen, true);
+        footerPass(D, "always-show", footerSeen);
       } catch (e) {
         noteError("footer", e);
       }
@@ -3857,6 +3876,7 @@
   } catch {}
 
   W.t3xTeardown = () => {
+    footerControlsActive = false;
     teardownVisualization();
     disposed = true;
     routeToken++; // any response still on its way belongs to a torn-down copy

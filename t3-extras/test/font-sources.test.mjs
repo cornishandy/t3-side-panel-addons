@@ -295,12 +295,14 @@ body { font-family: var(--font-sans); }
 <blockquote><p id="quote">Quote</p><h4 id="qh">QH</h4><div class="chat-markdown-table-container"><table><tr><td id="qcell">Q</td></tr></table></div></blockquote>
 <div class="chat-markdown-table-container"><table><tr><td id="cell">Cell <a id="celllink">L</a></td></tr></table></div>
 <hr>
-<div class="chat-markdown-table-container" id="footer"><table><thead><tr><th itemprop="settle-yes">A</th><th>B</th><th id="fth">C</th></tr></thead><tbody><tr><td id="ftd">D</td><td></td><td></td></tr></tbody></table></div>
+<div class="chat-markdown-table-container" id="footer"><div data-slot="scroll-area"><div data-slot="scroll-area-viewport"><table><thead><tr><th itemprop="settle-yes">A</th><th>B</th><th id="fth">C</th></tr></thead><tbody><tr><td id="ftd">D</td><td></td><td></td></tr></tbody></table></div></div></div>
 <p><sub id="sub">line</sub></p>
 </div></div>
 <div data-message-role="assistant"><div class="chat-markdown"><p id="ordinary-before">Before</p><hr><div class="chat-markdown-table-container"><table><tr><td>Ordinary</td></tr></table></div><p id="ordinary-after">After</p><h2 id="ordinary-head">After heading</h2></div></div>
 <div data-user-message-body><div class="chat-markdown"><hr><div class="chat-markdown-table-container"><table><tr><td>User table</td></tr></table></div><p id="prompt-after">Sent prompt after table</p></div></div>
-<div data-message-role="assistant"><div class="chat-markdown"><hr><div class="chat-markdown-table-container"><table><thead><tr><th itemprop="settle-no">State</th><th>Task</th><th>Who</th></tr></thead><tbody><tr><td>Done</td><td>Task</td><td>Sol</td></tr></tbody></table></div><div><div data-markdown-details><summary>Team</summary><p id="rosterprose">Team prose</p><div class="chat-markdown-table-container"><table><tr><td><span role="button" id="roster-native-control"><em id="roster-native-child">Control</em></span></td></tr></table></div></div></div><sub id="bare-footer">Footer <a id="bare-footer-link">link <code id="bare-footer-code">code</code></a></sub></div></div>
+<div data-message-role="assistant"><div class="chat-markdown"><hr><div class="chat-markdown-table-container"><div data-slot="scroll-area"><div data-slot="scroll-area-viewport"><table><thead><tr><th itemprop="settle-no">State</th><th>Task</th><th>Who</th></tr></thead><tbody><tr><td>Done</td><td>Task</td><td>Sol</td></tr></tbody></table></div></div></div><div><div data-markdown-details><summary>Team</summary><p id="rosterprose">Team prose</p><div class="chat-markdown-table-container"><table><tr><td id="rostercell"><span role="button" id="roster-native-control"><em id="roster-native-child">Control</em></span></td></tr></table></div></div></div><sub id="bare-footer">Footer <a id="bare-footer-link">link <code id="bare-footer-code">code</code></a></sub></div></div>
+<div data-message-role="assistant"><div class="chat-markdown"><hr><div class="chat-markdown-table-container"><div data-slot="scroll-area"><div data-slot="scroll-area-viewport"><table><thead><tr><th>A</th><th>B</th><th>C</th></tr></thead><tbody><tr><td itemprop="settle-yes" id="bodyhook">Body</td><td></td><td></td></tr></tbody></table></div></div></div></div></div>
+<div data-message-role="assistant"><div class="chat-markdown"><hr><div class="chat-markdown-table-container"><div data-slot="scroll-area"><div data-slot="scroll-area-viewport"><table><thead><tr><th itemprop="settle-yes">A</th><th>B</th><th>C</th><th>D</th></tr></thead><tbody><tr><td id="fourcol">Four</td><td></td><td></td><td></td></tr></tbody></table></div></div></div></div></div>
 <div data-slot="tooltip-popup"><a data-slot="context-chip" id="tooltip-custom-path"><span id="tooltip-custom-span">src/file.js</span><em id="tooltip-custom-em">path</em><code id="tooltip-custom-code">code</code></a>Tooltip <span data-slot="context-chip" id="tooltip-native-path">file<code id="tooltip-path-code">code</code></span><span role="button" id="tooltip-native-control">Control</span></div>
 <div data-testid="sidebar-row-card"><div class="relative"><div><span class="truncate" id="project">Project</span></div></div>
 <div role="button"><span data-testid="thread-title-1" id="ntitle">Title</span><input id="rename" value="rename"></div>
@@ -318,13 +320,13 @@ body { font-family: var(--font-sans); }
 const html = document.documentElement;
 for (const name of ["data-t3x-fm","data-t3x-ft-replies","data-t3x-flinks","data-t3x-fpaths","data-t3x-ftables","data-t3x-ffooter","data-t3x-fh","data-t3x-ft-headings","data-t3x-ft-projects","data-t3x-fq","data-t3x-ft-quotes","data-t3x-fthreadtitles","data-t3x-fsidebar","data-t3x-fprompts","data-t3x-ftooltips"]) html.setAttribute(name, "");
 const fam = (id) => getComputedStyle(document.getElementById(id)).fontFamily;
-const ids = ["reply","link","em","path","code","codelink","btn","h2","quote","qh","qcell","cell","celllink","fth","ftd","sub","project","ntitle","rename","branch","diff","term","glink","gtitle","flatmeta","gproject","gage","gicon","glong","gshort","gcount","gattn","gword","gsummary","gstatus","gnote","flatbadges","gbadge","stateicon","gstate","gscope","gcounts","gcue","gmethod","gempty"];
+const ids = ["bodyhook","fourcol","reply","link","em","path","code","codelink","btn","h2","quote","qh","qcell","cell","celllink","fth","ftd","sub","project","ntitle","rename","branch","diff","term","glink","gtitle","flatmeta","gproject","gage","gicon","glong","gshort","gcount","gattn","gword","gsummary","gstatus","gnote","flatbadges","gbadge","stateicon","gstate","gscope","gcounts","gcue","gmethod","gempty"];
 const before = fam("gword");
 html.style.setProperty("--font-sans", "Fixture Next");
 const after = Object.fromEntries(ids.map((id) => [id, fam(id)]));
 after.gwordBefore = before;
 after.customTooltipPath=Object.fromEntries(["tooltip-custom-path","tooltip-custom-span","tooltip-custom-em","tooltip-custom-code"].map(id=>[id,fam(id)]));
-const regressionIds=["ordinary-before","ordinary-after","ordinary-head","prompt-after","rosterprose","roster-native-control","roster-native-child","bare-footer","bare-footer-link","bare-footer-code","tooltip-native-path","tooltip-path-code","tooltip-native-control"];
+const regressionIds=["ordinary-before","ordinary-after","ordinary-head","prompt-after","rosterprose","rostercell","roster-native-control","roster-native-child","bare-footer","bare-footer-link","bare-footer-code","tooltip-native-path","tooltip-path-code","tooltip-native-control"];
 html.removeAttribute("data-t3x-flinks");html.removeAttribute("data-t3x-fpaths");
 after.regressions=Object.fromEntries(regressionIds.map(id=>[id,fam(id)]));
 document.getElementById("result").textContent = JSON.stringify(after);
@@ -360,7 +362,9 @@ document.getElementById("result").textContent = JSON.stringify(after);
   has("cell", "T3X Tables");
   has("qcell", "T3X Tables");
   has("celllink", "T3X Links");
+  for (const id of ["bodyhook", "fourcol"]) { has(id, "T3X Tables"); lacks(id, "T3X Footer"); }
   has("fth", "T3X Footer");
+  has("ftd", "T3X Footer");
   lacks("fth", "T3X Tables");
   has("sub", "T3X Footer");
   has("project", "T3X Heading");
@@ -394,7 +398,7 @@ document.getElementById("result").textContent = JSON.stringify(after);
   for(const id of ["ordinary-before","ordinary-after"])assert.match(regression[id],/T3X Main/);
   assert.match(regression["ordinary-head"],/T3X Heading/);
   assert.match(regression["prompt-after"],/T3X Prompts/);
-  for(const id of ["rosterprose","bare-footer"])assert.match(regression[id],/T3X Footer/);
+  for(const id of ["rosterprose","rostercell","bare-footer"])assert.match(regression[id],/T3X Footer/);
   for(const id of ["roster-native-control","roster-native-child","bare-footer-link","tooltip-native-path","tooltip-native-control"])assert.doesNotMatch(regression[id],/T3X/);
   for(const id of ["bare-footer-code","tooltip-path-code"])assert.match(regression[id],/Fixture Mono/);
   fs.rmSync(dir, { recursive: true, force: true });
