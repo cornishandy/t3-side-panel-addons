@@ -1027,6 +1027,7 @@
   // reply's last rule; no other collapsible is touched, and no attribute is set on T3's elements.
   const FOOTER_DETAILS = '.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]) + div > [data-markdown-details]';
   const footerControls = new WeakMap();
+  let footerControlsActive = true; // Old direct listeners become inert on loader replacement.
   // Capture before T3's delegated handlers: preventing activation keeps the panel mounted
   // and its summary focused. A closed list must still accept our restoration click.
   function footerControl(el, btn, mode) {
@@ -1034,7 +1035,7 @@
     if (!state) {
       state = { mode };
       const guard = (event) => {
-        if (state.mode !== "always-show" || el.getAttribute("data-markdown-details-open") !== "true") return;
+        if (!footerControlsActive || state.mode !== "always-show" || el.getAttribute("data-markdown-details-open") !== "true") return;
         if (event.type !== "click" && event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -3791,6 +3792,7 @@
   } catch {}
 
   W.t3xTeardown = () => {
+    footerControlsActive = false;
     teardownVisualization();
     disposed = true;
     routeToken++; // any response still on its way belongs to a torn-down copy
