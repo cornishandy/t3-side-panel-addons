@@ -426,6 +426,7 @@ html[data-t3x-working] [data-testid="sidebar-working-shelf-toggle"] {
 
 html[data-t3x-compact] li[data-thread-item] { padding-block: 2px; contain-intrinsic-size: auto 40px; }
 html[data-t3x-title-lines="3"] { --t3x-title-lines: 3; } /* "Lines at most: 3" (one-row titles off) */
+html[data-t3x-title-lines="unlimited"] { --t3x-title-lines: none; } /* Wrap the full title, without a line clamp. */
 html[data-t3x-compact] li[data-thread-item] + li[data-thread-item] {
   --t3x-thread-rule: color-mix(in oklab, var(--sidebar-foreground, currentColor) 22%, transparent);
   background: linear-gradient(var(--t3x-thread-rule), var(--t3x-thread-rule)) no-repeat;

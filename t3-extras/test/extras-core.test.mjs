@@ -519,8 +519,8 @@ test("footer team list: four choices, start-open by default, always on <html>", 
   assert.equal(C.readSettings(JSON.stringify({ workingHeader: "no" })).workingHeader, true, "a non-boolean is ignored");
 });
 
-test("title lines: 2 or 3 at most when one-row titles is off; 2 by default; set on <html> only then", () => {
-  assert.deepEqual(plain(C.TITLE_LINES), [2, 3]);
+test("title lines: 2, 3 or no limit when one-row titles is off; 2 by default; set on <html> only then", () => {
+  assert.deepEqual(plain(C.TITLE_LINES), [2, 3, "unlimited"]);
   const d = C.readSettings(null);
   assert.equal(d.titleLines, 2);
   assert.equal(C.rootAttrs(d)["data-t3x-title-lines"], null, "one-row titles is on by default, so no limit attribute");
@@ -530,6 +530,10 @@ test("title lines: 2 or 3 at most when one-row titles is off; 2 by default; set 
   assert.equal(C.rootAttrs(three)["data-t3x-title-lines"], "3");
   assert.equal(C.rootAttrs(three)["data-t3x-onerow"], null);
   assert.equal(C.rootAttrs({ ...three, oneRowTitles: true })["data-t3x-title-lines"], null, "the pick is kept but unused while one-row is on");
+  const unlimited = C.readSettings(JSON.stringify({ oneRowTitles: false, titleLines: "unlimited" }));
+  assert.equal(unlimited.titleLines, "unlimited");
+  assert.equal(C.rootAttrs(unlimited)["data-t3x-title-lines"], "unlimited");
+  assert.equal(C.rootAttrs({ ...unlimited, oneRowTitles: true })["data-t3x-title-lines"], null);
   for (const bad of [1, 4, "3", null]) assert.equal(C.readSettings(JSON.stringify({ titleLines: bad })).titleLines, 2, String(bad));
 });
 

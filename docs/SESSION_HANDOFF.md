@@ -2,6 +2,9 @@
 
 ## History
 
+- 7 Nov: ✦ panel "Your fonts" rows get − n% + size buttons (5% steps, 80–150%, the source area's size); the 26 Oct "Use for similar" option committed.
+- 7 Nov: Andy requested unrestricted sidebar title rows. Added No limit beside 2/3 lines under compact threads, with One-row titles off. Saved setting "unlimited" disables the CSS line clamp; existing defaults remain. 58 targeted core/browser tests passed; narrow 160px sidebar shows the full long title and preserves choice across the one-row switch. Installed only the narrow title patch into the existing signed bundle; no service/app restart, no key change. That session left it uncommitted; the font-size thread committed and pushed it the same morning.
+
 - 18 Oct 2026: sidebar keeper built (wrap, minWidth, rule, fit, titleGuide).
 - 19 Oct: t3-extras add-ons service, ✦ panel, usage displays, handover button and pill, handwriting fonts; keeper units `extras` and `firstClick`.
 - 20 Oct: usage round 2 (pace glyph with 5-hour tank, run-out strip), burn tells, reply-footer card CSS, stronger Working divider, selected-thread marker.

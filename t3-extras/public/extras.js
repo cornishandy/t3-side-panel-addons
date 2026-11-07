@@ -104,7 +104,7 @@
   });
   const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "printOnly", "showPartly", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen"];
   const MARKERS = ["bar", "outline", "off"];
-  const TITLE_LINES = Object.freeze([2, 3]);
+  const TITLE_LINES = Object.freeze([2, 3, "unlimited"]);
   // The Older section's choices: value, hours (null = by gaps, olderCutoff), panel label, header words.
   const OLDER_AFTER = Object.freeze([
     ["12h", 12, "12 hours", "12 hours"],
@@ -3198,7 +3198,7 @@
           + (settings.compactThreads ? "up to the lines picked below." : "in full (pick a limit with compact threads on).")),
         settings.compactThreads && !settings.oneRowTitles ? h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label t3x-indent-label", text: "Lines at most" }),
           h("div", { class: "t3x-radios", role: "radiogroup", "aria-label": "Lines at most" },
-            TITLE_LINES.map((n) => radio("titleLines", n, settings.titleLines, `${n} lines`, (v) => change({ titleLines: v }))))) : null,
+            TITLE_LINES.map((n) => radio("titleLines", n, settings.titleLines, n === "unlimited" ? "No limit" : `${n} lines`, (v) => change({ titleLines: v }))))) : null,
         sw("Pinned label and line", "pinnedLabel", "A small \u201cPinned\u201d label above pinned threads and a line below them."),
         sw("Gaps by time", "timeGaps", "A small gap between threads last active 25+ min apart, instead of lines between rows."),
         sw("Older threads section", "foldOlder", (settings.olderAfter === "auto"

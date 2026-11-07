@@ -157,16 +157,37 @@ test("older section: threads past the picked age fold under one header (default 
     assert.equal(await ev(`[...document.querySelectorAll("#side li[data-thread-item]")].filter((li) => li.checkVisibility()).length`), 7);
     assert.equal(await ev(`Boolean(document.querySelector(".t3x-older")?.checkVisibility())`), false);
 
-    // Title lines: "Lines at most: 2 · 3" shows under One-row titles once it is off, and sets <html>.
+    // Title lines: bounded choices plus No limit, remembered across the one-row switch.
     const lines = () => ev(`(() => { const g = document.querySelector('[role="radiogroup"][aria-label="Lines at most"]');
       return { radios: g && [...g.querySelectorAll('[role="radio"]')].map((r) => r.textContent + (r.getAttribute("aria-checked") === "true" ? "*" : "")),
         attr: document.documentElement.getAttribute("data-t3x-title-lines"), onerow: document.documentElement.hasAttribute("data-t3x-onerow") }; })()`);
     assert.deepEqual(await lines(), { radios: null, attr: null, onerow: true }, "one-row titles (the default) needs no line choice");
     await ev(`document.querySelector('[data-focus="sw-oneRowTitles"]').click(), 1`); await frames(); await frames();
-    assert.deepEqual(await lines(), { radios: ["2 lines*", "3 lines"], attr: "2", onerow: false });
+    assert.deepEqual(await lines(), { radios: ["2 lines*", "3 lines", "No limit"], attr: "2", onerow: false });
     await ev(`document.querySelector('[data-focus="r-titleLines-3"]').click(), 1`); await frames(); await frames();
-    assert.deepEqual(await lines(), { radios: ["2 lines", "3 lines*"], attr: "3", onerow: false });
+    assert.deepEqual(await lines(), { radios: ["2 lines", "3 lines*", "No limit"], attr: "3", onerow: false });
     assert.equal(await ev(`JSON.parse(localStorage.getItem("t3x:settings:v1")).titleLines`), 3);
+    // Exercise the real nested compact-row selectors at a narrow sidebar width.
+    await ev(`(() => { document.querySelector('#side').style.width='160px';
+      const card=document.querySelector('[data-thread-item="env-1:t1"] [data-testid="sidebar-row-card"]');
+      card.style.height='auto';card.style.display='block';
+      card.innerHTML='<div class="relative z-10"><div><i class="size-4">P</i><span class="flex-1">Project</span></div><div style="min-width:0"><span id="long-title" aria-hidden="true">'+
+        'A long sidebar title with every word visible even when it needs many more than three rows to fit at this narrow width'+
+        '</span></div><div>Branch</div></div>';return 1;})()`); await frames();
+    const titleHeight = () => ev(`document.querySelector('#long-title').getBoundingClientRect().height`);
+    const limitedHeight = await titleHeight();
+    assert.ok(limitedHeight > 0 && limitedHeight <= 61, 'three-line option clamps to three 20px rows');
+    await ev(`document.querySelector('[data-focus="r-titleLines-unlimited"]').click(), 1`); await frames(); await frames();
+    assert.deepEqual(await lines(), { radios: ["2 lines", "3 lines", "No limit*"], attr: "unlimited", onerow: false });
+    assert.equal(await ev(`JSON.parse(localStorage.getItem("t3x:settings:v1")).titleLines`), 'unlimited');
+    assert.ok(await titleHeight() > limitedHeight + 20, 'No limit exposes the full title beyond three rows');
+    assert.equal(await ev(`getComputedStyle(document.querySelector('#long-title')).webkitLineClamp`), 'none');
+    assert.equal(await ev(`(() => {const el=document.querySelector('#long-title');return el.scrollWidth <= el.clientWidth+1;})()`), true, 'wraps without horizontal overflow');
+    await shot('title-lines-unlimited.png');
+    await ev(`document.querySelector('[data-focus="sw-oneRowTitles"]').click(), 1`); await frames(); await frames();
+    assert.equal((await lines()).onerow, true);
+    await ev(`document.querySelector('[data-focus="sw-oneRowTitles"]').click(), 1`); await frames(); await frames();
+    assert.equal((await lines()).attr, 'unlimited', 'one-row toggle preserves the unlimited pick');
     await ev(`document.querySelector('[role="radiogroup"][aria-label="Lines at most"]').scrollIntoView({ block: "center" }), 1`); await frames();
     await shot("title-lines-panel.png");
     assert.deepEqual(exceptions, []);
