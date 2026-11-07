@@ -537,7 +537,7 @@ test("footer team list: start-folded clicks each footer list once (WeakSet), nev
   // A fake T3 collapsible: clicking its summary flips React's open state, like Base UI.
   const details = (open) => {
     const el = { attrs: { "data-markdown-details-open": String(open) }, clicks: 0, getAttribute: (k) => el.attrs[k] };
-    el.btn = { click() { el.clicks++; el.attrs["data-markdown-details-open"] = String(el.attrs["data-markdown-details-open"] !== "true"); } };
+    el.btn = { addEventListener() {}, click() { el.clicks++; el.attrs["data-markdown-details-open"] = String(el.attrs["data-markdown-details-open"] !== "true"); } };
     el.querySelector = (sel) => (sel === ":scope > [data-markdown-details-summary]" ? el.btn : null);
     return el;
   };
@@ -566,7 +566,7 @@ test("footer team list: saved always-show opens closed lists and new replies on 
   const mode = C.readSettings(JSON.stringify({ footerTeam: "always-show" })).footerTeam;
   const details = (open) => {
     const el = { open, clicks: 0, getAttribute: () => String(el.open) };
-    el.querySelector = () => ({ click() { el.open = !el.open; el.clicks++; } });
+    el.querySelector = () => ({ addEventListener() {}, click() { el.open = !el.open; el.clicks++; } });
     return el;
   };
   const saved = details(false);
@@ -582,14 +582,45 @@ test("footer team list: saved always-show opens closed lists and new replies on 
   assert.equal(C.footerPass(root, mode, seen), 1, "a newly rendered closed footer opens too");
   assert.equal(reply.open, true);
   assert.equal(alreadyOpen.clicks, 0);
-  saved.querySelector().click(); // Summary activation, including keyboard Enter, can close it.
+  saved.open = false; // A late host state update can close it without summary activation.
   assert.equal(saved.open, false);
-  assert.equal(C.footerPass(root, mode, seen), 1, "the next routine pass repairs summary activation");
+  assert.equal(C.footerPass(root, mode, seen), 1, "the next routine pass repairs a late closed state");
   assert.equal(saved.open, true);
   assert.equal(C.footerPass(root, mode, seen), 0, "repair does not toggle an open list again");
   saved.querySelector().click();
   assert.equal(C.footerPass(root, "start-open", seen), 0, "start-open preserves the user's closed state");
   assert.equal(saved.open, false);
+});
+
+test("footer team list: installs capture guards once, releases other modes, allows closed restoration", () => {
+  const handlers = new Map();
+  let registrations = 0;
+  const el = { open: false, getAttribute: () => String(el.open) };
+  const btn = {
+    addEventListener(type, guard, capture) { assert.equal(capture, true); registrations++; handlers.set(type, guard); },
+    click() { const e = event("click"); handlers.get("click")?.(e); if (!e.prevented) el.open = !el.open; },
+  };
+  el.querySelector = () => btn;
+  const root = { querySelectorAll: () => [el] }, seen = new WeakSet();
+  const event = (type, key) => ({ type, key, prevented: false, stopped: false,
+    preventDefault() { this.prevented = true; }, stopImmediatePropagation() { this.stopped = true; } });
+  assert.equal(C.footerPass(root, "always-show", seen), 1);
+  C.footerPass(root, "always-show", seen);
+  assert.equal(registrations, 3, "repeated passes do not duplicate listeners");
+  for (const type of ["keydown", "keyup", "click"]) for (const key of ["Enter", " "]) {
+    const e = event(type, key); handlers.get(type)(e); assert.equal(e.prevented, true); assert.equal(e.stopped, true);
+  }
+  const tab = event("keydown", "Tab"); handlers.get("keydown")(tab); assert.equal(tab.prevented, false);
+  for (const mode of ["start-open", "start-folded", "always-hide"]) {
+    C.footerPass(root, mode, seen);
+    for (const type of ["click", "keydown", "keyup"]) {
+      const e = event(type, "Enter"); handlers.get(type)(e); assert.equal(e.prevented, false, mode);
+    }
+  }
+  assert.equal(registrations, 3);
+  el.open = false;
+  assert.equal(C.footerPass(root, "always-show", seen), 1, "closed restoration click passes its installed guard");
+  btn.click(); assert.equal(el.open, true, "open summary click prevented again");
 });
 
 test("forecast boundary states: no usage, zero elapsed, limit reached, stale, expired, future start", () => {

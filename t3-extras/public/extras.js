@@ -1026,15 +1026,33 @@
   // its summary button. Only the collapsible right after the footer's verdict table, after a
   // reply's last rule; no other collapsible is touched, and no attribute is set on T3's elements.
   const FOOTER_DETAILS = '.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]) + div > [data-markdown-details]';
+  const footerControls = new WeakMap();
+  // Capture before T3's delegated handlers: preventing activation keeps the panel mounted
+  // and its summary focused. A closed list must still accept our restoration click.
+  function footerControl(el, btn, mode) {
+    let state = footerControls.get(btn);
+    if (!state) {
+      state = { mode };
+      const guard = (event) => {
+        if (state.mode !== "always-show" || el.getAttribute("data-markdown-details-open") !== "true") return;
+        if (event.type !== "click" && event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      };
+      for (const type of ["click", "keydown", "keyup"]) btn.addEventListener(type, guard, true);
+      footerControls.set(btn, state);
+    }
+    state.mode = mode;
+  }
   /** start-folded: fold each footer list once, the first time it's seen open (remembered in
    *  `seen`, a WeakSet), so Andy's own clicks are never undone. always-show: open any folded
    *  footer list on every pass, including saved settings and newly rendered replies. Returns how many it clicked. */
   function footerPass(root, mode, seen) {
-    if (mode !== "start-folded" && mode !== "always-show") return 0;
     let clicks = 0;
     for (const el of root.querySelectorAll(FOOTER_DETAILS)) {
       const open = el.getAttribute("data-markdown-details-open") === "true";
       const btn = el.querySelector(":scope > [data-markdown-details-summary]");
+      if (btn) footerControl(el, btn, mode);
       if (mode === "start-folded") {
         if (seen.has(el)) continue;
         seen.add(el);
@@ -1042,7 +1060,7 @@
           btn.click();
           clicks++;
         }
-      } else if (!open && btn) {
+      } else if (mode === "always-show" && !open && btn) {
         btn.click();
         clicks++;
       }
