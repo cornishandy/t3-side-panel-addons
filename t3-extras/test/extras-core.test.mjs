@@ -556,10 +556,40 @@ test("footer team list: start-folded clicks each footer list once (WeakSet), nev
   list = [a, b, c];
   assert.equal(C.footerPass(root, "start-folded", seen), 1, "a new footer is folded once");
   assert.equal(c.clicks, 1);
-  for (const mode of ["start-open", "always-hide", "always-show"]) assert.equal(C.footerPass(root, mode, new WeakSet()), 0, mode);
-  assert.equal(C.footerPass(root, "always-show", seen, true), 2, "switching to always-show opens the folded ones");
+  for (const mode of ["start-open", "always-hide"]) assert.equal(C.footerPass(root, mode, new WeakSet()), 0, mode);
+  assert.equal(C.footerPass(root, "always-show", seen), 2, "switching to always-show opens the folded ones");
   assert.ok([a, b, c].every((x) => x.attrs["data-markdown-details-open"] === "true"));
   assert.match(C.FOOTER_DETAILS, /^\.chat-markdown > hr:last-of-type \+ \.chat-markdown-table-container:has\(\[itemprop~="settle-yes"\], \[itemprop~="settle-no"\]\) \+ div > \[data-markdown-details\]$/);
+});
+
+test("footer team list: saved always-show opens closed lists and new replies on routine passes", () => {
+  const mode = C.readSettings(JSON.stringify({ footerTeam: "always-show" })).footerTeam;
+  const details = (open) => {
+    const el = { open, clicks: 0, getAttribute: () => String(el.open) };
+    el.querySelector = () => ({ click() { el.open = !el.open; el.clicks++; } });
+    return el;
+  };
+  const saved = details(false);
+  const alreadyOpen = details(true);
+  const list = [saved, alreadyOpen];
+  const root = { querySelectorAll: (sel) => sel === C.FOOTER_DETAILS ? list : [] };
+  const seen = new WeakSet();
+  assert.equal(C.footerPass(root, mode, seen), 1, "saved always-show opens a closed list without a settings transition");
+  assert.equal(saved.open, true);
+  assert.equal(C.footerPass(root, mode, seen), 0, "open lists are left alone on repeated passes");
+  const reply = details(false);
+  list.push(reply);
+  assert.equal(C.footerPass(root, mode, seen), 1, "a newly rendered closed footer opens too");
+  assert.equal(reply.open, true);
+  assert.equal(alreadyOpen.clicks, 0);
+  saved.querySelector().click(); // Summary activation, including keyboard Enter, can close it.
+  assert.equal(saved.open, false);
+  assert.equal(C.footerPass(root, mode, seen), 1, "the next routine pass repairs summary activation");
+  assert.equal(saved.open, true);
+  assert.equal(C.footerPass(root, mode, seen), 0, "repair does not toggle an open list again");
+  saved.querySelector().click();
+  assert.equal(C.footerPass(root, "start-open", seen), 0, "start-open preserves the user's closed state");
+  assert.equal(saved.open, false);
 });
 
 test("forecast boundary states: no usage, zero elapsed, limit reached, stale, expired, future start", () => {

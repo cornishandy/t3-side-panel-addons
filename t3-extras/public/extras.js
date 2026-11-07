@@ -1027,10 +1027,10 @@
   // reply's last rule; no other collapsible is touched, and no attribute is set on T3's elements.
   const FOOTER_DETAILS = '.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]) + div > [data-markdown-details]';
   /** start-folded: fold each footer list once, the first time it's seen open (remembered in
-   *  `seen`, a WeakSet), so Andy's own clicks are never undone. opening = the moment "always-show"
-   *  is picked: open any folded one. Returns how many it clicked. */
-  function footerPass(root, mode, seen, opening = false) {
-    if (mode !== "start-folded" && !(mode === "always-show" && opening)) return 0;
+   *  `seen`, a WeakSet), so Andy's own clicks are never undone. always-show: open any folded
+   *  footer list on every pass, including saved settings and newly rendered replies. Returns how many it clicked. */
+  function footerPass(root, mode, seen) {
+    if (mode !== "start-folded" && mode !== "always-show") return 0;
     let clicks = 0;
     for (const el of root.querySelectorAll(FOOTER_DETAILS)) {
       const open = el.getAttribute("data-markdown-details-open") === "true";
@@ -3201,7 +3201,7 @@
     settings = patch === null ? readSettings("{}") : readSettings(JSON.stringify({ ...settings, ...patch }));
     if (settings.footerTeam === "always-show" && wasTeam !== "always-show") {
       try {
-        footerPass(D, "always-show", footerSeen, true);
+        footerPass(D, "always-show", footerSeen);
       } catch (e) {
         noteError("footer", e);
       }
