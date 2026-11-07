@@ -1028,9 +1028,17 @@ html[data-t3x-picking], html[data-t3x-picking] * { cursor:crosshair!important; }
 
 /* ---------- ✦ panel "Your fonts": each pick's name in its own face, with Previous/Next ---------- */
 .t3x-fs-row { display: flex; flex-direction: column; padding: 2px 0; }
-.t3x-fs-area { display: flex; gap: 6px; align-items: baseline; color: var(--muted-foreground); font: 11px var(--font-sans); }
-.t3x-fs-also { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.t3x-fs-pos { margin-left: auto; flex: none; font-variant-numeric: tabular-nums; opacity: .75; }
+.t3x-fs-area { display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: center; min-height: 18px; color: var(--muted-foreground); font: 11px var(--font-sans); }
+.t3x-fs-also, .t3x-fs-gap { min-width: 0; flex: 1 1 3.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t3x-fs-tail { flex: none; margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.t3x-fs-pos { flex: none; font-variant-numeric: tabular-nums; opacity: .75; }
+.t3x-fs-size { display: flex; align-items: center; gap: 3px; }
+.t3x-fs-sz {
+  flex: none; width: 20px; height: 18px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: transparent;
+  color: var(--popover-foreground, var(--foreground)); cursor: pointer; font: 13px/16px var(--font-sans);
+}
+.t3x-fs-sz[disabled] { opacity: .35; cursor: default; }
+.t3x-fs-size-val { min-width: 4ch; text-align: center; font-variant-numeric: tabular-nums; }
 .t3x-fs-pick { display: flex; align-items: center; gap: 2px; }
 .t3x-fs-step {
   flex: none; width: 28px; height: 30px; border: 1px solid var(--border); border-radius: 8px;
@@ -1043,11 +1051,10 @@ html[data-t3x-picking], html[data-t3x-picking] * { cursor:crosshair!important; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .t3x-fs-similar {
-  flex: none; margin-left: auto; border: 1px solid var(--border); border-radius: 999px; background: transparent;
+  flex: none; border: 1px solid var(--border); border-radius: 999px; background: transparent;
   color: inherit; cursor: pointer; padding: 0 7px; font: 10.5px/16px var(--font-sans);
 }
-.t3x-fs-similar + .t3x-fs-pos { margin-left: 0; }
-.t3x-fs-step:hover:not([disabled]), .t3x-fs-name:hover, .t3x-fs-similar:hover { background: var(--accent); }
+.t3x-fs-step:hover:not([disabled]), .t3x-fs-name:hover, .t3x-fs-similar:hover, .t3x-fs-sz:hover:not([disabled]) { background: var(--accent); }
 .t3x-fs button:focus-visible { outline: 2px solid var(--ring, currentColor); outline-offset: 1px; }
 
 /* ---------- reply footer card ----------

@@ -3666,7 +3666,10 @@
       const entries = catalog ? fontOptions(catalog, settings, pick.family, nativeAvailable, id).flatMap((g) => g.options) : [];
       const at = entries.findIndex((o) => o.name === pick.family);
       const t3 = f?.source === "t3" && id !== "viz";
-      const loaded = roleFaces[id]?.key === `${pick.family}|${sizeOf(f, pick)}`;
+      // The face stays registered under the alias until a new size's face loads, so a size-only
+      // change keeps showing it (at the old size) rather than flashing the fallback font.
+      const faceKey = roleFaces[id]?.key;
+      const loaded = faceKey != null && faceKey.slice(0, faceKey.lastIndexOf("|")) === pick.family;
       const label = areaTitle(id), also = followers.map(areaTitle);
       const arrow = (dir) => h("button", { type: "button", class: "t3x-fs-step", "data-focus": `fs-${dir < 0 ? "prev" : "next"}-${id}`, "aria-label": `${dir < 0 ? "Previous" : "Next"} font for ${label}`, title: `${dir < 0 ? "Previous" : "Next"} font`, disabled: !catalog || !f ? true : null, onclick: () => stepAreaFont(id, dir) }, dir < 0 ? "‹" : "›");
       const name = h("button", {
@@ -3682,9 +3685,32 @@
         "aria-label": offer.areas.length ? `${offer.text} Applies now; Undo appears here.` : `Undo: ${offer.text}`,
         onclick: () => offer.areas.length ? applySimilar(id) : undoSimilar(),
       }, offer.areas.length ? "Use for similar" : "Undo");
+      // − n% +: the same size as Fonts' Size, on the source area, so areas that follow it change too.
+      // T3's own fonts take T3's size, so they have none.
+      let size = null;
+      if (f && f.source !== "t3") {
+        const n = sizeOf(f, pick), def = sizePct(f.size) ?? 100;
+        const step = (d) => {
+          const cur = settings[ROLE[id].key], cf = catalog?.find((x) => x.name === cur.family);
+          change({ [ROLE[id].key]: { family: cur.family, size: clamp(sizeOf(cf, cur) + d, 80, 150) } });
+        };
+        const sizeBtn = (d) => h("button", {
+          type: "button", class: "t3x-fs-sz", "data-focus": `${d < 0 ? "minus" : "plus"}-${id}`,
+          "aria-label": `${d < 0 ? "Smaller" : "Larger"} font for ${label}, now ${n}%`,
+          title: `${d < 0 ? "Smaller" : "Larger"} (${n}% → ${clamp(n + d, 80, 150)}%)`,
+          disabled: (d < 0 ? n <= 80 : n >= 150) ? true : null, onclick: () => step(d),
+        }, d < 0 ? "−" : "+");
+        size = h("span", { class: "t3x-fs-size", role: "group", "aria-label": `Size for ${label}` }, sizeBtn(-5),
+          h("span", { class: "t3x-fs-size-val", text: `${n}%`, title: `Size ${n}%, default ${def}%. To go back to the default, click the font name, then Default ${def}%.` }),
+          sizeBtn(5));
+      }
+      const pos = at >= 0 ? h("span", { class: "t3x-fs-pos", text: `${at + 1} of ${entries.length}` }) : null;
       return h("div", { class: "t3x-fs-row" },
-        h("div", { class: "t3x-fs-area" }, h("span", { text: label }), also.length ? h("span", { class: "t3x-fs-also", text: `+ ${also.join(", ")}` }) : null,
-          similar, at >= 0 ? h("span", { class: "t3x-fs-pos", text: `${at + 1} of ${entries.length}` }) : null),
+        // The followers span always takes the line's spare room (and keeps a little even when it's
+        // crowded); a crowded line moves the size and position to a second line on the right.
+        h("div", { class: "t3x-fs-area" }, h("span", { text: label }),
+          also.length ? h("span", { class: "t3x-fs-also", text: `+ ${also.join(", ")}`, title: `+ ${also.join(", ")}` }) : h("span", { class: "t3x-fs-gap", "aria-hidden": "true" }),
+          similar, size || pos ? h("span", { class: "t3x-fs-tail" }, size, pos) : null),
         h("div", { class: "t3x-fs-pick" }, arrow(-1), name, arrow(1)));
     }));
   }
