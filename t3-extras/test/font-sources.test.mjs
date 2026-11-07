@@ -399,3 +399,19 @@ document.getElementById("result").textContent = JSON.stringify(after);
   for(const id of ["bare-footer-code","tooltip-path-code"])assert.match(regression[id],/Fixture Mono/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("similar areas: the rest of the group not already on this font, never a cycle", () => {
+  const groups = plain(C.FONT_SIMILAR_GROUPS).flat();
+  assert.equal(new Set(groups).size, groups.length, "each area sits in one group at most");
+  for (const id of groups) assert.ok(C.FONT_ROLES.some((r) => r.id === id), id);
+  const sources = { main: "own", quotes: "link:main", reasoning: "native", plans: "own", questions: "link:plans", composer: "own", prompts: "link:composer" };
+  assert.deepEqual(plain(C.similarFontAreas(sources, "main")), ["reasoning", "plans", "questions"]);
+  // questions follows plans, so pointing plans at questions would loop
+  assert.deepEqual(plain(C.similarFontAreas(sources, "questions")), ["main", "quotes", "reasoning"]);
+  assert.deepEqual(plain(C.similarFontAreas(sources, "composer")), []);
+  assert.deepEqual(plain(C.similarFontAreas(sources, "viz")), []);
+  const linked = { ...sources };
+  for (const a of C.similarFontAreas(sources, "main")) linked[a] = "link:main";
+  const terminal = plain(C.resolveFontGraph(linked));
+  for (const a of ["main", "quotes", "reasoning", "plans", "questions"]) assert.equal(terminal[a], "main", a);
+});
