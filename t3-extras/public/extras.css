@@ -1025,6 +1025,27 @@ html[data-t3x-picking], html[data-t3x-picking] * { cursor:crosshair!important; }
 .t3x-pick-tag span { display:block; margin-top:1px; color:var(--muted-foreground); font-weight:400; }
 .t3x-pick-bar { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); box-sizing:border-box; display:flex; align-items:center; gap:12px; max-width:calc(100vw - 24px); padding:6px 6px 6px 14px; border:1px solid var(--border); border-radius:999px; background:var(--popover,var(--background)); color:var(--popover-foreground,var(--foreground)); box-shadow:0 6px 24px #0006; font-size:13px; }
 .t3x-pick-bar .t3x-btn { border-radius:999px; }
+
+/* ---------- moving popups (popMove): ⠿ on each top bar; drag it, or the bar, anywhere ---------- */
+html:not([data-t3x-pop-move]) :is(.t3x-grip, .t3x-font-small) { display:none!important; }
+.t3x-grip { display:inline-flex; align-items:center; justify-content:center; flex:none; align-self:center; width:18px; height:22px; margin:0 2px 0 -6px; padding:0; border:0; border-radius:5px; background:none; color:var(--muted-foreground); font:400 14px/1 var(--font-sans); cursor:grab; touch-action:none; }
+.t3x-grip:hover { background:var(--accent); color:var(--foreground); }
+.t3x-grip:focus-visible { outline:2px solid var(--ring,var(--primary)); outline-offset:1px; }
+html[data-t3x-pop-move] :is(.t3x-pop-head, .t3x-font-workspace-head, .t3x-font-dockgrip, .t3x-pick-bar) { cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none; }
+html[data-t3x-pop-move] :is(.t3x-pop-head, .t3x-font-workspace-head, .t3x-pick-bar) :is(button:not(.t3x-grip), a, input, select) { cursor:pointer; }
+.t3x-pop-head > .t3x-grip + *, .t3x-font-workspace-head > .t3x-grip + * { margin-right:auto; }
+/* The panel's top bar stays in reach while the rest scrolls under it. */
+html[data-t3x-pop-move] .t3x-pop > .t3x-pop-head:first-child { position:sticky; top:-12px; z-index:1; margin:-12px -14px 0; padding:12px 14px 6px; background:var(--t3x-surface); }
+html[data-t3x-pop-move] .t3x-font-workspace::backdrop { background:transparent; }
+.t3x-font-workspace[data-t3x-moved]:not([data-mode="dock"]) { inset:auto; margin:0; }
+.t3x-font-dockgrip { display:none; }
+html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockgrip { flex:none; display:flex; align-items:center; height:24px; padding:4px 14px 0; }
+html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockgrip .t3x-grip { margin-left:-4px; }
+html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-editor { padding-top:4px; padding-bottom:0; }
+/* The card's Pick other text / All fonts… / Done stay in view while the rest scrolls. */
+html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar { position:sticky; bottom:0; z-index:1; margin-left:-16px; margin-right:-16px; padding:10px 16px 12px; background:var(--popover,var(--background)); }
+.t3x-pick-bar[data-t3x-moved] { transform:none; bottom:auto; }
+.t3x-pick-bar .t3x-grip { margin:0 -6px 0 -8px; }
 .t3x-pick .t3x-pick-label { position:fixed; height:18px; padding:0 6px; border:0; border-radius:4px; background:var(--primary,#7aa2ff); color:var(--primary-foreground,#0b1020); font:600 11px/18px var(--font-sans); white-space:nowrap; cursor:pointer!important; box-shadow:0 2px 6px #0005; }
 
 /* ---------- ✦ panel "Your fonts": each pick's name in its own face, with Previous/Next ---------- */

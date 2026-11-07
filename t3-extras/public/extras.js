@@ -99,10 +99,12 @@
     fontPickDock: true, // a picked area opens as a small Fonts card beside the text, not the full window
     fontPickLabels: true, // while picking, hold Shift to label every area on screen
     fontShowOnScreen: true, // Fonts: "Show on screen" outlines where an area applies
+    popMove: true, // popups drag by their top bar and reopen there; Fonts skips the dark wash and offers a small card
+    popSpots: Object.freeze({}), // each moved popup's spot, from the window edges nearest it (see readSpots)
     footerTeam: "start-open", // the reply footer's team list: always-show | start-open | start-folded | always-hide
     fontTargets: Object.freeze({ composer: true, quotes: true, projects: true, pills: true, headings: true, replies: true, mine: true, ...Object.fromEntries(INTERFACE_TARGETS.map(([key]) => [key, false])) }),
   });
-  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "printOnly", "showPartly", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen"];
+  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "printOnly", "showPartly", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen", "popMove"];
   const MARKERS = ["bar", "outline", "off"];
   const TITLE_LINES = Object.freeze([2, 3, "unlimited"]);
   // The Older section's choices: value, hours (null = by gaps, olderCutoff), panel label, header words.
@@ -283,6 +285,7 @@
     if (FOOTER_TEAM.some(([v]) => v === s.footerTeam)) out.footerTeam = s.footerTeam;
     if (OLDER_AFTER.some(([v]) => v === s.olderAfter)) out.olderAfter = s.olderAfter;
     if (TITLE_LINES.includes(s.titleLines)) out.titleLines = s.titleLines;
+    out.popSpots = readSpots(s.popSpots);
     if (s.fontHead || s.fontBody) {
       out.fontHead = fontPick(s.fontHead);
       out.fontBody = fontPick(s.fontBody);
@@ -305,6 +308,62 @@
     out.fontSchema = 2;
     out.fontSources = normalizeFontSources(Object.prototype.hasOwnProperty.call(s, "fontSources") ? s.fontSources : undefined, out, out.fontTargets.plantext === true);
     return out;
+  }
+
+  // ---------- moving popups (the pure part) ----------
+
+  const POP_KINDS = Object.freeze(["panel", "usage", "handover", "chain", "fonts", "card", "pickbar"]);
+  /** Saved spots: { kind: { ax: "l"|"r", x, ay: "t"|"b", y } }, each measured from the window edges nearest the
+   *  popup, so one dragged to the right stays on the right when the window changes size. */
+  function readSpots(v) {
+    const out = {}, num = (n) => Math.round(Math.min(4000, Math.max(-4000, n)));
+    if (!v || typeof v !== "object") return out;
+    for (const k of POP_KINDS) {
+      const p = v[k];
+      if (p && (p.ax === "l" || p.ax === "r") && (p.ay === "t" || p.ay === "b") && Number.isFinite(p.x) && Number.isFinite(p.y)) out[k] = { ax: p.ax, x: num(p.x), ay: p.ay, y: num(p.y) };
+    }
+    return out;
+  }
+  /** A box's spot in a vw×vh window, from the nearer left/right and top/bottom edges. */
+  function spotFrom(b, vw, vh) {
+    const ax = b.left + (b.right - b.left) / 2 <= vw / 2 ? "l" : "r", ay = b.top + (b.bottom - b.top) / 2 <= vh / 2 ? "t" : "b";
+    return { ax, x: Math.round(ax === "l" ? b.left : vw - b.right), ay, y: Math.round(ay === "t" ? b.top : vh - b.bottom) };
+  }
+  /** Where a w×h card covers the least of the `avoid` rects, inside a vw×vh window with margin m. Candidates line
+   *  up with every rect's edges, touching or m away, and with the window's (plus a coarse grid), so an exact gap
+   *  is never missed. Order: `keep` (text just picked) uncovered whenever any spot allows; least text covered;
+   *  least of the m-wide breathing room around the text; nearest `keep`, else the text, else the top right.
+   *  Among equals, the right-hand side first. */
+  function clearSpot(w, h, avoid, { vw, vh, m = 12, keep = null } = {}) {
+    const maxX = Math.max(m, vw - w - m), maxY = Math.max(m, vh - h - m), xs = new Set([m, maxX]), ys = new Set([m, maxY]);
+    for (let x = m; x < maxX; x += 48) xs.add(x);
+    for (let y = m; y < maxY; y += 48) ys.add(y);
+    const all = keep ? [...avoid, keep] : avoid;
+    for (const r of all) {
+      for (const x of [r.right, r.right + m, r.left - w, r.left - m - w]) xs.add(x); // unrounded: text edges sit on fractions
+      for (const y of [r.bottom, r.bottom + m, r.top - h, r.top - m - h]) ys.add(y);
+    }
+    const inX = [...xs].filter((x) => x >= m && x <= maxX).sort((a, b) => b - a), inY = [...ys].filter((y) => y >= m && y <= maxY).sort((a, b) => a - b);
+    const padded = all.map((r) => ({ left: r.left - m, top: r.top - m, right: r.right + m, bottom: r.bottom + m }));
+    const area = (x, y, r) => Math.max(0, Math.min(x + w, r.right) - Math.max(x, r.left)) * Math.max(0, Math.min(y + h, r.bottom) - Math.max(y, r.top));
+    const gap = (x, y, r) => Math.hypot(Math.max(0, r.left - (x + w), x - r.right), Math.max(0, r.top - (y + h), y - r.bottom));
+    const same = (a, b) => Math.abs(a - b) <= 0.5;
+    let best = null;
+    for (const x of inX) for (const y of inY) {
+      const k = keep && area(x, y, keep) > 0 ? 1 : 0;
+      if (best && k > best.k) continue;
+      const tied = best && k === best.k;
+      let cover = 0, pad = 0;
+      for (const r of avoid) { cover += area(x, y, r); if (tied && cover > best.cover + 0.5) break; }
+      if (tied && cover > best.cover + 0.5) continue;
+      const level = tied && same(cover, best.cover);
+      for (const r of padded) { pad += area(x, y, r); if (level && pad > best.pad + 0.5) break; }
+      if (level && pad > best.pad + 0.5) continue;
+      let near = keep ? gap(x, y, keep) : avoid.length ? Infinity : maxX - x + y - m;
+      if (!keep) for (const r of avoid) near = Math.min(near, gap(x, y, r));
+      if (!best || k < best.k || (!same(cover, best.cover) ? cover < best.cover : !same(pad, best.pad) ? pad < best.pad : near < best.near)) best = { left: x, top: y, k, cover, pad, near };
+    }
+    return best ? { left: best.left, top: best.top } : { left: maxX, top: m };
   }
 
   // ---------- font lists ----------
@@ -1090,6 +1149,7 @@
   function rootAttrs(st) {
     const out = {
       "data-t3x-tight": st.tighter ? "" : null,
+      "data-t3x-pop-move": st.popMove ? "" : null,
       "data-t3x-compact": st.compactThreads ? "" : null,
       "data-t3x-pinned-label": st.pinnedLabel ? "" : null,
       "data-t3x-fold": st.foldOlder ? "" : null,
@@ -1189,7 +1249,7 @@
 
   const core = {
     rowAgeHours, olderCutoff, olderRows, olderTitle, OLDER_AFTER, TITLE_LINES, titleSuffix, gapsBefore,
-    DEFAULTS, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
+    DEFAULTS, POP_KINDS, readSpots, spotFrom, clearSpot, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, FONT_SIMILAR_GROUPS, similarFontAreas, usagePageHash, usageContainerMatches,
     FOOTER_TEAM, FOOTER_DETAILS, footerPass, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
     forecast, seriesSegments, mergeSeries, dGeometry, fmtClock, lowRefills, compactParts, composerLabel, labUsageFailedSince, toolGates, labsForMerge, labFailure, handoverGate, HANDOVER_REQUEST, chainLabel, contrast, STALE_MS, T3_STALE_MS,
@@ -1849,6 +1909,7 @@
     const el = h("div", { [OWN]: "pop", class: "t3x-pop", role: "dialog", "aria-label": build.label, tabindex: "-1" });
     el.style.width = `${width}px`;
     D.body.append(el);
+    movable(el, () => ({ kind, reset: place, done: place }), ".t3x-pop-head");
     pop = { el, trigger, kind, build, onClose };
     trigger.setAttribute("aria-expanded", "true");
     fillPopover();
@@ -1860,6 +1921,7 @@
     const keep = pop.el.scrollTop;
     const focusKey = D.activeElement?.closest?.(".t3x-pop") ? D.activeElement.getAttribute("data-focus") : null;
     pop.el.replaceChildren(...[pop.build()].flat(4).filter((n) => n !== null && n !== undefined && n !== false));
+    if (settings.popMove) pop.el.querySelector(".t3x-pop-head")?.prepend(grip("this popup"));
     pop.el.scrollTop = keep;
     if (pop.kind === "panel") warmSelectedNames();
     if (focusKey) {
@@ -1877,6 +1939,8 @@
   }
   function place() {
     if (!pop) return;
+    const spot = settings.popMove && settings.popSpots[pop.kind];
+    if (spot) return placePopAt(pop.el, spot);
     const r = pop.trigger.getBoundingClientRect();
     const el = pop.el;
     const vw = innerWidth;
@@ -1906,6 +1970,91 @@
     if (pop && !pop.el.contains(e.target) && !pop.trigger.contains(e.target)) closePopover();
   }, true);
   listen(W, "resize", () => { closePopover(); preserveFontWorkspaceOnResize(); });
+
+  // ---------- moving popups (popMove): drag by the top bar or ⠿, a spot remembered per kind ----------
+
+  const NO_DRAG = "button:not(.t3x-grip), a, input, select, textarea, summary, label, [contenteditable]";
+  const BIG_KEEP = Object.freeze({ w: 160, h: 48 }); // the Fonts window may hang off an edge, but this much of its header stays in
+  const grip = (what) => h("button", { type: "button", class: "t3x-grip", "data-focus": "grip", "aria-label": `Move ${what}: drag, or arrow keys; Home puts it back`, title: "Drag to move · double-click the bar to put it back" }, "⠿");
+  function saveSpot(kind, spot) {
+    settings = readSettings(JSON.stringify({ ...settings, popSpots: { ...settings.popSpots, [kind]: spot } }));
+    saveSettings();
+  }
+  function forgetSpot(kind) {
+    const { [kind]: _, ...rest } = settings.popSpots;
+    settings = readSettings(JSON.stringify({ ...settings, popSpots: rest }));
+    saveSettings();
+  }
+  /** Move a fixed box to left/top, inside the window by margin m (keep: only that much of its top-left must stay in). */
+  function moveBox(el, left, top, keep = null, m = 8) {
+    const w = el.offsetWidth, ht = el.offsetHeight, vw = innerWidth, vh = innerHeight;
+    left = keep ? clamp(left, keep.w - w, vw - keep.w) : clamp(left, m, Math.max(m, vw - w - m));
+    top = keep ? clamp(top, 0, vh - keep.h) : clamp(top, m, Math.max(m, vh - ht - m));
+    Object.assign(el.style, { left: `${left}px`, top: `${top}px`, right: "", bottom: "" });
+  }
+  /** The Find-fonts bar at its spot, pinned by that spot's edges (its width follows its text), inside the window. */
+  function pinBar(el, spot, m = 8) {
+    const x = clamp(spot.x, m, Math.max(m, innerWidth - el.offsetWidth - m)), y = clamp(spot.y, m, Math.max(m, innerHeight - el.offsetHeight - m));
+    Object.assign(el.style, spot.ax === "l" ? { left: `${x}px`, right: "auto" } : { right: `${x}px`, left: "auto" }, spot.ay === "t" ? { top: `${y}px`, bottom: "auto" } : { bottom: `${y}px`, top: "auto" });
+  }
+  const spotXY = (el, spot) => [spot.ax === "l" ? spot.x : innerWidth - spot.x - el.offsetWidth, spot.ay === "t" ? spot.y : innerHeight - spot.y - el.offsetHeight];
+  /** A popover at its saved spot, anchored to that spot's edges (one near the bottom grows upward, as from ✦). */
+  function placePopAt(el, spot) {
+    const m = 8, vw = innerWidth, vh = innerHeight, w = el.offsetWidth, y = Math.round(clamp(spot.y, m, Math.max(m, vh - 160 - m)));
+    el.style.left = `${Math.round(clamp(spot.ax === "l" ? spot.x : vw - spot.x - w, m, Math.max(m, vw - w - m)))}px`;
+    el.style.maxHeight = `${Math.max(160, vh - y - m)}px`;
+    if (spot.ay === "t") Object.assign(el.style, { top: `${y}px`, bottom: "" });
+    else Object.assign(el.style, { bottom: `${y}px`, top: "" });
+  }
+  /** Drag `box` by any `handles` element inside it (not its buttons or fields, except ⠿); arrow keys on ⠿ move it,
+   *  Home or a double-click on the bar puts it back. The box itself holds the pointer capture, so a popup that
+   *  rebuilds its header mid-drag keeps moving. `config()` gives { kind, keep, m, reset, done } at that moment. */
+  function movable(box, config, handles) {
+    const handleOf = (t) => { const hd = t?.closest?.(handles); return hd && box.contains(hd) && !t.closest(NO_DRAG) ? hd : null; };
+    const put = (left, top) => { const c = config(); box.setAttribute("data-t3x-moved", ""); moveBox(box, left, top, c.keep, c.m); };
+    const keepIt = () => { const c = config(); saveSpot(c.kind, spotFrom(box.getBoundingClientRect(), innerWidth, innerHeight)); c.done?.(); };
+    const putBack = () => { const c = config(); forgetSpot(c.kind); c.reset(); };
+    let downOnBar = false; // the box holds the capture, so a double-click's own target is the box, not the bar
+    box.addEventListener("pointerdown", guarded("move-down", (e) => {
+      downOnBar = !!handleOf(e.target);
+      if (!settings.popMove || e.button !== 0 || !e.isPrimary || !downOnBar) return;
+      e.preventDefault();
+      const b = box.getBoundingClientRect(), dx = e.clientX - b.left, dy = e.clientY - b.top, id = e.pointerId;
+      let moved = false;
+      box.setAttribute("data-t3x-dragging", "");
+      const move = (ev) => {
+        if (ev.pointerId !== id || (!moved && Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 3)) return;
+        moved = true;
+        put(ev.clientX - dx, ev.clientY - dy);
+      };
+      const end = (ev) => {
+        if (ev.pointerId !== id) return;
+        for (const [type, fn] of fns) box.removeEventListener(type, fn);
+        box.removeAttribute("data-t3x-dragging");
+        if (box.hasPointerCapture?.(id)) box.releasePointerCapture(id);
+        if (moved) keepIt();
+      };
+      const fns = [["pointermove", move], ["pointerup", end], ["pointercancel", end], ["lostpointercapture", end]].map(([type, fn]) => [type, guarded(`move-${type}`, fn)]);
+      for (const [type, fn] of fns) box.addEventListener(type, fn);
+      try { box.setPointerCapture(id); } catch { /* the pointer already left */ }
+    }));
+    box.addEventListener("dblclick", guarded("move-reset", (e) => {
+      if (!settings.popMove || !(downOnBar || handleOf(e.target))) return;
+      e.preventDefault();
+      putBack();
+    }));
+    box.addEventListener("keydown", guarded("move-key", (e) => {
+      if (!settings.popMove || !e.target?.matches?.(".t3x-grip") || !box.contains(e.target)) return;
+      const step = e.shiftKey ? 64 : 16, d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+      if (e.key !== "Home" && !d) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Home") return putBack();
+      const b = box.getBoundingClientRect();
+      put(b.left + d[0], b.top + d[1]);
+      keepIt();
+    }));
+  }
 
   // ---------- usage detail (D, one strip per lab) ----------
 
@@ -3010,7 +3159,12 @@
   }
   function preserveFontWorkspaceOnResize() {
     const ui=fontWorkspace;if(!ui)return;
-    if(ui.el.dataset.mode==="dock"){positionDock(ui.el,ui.dockAnchor?.isConnected?ui.dockAnchor.getBoundingClientRect():null);return;}
+    if(ui.el.dataset.mode==="dock"){
+      // A card the user dragged (or one placed clear of text) stays put, inside the window; else it re-docks.
+      if(settings.popMove){keepCardIn(ui.el);return;}
+      positionDock(ui.el,ui.dockAnchor?.isConnected?ui.dockAnchor.getBoundingClientRect():null);return;
+    }
+    if(ui.el.hasAttribute("data-t3x-moved"))placeBigSaved(ui.el);
     const previous=ui.lastFocus;
     // A narrow window keeps the pane the user is working in, including active search.
     if(innerWidth<720&&previous?.isConnected&&ui.navigation.contains(previous)) {
@@ -3073,8 +3227,10 @@
       h("button",{type:"button",class:"t3x-btn",onclick:()=>undockFonts()},"All fonts…"),
       h("button",{type:"button",class:"t3x-btn t3x-font-done",onclick:()=>closeFontWorkspace(false)},"Done"));
     editor.append(back,returnButton,editorTitle,pickNote,h("div",{class:"t3x-font-tools"},showBtn),h("strong",{class:"t3x-font-scope-label",text:"Applies to"}),scope,targets,h("label",{for:"t3x-font-source",text:"Font source"}),source,resolved,editSource,similar,own,fontNote,h("div",{class:"t3x-font-preview-label",text:"Preview"}),sample,h("p",{class:"t3x-note",text:"Changes apply immediately. A preview illustrates the face; native surfaces may have different text sizes and layout."}),dockbar);
-    el.append(h("header",{class:"t3x-font-workspace-head"},h("div",{},title,h("p",{text:"Choose an area, then its font"})),h("div",{class:"t3x-font-head-actions"},settings.fontPicker?h("button",{type:"button",class:"t3x-btn",onclick:()=>startFontPick()},"Pick from screen"):null,h("button",{type:"button",class:"t3x-btn","aria-label":"Close Fonts",onclick:()=>closeFontWorkspace()},"Close"))),h("div",{class:"t3x-font-workspace-body"},h("nav",{class:"t3x-font-navigation","aria-label":"Font areas"},h("label",{for:"t3x-font-search",text:"Find an area"}),search,index),editor));
+    el.append(h("div",{class:"t3x-font-dockgrip"},grip("the Fonts card")),h("header",{class:"t3x-font-workspace-head"},grip("Fonts"),h("div",{},title,h("p",{text:"Choose an area, then its font"})),h("div",{class:"t3x-font-head-actions"},h("button",{type:"button",class:"t3x-btn t3x-font-small",title:"Shrink to a small card for this area, placed clear of its text",onclick:()=>shrinkFonts()},"Small card"),settings.fontPicker?h("button",{type:"button",class:"t3x-btn",onclick:()=>startFontPick()},"Pick from screen"):null,h("button",{type:"button",class:"t3x-btn","aria-label":"Close Fonts",onclick:()=>closeFontWorkspace()},"Close"))),h("div",{class:"t3x-font-workspace-body"},h("nav",{class:"t3x-font-navigation","aria-label":"Font areas"},h("label",{for:"t3x-font-search",text:"Find an area"}),search,index),editor));
     fontWorkspace={el,trigger:anchor,search,index,editor,navigation:el.querySelector(".t3x-font-navigation"),lastFocus:null,switchingArea:true,rows,empty,guidance,title:editorTitle,scope,targets,source,resolved,editSource,similar,similarNote,similarApply,similarBack,own,family,prev,next,minus,plus,size,reset,sample,fontNote,returnButton,pickNote,showBtn,role:null,optionsKey:null};
+    new ResizeObserver(guarded("card-size",()=>{if(el.open&&el.dataset.mode==="dock"&&settings.popMove)keepCardIn(el);})).observe(el); // content that grows stays inside the window
+    movable(el,()=>el.dataset.mode==="dock"?{kind:"card",m:12,reset:()=>placeCard(el)}:{kind:"fonts",keep:BIG_KEEP,reset:()=>{el.removeAttribute("data-t3x-moved");el.style.removeProperty("left");el.style.removeProperty("top");}},".t3x-font-workspace-head, .t3x-font-dockgrip");
     el.addEventListener("focusin",e=>{if(fontWorkspace?.el===el){rememberFontScroll();fontWorkspace.lastFocus=e.target;}});
     for(const pane of [index,editor])pane.addEventListener("scroll",()=>{if(fontWorkspace?.el===el)rememberFontScroll();});
     el.addEventListener("cancel",e=>{e.preventDefault();if(!fontSelectOpen())closeFontWorkspace();});
@@ -3090,8 +3246,8 @@
     if(dock){el.dataset.mode="dock";el.setAttribute("aria-labelledby","t3x-font-editor-title");}
     D.body.append(el);syncFontWorkspace(true);
     pickNote.textContent=note;pickNote.hidden=!note;
-    if(dock){fontWorkspace.dockAnchor=dockAnchor;el.show();positionDock(el,dock);}
-    else el.showModal();
+    if(dock){fontWorkspace.dockAnchor=dockAnchor;el.show();placeCard(el,dock);}
+    else{el.showModal();placeBigSaved(el);}
     index.scrollTop=fontNav.indexScroll;editor.scrollTop=fontNav.scroll.get(fontNav.role)||0;
     fontWorkspace.switchingArea=false;
     (fontNav.editor?editorTitle:search).focus({preventScroll:true});
@@ -3223,6 +3379,8 @@
         h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: "Footer team list" }),
           h("div", { class: "t3x-radios t3x-col t3x-indent", role: "radiogroup", "aria-label": "Footer team list" },
             FOOTER_TEAM.map(([value, label]) => radio("footerTeam", value, settings.footerTeam, label, (v) => change({ footerTeam: v })))))),
+      h("section", {}, h("h3", { text: "Popups" }),
+        sw("Move popups out of the way", "popMove", "Drag a popup by its top bar (⠿); it reopens there. Double-click the bar, or press Home on ⠿, to put it back. Fonts stops dimming the screen and gets a Small card button.")),
       h("section", {}, h("h3", { text: "Fonts on screen" }),
         sw("Pick from screen", "fontPicker", "Hover any text to see which Fonts area controls it; click it to change that font."),
         settings.fontPicker ? [
@@ -3256,6 +3414,7 @@
     else burnData = null;
     render();
     if (pop?.kind === "panel") fillPopover();
+    if (pop && patch && Object.prototype.hasOwnProperty.call(patch, "popMove")) place();
     syncFontWorkspace();
   }
   // One row per font you picked (areas that follow it listed beside it). Clicking a name opens Fonts there.
@@ -3428,7 +3587,23 @@
     endInspector();
     const s = { layer: h("div", { [OWN]: "pick", class: "t3x-pick" }), listeners: [], raf: 0, timer: 0, onEnd };
     s.on = (type, fn) => { const g = guarded(`pick-${type}`, fn); W.addEventListener(type, g, true); s.listeners.push([type, g]); };
-    s.bar = (text, button) => h("div", { class: "t3x-pick-bar", "data-pick-ui": "" }, h("span", { text }), h("button", { type: "button", class: "t3x-btn", onclick: () => endInspector() }, button));
+    s.bar = (text, button) => {
+      const bar = h("div", { class: "t3x-pick-bar", "data-pick-ui": "" }, grip("this bar"), h("span", { text }), h("button", { type: "button", class: "t3x-btn", onclick: () => endInspector() }, button));
+      movable(bar, () => ({ kind: "pickbar", reset: () => { bar.removeAttribute("data-t3x-moved"); for (const k of ["left", "right", "top", "bottom"]) bar.style.removeProperty(k); }, done: () => pinBar(bar, settings.popSpots.pickbar) }), ".t3x-pick-bar");
+      const spot = settings.popMove && settings.popSpots.pickbar;
+      if (spot) queueMicrotask(() => { if (bar.isConnected) { bar.setAttribute("data-t3x-moved", ""); pinBar(bar, spot); } }); // once the caller has placed it
+      // Its text changes ("Reading this screen's fonts…", then the hint): pinned by its spot's own edges, it grows
+      // away from them, and a size change re-checks that it still fits.
+      new ResizeObserver(guarded("pick-bar-size", () => {
+        const sp = settings.popMove && settings.popSpots.pickbar;
+        if (sp && bar.isConnected && bar.hasAttribute("data-t3x-moved") && !bar.hasAttribute("data-t3x-dragging")) pinBar(bar, sp);
+      })).observe(bar);
+      return bar;
+    };
+    s.on("resize", () => { // a moved bar stays in reach when the window shrinks
+      const spot = settings.popMove && settings.popSpots.pickbar;
+      if (spot) for (const bar of s.layer.querySelectorAll(".t3x-pick-bar[data-t3x-moved]")) pinBar(bar, spot);
+    });
     D.body.append(s.layer);
     D.documentElement.setAttribute("data-t3x-probing", ""); // transitions off while probing (see probeAreas)
     inspector = s;
@@ -3517,7 +3692,7 @@
     s.tag = h("div", { class: "t3x-pick-tag", role: "status", "aria-live": "polite", hidden: true });
     s.hintText = `Click text to change its font${settings.fontPickLabels ? " · hold Shift to label everything" : ""} · Esc to stop`;
     const bar = s.bar(s.hintText, "Stop");
-    s.hint = bar.firstChild;
+    s.hint = bar.querySelector(":scope > span"); // the text, not the ⠿ before it
     s.layer.append(s.box, s.tag, bar);
     shieldFrames(s);
     // Read the visible screen (text and its nearby containers) once, after the bar has painted.
@@ -3596,12 +3771,56 @@
     if (!ui || ui.el.dataset.mode !== "dock") return;
     ui.el.close();
     delete ui.el.dataset.mode;
+    ui.el.removeAttribute("data-t3x-moved");
     ui.el.style.removeProperty("left");
     ui.el.style.removeProperty("top");
     ui.el.setAttribute("aria-labelledby", "t3x-fonts-title");
     ui.el.showModal();
+    placeBigSaved(ui.el);
     syncFontWorkspace();
     ui.title.focus({ preventScroll: true });
+  }
+  const keepCardIn = (el) => { const b = el.getBoundingClientRect(); moveBox(el, b.left, b.top, null, 12); };
+  /** The full Fonts window at its saved spot, if it has one (else centred, as ever). */
+  function placeBigSaved(el) {
+    const spot = settings.popMove && settings.popSpots.fonts;
+    if (!spot) { el.removeAttribute("data-t3x-moved"); el.style.removeProperty("left"); el.style.removeProperty("top"); return; }
+    el.setAttribute("data-t3x-moved", "");
+    moveBox(el, ...spotXY(el, spot), BIG_KEEP);
+  }
+  /** "Small card": the full window becomes the card for the area being edited, placed clear of that area's text. */
+  function shrinkFonts() {
+    const ui = fontWorkspace;
+    if (!ui || ui.el.dataset.mode === "dock" || !settings.popMove) return;
+    rememberFontScroll();
+    fontNav.editor = true;
+    ui.el.close();
+    ui.el.dataset.mode = "dock";
+    ui.el.removeAttribute("data-t3x-moved");
+    ui.el.setAttribute("aria-labelledby", "t3x-font-editor-title");
+    ui.dockAnchor = null;
+    ui.el.show();
+    syncFontWorkspace();
+    placeCard(ui.el);
+    ui.title.focus({ preventScroll: true });
+  }
+  /** Every visible place the area applies (or would, once it has a font), as merged outlines. */
+  function areaRects(id) {
+    const els = visibleTextElements(), [fam] = probeAreas([{ add: roleAttrs(id) }], els);
+    return [...areaClusters(els, fam.map((r) => (r === id ? { role: id } : null))), ...(id === "viz" ? vizFrameClusters() : [])];
+  }
+  /** The Fonts card: at the spot the user dragged it to; else (or when that spot would cover text just picked)
+   *  where it covers none of the area's text, or the least of it, beside the picked text when there is some. */
+  function placeCard(el, picked = null) {
+    if (!settings.popMove) return positionDock(el, picked);
+    const m = 12, spot = settings.popSpots.card;
+    if (spot) {
+      moveBox(el, ...spotXY(el, spot), null, m);
+      if (!picked || !near(el.getBoundingClientRect(), picked, 0)) return;
+    }
+    const avoid = areaRects(fontNav.role).slice(0, 120).map((c) => c.rect);
+    const at = clearSpot(el.offsetWidth, el.offsetHeight, avoid, { vw: innerWidth, vh: innerHeight, m, keep: picked && { left: picked.left, top: picked.top, right: picked.right, bottom: picked.bottom } });
+    moveBox(el, at.left, at.top, null, m);
   }
   /** Outline every visible place an area applies (or would, once it has a font). */
   function showAreaOnScreen(id) {
@@ -3611,8 +3830,7 @@
     const s = beginInspector(() => { if (modal && fontWorkspace === ui && !disposed) { ui.el.showModal(); ui.showBtn.focus({ preventScroll: true }); } });
     const draw = () => {
       s.layer.replaceChildren();
-      const els = visibleTextElements(), [fam] = probeAreas([{ add: roleAttrs(id) }], els);
-      const clusters = [...areaClusters(els, fam.map((r) => (r === id ? { role: id } : null))), ...(id === "viz" ? vizFrameClusters() : [])];
+      const clusters = areaRects(id);
       for (const c of clusters.slice(0, 80)) { const box = h("div", { class: "t3x-pick-box t3x-pick-shown" }); placeBox(box, c.rect); s.layer.append(box); }
       const label = fontArea(id).label;
       shieldFrames(s);
