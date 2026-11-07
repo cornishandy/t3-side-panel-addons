@@ -99,6 +99,6 @@ test("Questions and Reasoning reach T3's own markup without the native bridge", 
     try { ws?.close(); } catch {}
     chrome.kill("SIGKILL");
     server.close();
-    fs.rmSync(profile, { recursive: true, force: true });
+    fs.rmSync(profile, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
   }
 });
