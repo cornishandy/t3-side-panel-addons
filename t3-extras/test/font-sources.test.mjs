@@ -197,7 +197,7 @@ test("font CSS names the verified leaves and does not claim controls, toggles, o
   assert.equal(leaves.includes("!important"), false);
   assert.equal(nestedHas(leaves), false);
   const block = css.slice(css.indexOf("/* ---------- reply footer card"));
-  assert.equal(crypto.createHash("sha256").update(block).digest("hex"), "cc08951882cfa8d04e113727bf598b05d5841957f4b910236760dbbba68458b9");
+  assert.equal(crypto.createHash("sha256").update(block).digest("hex"), "cd92ff01a306807bae121bb5a758639133992300c0a212ae7ec8979a01d21011");
   const readme = fs.readFileSync(new URL("../README.md", import.meta.url), "utf8");
   const at = readme.indexOf("**Reply footer card.**");
   const paragraph = readme.slice(at, readme.indexOf("\n\n", at));

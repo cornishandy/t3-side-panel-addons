@@ -1086,7 +1086,9 @@ html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar 
  * (Andy, 7 Nov 2026: wrap everywhere, not just in narrow lanes): cells wrap between words, and only code, links and
  * chips break mid-word, each keeping at least 6rem (about ten characters a line). Under a 36rem lane cells also take
  * less side padding. A table whose words still don't fit (many columns) scrolls, and a table that scrolls shows its
- * scrollbar. "chat-lane" is T3's own container on each timeline row, the one its table rules use.
+ * scrollbar. Widths come from "t3x-lane", a container this file gives each assistant reply that ends in a footer card
+ * (T3 Nightly dropped its own "chat-lane" container on 7 Nov 2026). Only assistant replies: a user message is a
+ * shrink-to-fit bubble, which a size container would collapse. A plain reply has none, so it keeps the wider padding.
  * The footer card and its team list keep their own layout (below). */
 .chat-markdown .chat-markdown-table-container:not(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)), .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]) *) {
   & table { min-width: 0; }
@@ -1094,7 +1096,10 @@ html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar 
   & :is(th, td) :is(code, a, .chat-markdown-file-link, [data-slot="context-chip"]) { white-space: normal; overflow-wrap: anywhere; }
   & :is(th, td):has(code, a, .chat-markdown-file-link, [data-slot="context-chip"]) { min-width: 6rem; }
 }
-@container chat-lane (width < 36rem) {
+[data-message-role="assistant"] .chat-markdown:has(> hr:last-of-type + .chat-markdown-table-container :is([itemprop~="settle-yes"], [itemprop~="settle-no"])):has(> hr:last-of-type + .chat-markdown-table-container thead th:nth-child(3)) {
+  container: t3x-lane / inline-size;
+}
+@container t3x-lane (width < 36rem) {
   .chat-markdown .chat-markdown-table-container:not(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)), .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]) *) :is(th, td) { padding-inline: .5rem; }
 }
 .chat-markdown .chat-markdown-table-container [data-slot="scroll-area-scrollbar"][data-orientation="horizontal"] {
@@ -1276,7 +1281,7 @@ html[data-t3x-footer-team="always-show"] .chat-markdown > hr:last-of-type + .cha
 /* a narrow chat lane (a phone, or a narrowed window whose sidebar leaves the chat under 30rem): who and when drop under
  * the step, left-aligned with it, and header words wrap. The lane is measured, not the window, so this also holds in a
  * wide window's narrow pane (Andy, 25 Oct 2026). */
-@container chat-lane (width < 30rem) {
+@container t3x-lane (width < 30rem) {
   .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) {
     & thead th { white-space: normal; }
     & td:first-child { flex-basis: 4.9rem; min-width: 0; white-space: normal; }
@@ -1290,7 +1295,7 @@ html[data-t3x-footer-team="always-show"] .chat-markdown > hr:last-of-type + .cha
  * so long rows (Usage, Time, Needs you) wrap less instead of leaving the pane's right side empty (Andy, 7 Nov 2026:
  * "when window is wider than the footer table, please have it expand to fit, within reason"). Shorter cards keep
  * fitting their words. */
-@container chat-lane (width >= 40rem) {
+@container t3x-lane (width >= 40rem) {
   .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)):has(tbody tr:nth-child(5)) {
     width: min(100%, 52rem);
     & td:nth-child(2) { flex: 1 1 18rem; width: auto; }
