@@ -982,3 +982,10 @@ test("gaps by time: a gap only where both times are known and 25+ min apart", ()
   assert.deepEqual([...C.gapsBefore([T - 60 * M, T])], [false, false]); // out of order: no gap
   assert.deepEqual([...C.gapsBefore([])], []);
 });
+
+test("stale estimates explain freshness even when a failed refresh kept a recent reading", () => {
+  const recent = C.labView(C.mergeLabs(null, serverLabs)[0], NOW, { labUsage: NOW });
+  assert.equal(recent.stale, true);
+  assert.match(C.forecast(recent, NOW).text, /reading is stale/);
+  assert.doesNotMatch(C.forecast(recent, NOW).text, /reading is .* old/);
+});

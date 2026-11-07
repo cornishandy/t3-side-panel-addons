@@ -44,8 +44,8 @@ Quit and reopen T3 after `--restore`. The keeper's uninstall only removes its ba
 
 ## Known issues
 
-- Keeper `minWidth` fails on T3 0.1.3 (the sidebar width clamp changed shape). Seven keeper tests fail because of it. The other units still apply.
-- `geminiQuota` works around pingdotgg/t3code#22876. Remove that unit once T3 fixes it.
+- Older keeper builds failed to patch `minWidth` on T3 0.1.3 after the sidebar width clamp changed shape. The current keeper supports the shared width constant in nightly `0.1.8-nightly.20261106.4247`; committed tests cover all three clamps. On unsupported older builds, leave that unit disabled until updating the keeper.
+- `geminiQuota` retains the workaround for pingdotgg/t3code#22876 on older builds. Nightly `0.1.8-nightly.20261106.4247` already sends `2.24.0`, so this unit reports `already` without rewriting it.
 - Apple silicon only.
 
 ## Tests
@@ -62,11 +62,11 @@ Quit and reopen T3 after `--restore`. The keeper's uninstall only removes its ba
 - [x] Sidebar sections: a "Pinned" label and line, older threads folded under one header, one-row titles that keep a trailing (N) — each with its own switch
 - [x] Older threads section: threads last active more than 2 days ago (12 hours to 1 week, or Auto, in the ✦ panel) fold under one "Older than 2 days" header
 - [x] Keeper units: wrap, minWidth, rule, fit, titleGuide, extras, firstClick, geminiQuota
-- [ ] Keeper `minWidth` unit fails on T3 0.1.3 builds (sidebar width clamp changed shape); 7 keeper tests fail because of it
+- [x] Keeper `minWidth` supports nightly `0.1.8-nightly.20261106.4247`; older keeper/build combinations may need the workaround above
 - [x] Compact sidebar usage in a short window (under 800 px tall)
 - [x] Find fonts on screen: hover names the font area, Shift labels every area, a click opens Fonts beside the text, Show on screen — each with its own switch
-- [x] All 220 add-on tests pass (browser tests use the newest installed headless Chrome)
-- [ ] Delete `geminiQuota` once T3 fixes pingdotgg/t3code#22876
+- [x] Committed add-on tests cover usage, fonts and sidebar behavior (browser tests use the newest installed headless Chrome)
+- [x] `geminiQuota` recognizes the corrected probe version in the November 6 nightly; the workaround remains for older builds
 
 ## Docs
 

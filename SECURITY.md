@@ -82,4 +82,4 @@ Report a vulnerability privately, through GitHub private vulnerability reporting
 
 Git history is kept as it is. A gitleaks scan of this directory and of the git history found no credentials. If a real credential were in the history, deleting the line would not be enough. It would have to be revoked.
 
-Keeper tests that read `/Applications/T3 Code (Nightly).app` or `~/.local/share/t3-sidebar-keeper/backups` are local-only. They clone with `cp -c` and do not write those files. The known `minWidth` failure on T3 0.1.3 is in the root README under Known issues.
+Keeper tests that read `/Applications/T3 Code (Nightly).app` or `~/.local/share/t3-sidebar-keeper/backups` are local-only. They clone with `cp -c` and do not write those files. The current keeper supports the shared `minWidth` constant in nightly `0.1.8-nightly.20261106.4247`; the root README under Known issues retains the workaround for older keeper/build combinations.

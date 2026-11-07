@@ -150,7 +150,7 @@ test("find fonts on screen in a headless browser", { timeout: 90_000 }, async ()
     // 3. Shift labels every area; letting go removes them.
     await key("keyDown", "Shift", "ShiftLeft", 16); await frames();
     const labels = await ev(`[...document.querySelectorAll(".t3x-pick-label")].map((n) => n.textContent)`);
-    for (const want of ["Replies", "Quotes in replies", "Expanded reasoning", "Message composer"]) assert.ok(labels.includes(want), `${want} in ${labels}`);
+    for (const want of ["Replies", "Reply headings, project & add-on labels", "Quotes in replies", "Expanded reasoning", "Message composer"]) assert.ok(labels.includes(want), `${want} in ${labels}`);
     await shot("picker-labels.png");
     await key("keyUp", "Shift", "ShiftLeft", 16); await frames();
     assert.equal(await ev(`document.querySelectorAll(".t3x-pick-label").length`), 0);
