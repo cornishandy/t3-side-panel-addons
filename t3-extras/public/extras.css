@@ -1201,6 +1201,19 @@ html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar 
   & tbody tr:has(> td:nth-child(2) > strong:first-child) { background: color-mix(in srgb, var(--foreground) 5%, transparent); box-shadow: inset 2px 0 0 var(--foreground); padding-block: .36rem; }
   & tbody tr:has(> td:nth-child(2) > strong:first-child) td:first-child { color: var(--foreground); }
   & tbody tr:has(> td:nth-child(2) > strong:first-child) > td:nth-child(2) > ins { text-decoration-line: underline; text-decoration-thickness: 1.5px; text-underline-offset: .18em; text-decoration-color: currentColor; text-decoration-skip-ink: auto; }
+  /* a folded Needs you item (the Thread health watch writes each item as a <details> in the step cell, its advice as a
+   * second <details> inside): one tight line each, without T3's fold border, padding or larger type; an open item's
+   * text is lightly indented (Andy, 7 Nov 2026: "it's still so big, can you make it more compact when it's in its
+   * collapsed state") */
+  & td:nth-child(2) div:has(> [data-markdown-details]) { margin: 0; border-block: 0; }
+  & td:nth-child(2) [data-markdown-details-summary] { padding-block: 0; gap: .25rem; margin-left: -.15rem; font-size: inherit; font-weight: inherit; line-height: 1.25rem; color: inherit; }
+  & td:nth-child(2) [data-markdown-details-summary] > svg { width: .8rem; height: .8rem; }
+  & td:nth-child(2) [data-markdown-details-content] { padding: .15rem 0 .3rem 1rem; }
+  & td:nth-child(2) [data-markdown-details-content] div:has(> [data-markdown-details]) { margin-top: .25rem; }
+  & tbody tr:has(> td:nth-child(2) > div:first-child > [data-markdown-details] > [data-markdown-details-summary] strong:first-child) { background: color-mix(in srgb, var(--foreground) 5%, transparent); box-shadow: inset 2px 0 0 var(--foreground); padding-block: .1rem; }
+  & tbody tr:has(> td:nth-child(2) > div:first-child > [data-markdown-details] > [data-markdown-details-summary] strong:first-child) td:first-child { color: var(--foreground); }
+  & tbody tr:has(> td:nth-child(2) > div:first-child > [data-markdown-details]) > td { padding-block: .06rem; }
+  & tbody tr:has(> td:nth-child(2) > div:first-child > [data-markdown-details]) [data-markdown-details-content] ins { text-decoration-line: underline; text-decoration-thickness: 1.5px; text-underline-offset: .18em; text-decoration-color: currentColor; text-decoration-skip-ink: auto; }
   /* decided for you: quiet, still readable */
   & tbody tr:has(> td:last-child:empty):not(:has(strong, del, [itemprop])) td:nth-child(2) { color: var(--muted-foreground); }
   & [itemprop~="failed"] { color: color-mix(in srgb, var(--t3x-bad) 75%, var(--foreground)); }
