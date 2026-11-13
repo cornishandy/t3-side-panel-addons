@@ -10,7 +10,8 @@
  *   fit       binCli-*.mjs        generated titles <= 40 chars, child titles <= 42; readable native ids
  *   titleGuide binCli-*.mjs       one compact Titles section in every provider's instructions
  *   geminiQuota binCli-*.mjs      Antigravity limits probe sends a current version, so Google
- *                                 returns the Gemini quota rows (server: next T3 launch)
+ *                                 returns the Gemini quota rows (server: next T3 launch); builds
+ *                                 that already send 2.24.0 or newer are left as they are
  *   extras    client/index.html   tiny inline loader for the t3-extras add-ons (127.0.0.1:8793);
  *                                 its bytes come out of wrap's <style> padding
  *   firstClick desktop main.cjs   acceptFirstMouse on the Mac window, so the first click on an
@@ -88,7 +89,7 @@ const USER_DATA = process.env.T3_USER_DATA_DIR || path.join(os.homedir(), "Libra
 const FRAMEWORK = path.join(APP, "Contents/Frameworks/Electron Framework.framework/Electron Framework");
 const STYLE_ID = "t3-keeper-sidebar-1"; // bump the number when WRAP_CSS changes
 const KEEP_BACKUPS = 3;
-const KEEPER_VERSION = 14; // bump when units change so --auto re-checks an already-handled build
+const KEEPER_VERSION = 15; // bump when units change so --auto re-checks an already-handled build
 const MIN_FREE_BYTES = 1024 ** 3;
 const TMP_PREFIX = ".app.asar.t3-keeper-";
 const PARSE = { ecmaVersion: "latest", allowHashBang: true };
@@ -1031,20 +1032,25 @@ function absorb(text, targetBytes, sourceType, comments = null) {
   throw new Error(`no comment block could absorb ${delta} bytes`);
 }
 
+const ANTIGRAVITY_UA_MARK = "`antigravity/hub/";
 const ANTIGRAVITY_UA_FROM = "`antigravity/hub/1.0.0 (aidev_client;";
 const ANTIGRAVITY_UA_TO = "`antigravity/hub/2.24.0 (aidev_client;";
+const ANTIGRAVITY_UA_RE = /`antigravity\/hub\/(\d+)\.(\d+)\.(\d+) \(aidev_client;/g;
 
 /**
- * geminiQuota: T3's Antigravity limits probe calls itself antigravity/hub/1.0.0, and Google leaves
- * the Gemini buckets (gemini-5h, gemini-weekly) out of its quota summary for that version, so only
- * the shared Claude/GPT rows show (upstream #22876; checked here 25 Oct 2026: 2.24.0 returns them).
+ * geminiQuota: older T3 builds' Antigravity limits probe calls itself antigravity/hub/1.0.0, and
+ * Google leaves the Gemini buckets (gemini-5h, gemini-weekly) out of its quota summary for that
+ * version, so only the shared Claude/GPT rows show (upstream #22876; checked here 25 Oct 2026:
+ * 2.24.0 returns them). T3 has sent 2.24.0 itself since the 6 Nov nightly, so a build that sends
+ * 2.24.0 or newer is left alone ("already"); only the known-bad 1.0.0 is rewritten.
  * Server code, so it starts at T3's next launch. Byte balance is done once for the file.
  */
 function unitGeminiQuota(text) {
-  const from = text.split(ANTIGRAVITY_UA_FROM).length - 1;
-  const to = text.split(ANTIGRAVITY_UA_TO).length - 1;
-  if (from === 0 && to === 1) return { state: "already", text };
-  if (from !== 1 || to !== 0) throw new Error(`Antigravity probe User-Agent found ${from} times (patched ${to})`);
+  const found = [...text.matchAll(ANTIGRAVITY_UA_RE)];
+  if (found.length !== 1) throw new Error(`Antigravity probe User-Agent found ${found.length} times`);
+  const [major, minor, patch] = found[0].slice(1).map(Number);
+  if (major > 2 || (major === 2 && minor >= 24)) return { state: "already", text };
+  if (found[0][0] !== ANTIGRAVITY_UA_FROM) throw new Error(`Antigravity probe sends version ${major}.${minor}.${patch}, which is not known to return the Gemini rows`);
   return { state: "patched", text: text.replace(ANTIGRAVITY_UA_FROM, () => ANTIGRAVITY_UA_TO) };
 }
 
@@ -1160,6 +1166,12 @@ function plan(fd, layout, targets) {
         texts[file] = finishBinCli(child.text, originals[file].length, child.state === "patched");
         if (child.state === "patched") out.state = "patched";
         else if (child.state === "retained" && out.state === "disabled") out.state = "retained";
+      } else if (unit.name === "geminiQuota" && targets.delegatedTitles && !before.includes(ANTIGRAVITY_UA_MARK)) {
+        // 13 Nov nightly: the probe moved to the server bundle, which sends T3's own corrected
+        // version. Recognise it there; the old-version rewrite stays in the runtime bundle.
+        const server = texts.delegatedTitles ?? readEntry(fd, layout, targets.delegatedTitles).toString("utf8");
+        if (unitGeminiQuota(server).state !== "already") throw new Error("Antigravity probe in the server bundle sends the old version; this keeper only rewrites it in the runtime bundle");
+        out = { state: "already", text: before };
       } else out = unit.run(before, ctx);
       results[unit.name] = { state: out.state, ...(out.error ? { error: out.error } : {}) };
       texts[unit.file] = out.text;

@@ -45,7 +45,7 @@ Quit and reopen T3 after `--restore`. The keeper's uninstall only removes its ba
 ## Known issues
 
 - Older keeper builds failed to patch `minWidth` on T3 0.1.3 after the sidebar width clamp changed shape. The current keeper supports the shared width constant in nightly `0.1.8-nightly.20261106.4247`; committed tests cover all three clamps. A failed width patch leaves that build’s original width unchanged; update the keeper for supported builds.
-- `geminiQuota` retains the workaround for pingdotgg/t3code#22876 on older builds. Nightly `0.1.8-nightly.20261106.4247` already sends `2.24.0`, so this unit reports `already` without rewriting it.
+- `geminiQuota` retains the workaround for pingdotgg/t3code#22876 on older builds. Nightly `0.1.8-nightly.20261106.4247` already sends `2.24.0`, so this unit reports `already` without rewriting it. Nightly `0.1.10-nightly.20261113.4643` moved the probe to another server bundle, which keeper v14 could not find (`cannot patch: Antigravity probe User-Agent found 0 times`; harmless, since that build needs no patch); keeper v15 finds it in either bundle.
 - Apple silicon only.
 
 ## Tests
@@ -69,6 +69,7 @@ Quit and reopen T3 after `--restore`. The keeper's uninstall only removes its ba
 - [x] Move popups out of the way: every popup drags by its top bar and reopens there; Fonts stops dimming, and its Small card sits clear of the text
 - [x] Committed add-on tests cover usage, fonts and sidebar behavior (browser tests use the newest installed headless Chrome)
 - [x] `geminiQuota` recognizes the corrected probe version in the November 6 nightly; the workaround remains for older builds
+- [x] `geminiQuota` follows the probe into the server bundle (November 13 nightly) and accepts any version from `2.24.0` up (keeper v15)
 
 ## Docs
 

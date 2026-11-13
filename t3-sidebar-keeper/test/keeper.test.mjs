@@ -59,15 +59,21 @@ const fileSha = (file) => K.sha(fs.readFileSync(file));
 const ctx = { desktopMain: "style-src 'self' 'unsafe-inline'" };
 const html = (script) => `<!doctype html><html><head>\n<script>\n${script}\n</script>\n</head><body></body></html>\n`;
 
-function binCliOf(file = asar) {
+function bundleOf(target, file = asar) {
   const fd = fs.openSync(file, "r");
   try {
     const layout = K.readLayout(fd);
-    return K.readEntry(fd, layout, K.findTargets(fd, layout).binCli).toString("utf8");
+    const rel = K.findTargets(fd, layout)[target];
+    return rel ? K.readEntry(fd, layout, rel).toString("utf8") : "";
   } finally {
     fs.closeSync(fd);
   }
 }
+const binCliOf = (file = asar) => bundleOf("binCli", file);
+
+// The Antigravity limits probe: in the runtime bundle up to 12 Nov, in the server bundle from 13 Nov.
+const UA_MARK = "`antigravity/hub/";
+const probeTarget = (file = asar) => ["binCli", "delegatedTitles"].filter((t) => bundleOf(t, file).includes(UA_MARK));
 
 function orchestrationSections(text) {
   const ast = acorn.parse(text, { ecmaVersion: "latest", sourceType: "module" });
@@ -87,7 +93,7 @@ function legacyFit(text) {
 }
 
 const statesOf = (out) => Object.fromEntries(Object.entries(out.results).map(([name, r]) => [name, r.state]));
-const freshStates = { wrap: "patched", minWidth: "patched", rule: "patched", fit: "patched", titleGuide: "patched", geminiQuota: K.unitGeminiQuota(binCliOf(pristine)).state, extras: "patched", firstClick: "patched" };
+const freshStates = { wrap: "patched", minWidth: "patched", rule: "patched", fit: "patched", titleGuide: "patched", geminiQuota: bundleOf(probeTarget(pristine)[0], pristine).includes(`${UA_MARK}1.0.0 `) ? "patched" : "already", extras: "patched", firstClick: "patched" };
 
 // ---------- parser-based room making (Astra round 1 fixtures) ----------
 
@@ -561,8 +567,10 @@ function titleFunctions(patched) {
     } finally { fs.closeSync(fd); }
   }
   const ast = acorn.parse(patched, { ecmaVersion: "latest", sourceType: "module" });
-  const names = ["t3KeeperFitTitle", "subagentThreadTitle", "subagentThreadTitle$t3orig", "threadTitle", "threadTitle$t3orig", "sanitizeThreadTitle", "sanitizeThreadTitle$t3orig", "trimmed$1"];
-  const code = ast.body.filter((n) => n.type === "FunctionDeclaration" && names.includes(n.id.name)).map((n) => patched.slice(n.start, n.end)).join("\n");
+  const names = ["t3KeeperFitTitle", "subagentThreadTitle", "subagentThreadTitle$t3orig", "threadTitle", "threadTitle$t3orig", "sanitizeThreadTitle", "sanitizeThreadTitle$t3orig"];
+  // T3's own trim helper, which subagentThreadTitle calls: the bundler names it trimmed or trimmed$N, changing between builds.
+  const helper = /^trimmed(?:\$\d+)?$/;
+  const code = ast.body.filter((n) => n.type === "FunctionDeclaration" && (names.includes(n.id.name) || helper.test(n.id.name))).map((n) => patched.slice(n.start, n.end)).join("\n");
   const maxDecl = patched.match(/^const MAX_THREAD_TITLE_CHARS = [^;]+;$/m)[0]; // the patched value
   const stubs = maxDecl + " const isSome = (o) => o?._tag === 'Some'; function decodeJsonThreadTitle(raw) { try { const v = JSON.parse(raw); return typeof v?.title === 'string' ? { _tag: 'Some', value: v } : { _tag: 'None' }; } catch { return { _tag: 'None' }; } }\n";
   return vm.runInNewContext(`${stubs}${code}\n({ subagentThreadTitle, threadTitle, sanitizeThreadTitle })`, { Intl });
@@ -839,15 +847,68 @@ for (const boundary of ['afterArchiveRename', 'beforeReminderFinalize']) {
   });
 }
 
-test("geminiQuota: the Antigravity probe sends a version Google returns Gemini buckets for", () => {
-  const before = binCliOf(pristine);
+const uaLine = (version) => `function antigravityUserAgent(platform, architecture) {\nreturn \`antigravity/hub/${version} (aidev_client; os_type=\${platform}; arch=\${architecture}; cl=963137146)\`;\n}\n`;
+
+test("geminiQuota: only the old 1.0.0 version is rewritten; T3's own 2.24.0 or newer is left alone", () => {
+  const old = K.unitGeminiQuota(uaLine("1.0.0"));
+  assert.equal(old.state, "patched");
+  assert.equal(old.text, uaLine("2.24.0"));
+  for (const version of ["2.24.0", "2.24.7", "2.31.0", "3.0.1"]) {
+    assert.deepEqual(K.unitGeminiQuota(uaLine(version)), { state: "already", text: uaLine(version) }, version);
+  }
+  for (const version of ["1.0.1", "1.9.0", "2.23.9", "0.0.0"]) {
+    assert.throws(() => K.unitGeminiQuota(uaLine(version)), /not known to return the Gemini rows/, version);
+  }
+  assert.throws(() => K.unitGeminiQuota("const ua = `other`;"), /found 0 times/);
+  assert.throws(() => K.unitGeminiQuota(uaLine("1.0.0") + uaLine("2.24.0")), /found 2 times/);
+});
+
+test("geminiQuota: this build's probe is found in one server bundle and comes out sending 2.24.0 or newer", () => {
+  const where = probeTarget(pristine);
+  assert.equal(where.length, 1, `probe found in ${JSON.stringify(where)}`);
+  const before = bundleOf(where[0], pristine);
+  const state = K.inspect(pristine).results.geminiQuota;
+  assert.deepEqual(state, { state: before.includes(`${UA_MARK}1.0.0 `) ? "patched" : "already" });
+  if (state.state === "already") {
+    assert.match(before, /`antigravity\/hub\/(?:2\.(?:2[4-9]|[3-9]\d|\d{3,})|[3-9]|\d{2,})[\d.]* \(aidev_client;/);
+    fresh();
+    K.apply({ reason: "test" });
+    assert.equal(bundleOf(where[0]).split(UA_MARK).length, 2);
+    assert.equal(bundleOf(where[0]).match(/`antigravity\/hub\/[\d.]+ /)[0], before.match(/`antigravity\/hub\/[\d.]+ /)[0], "T3's own version is kept");
+  }
+});
+
+test("geminiQuota: an older runtime bundle with 1.0.0 is rewritten and keeps its byte length", () => {
+  const runtime = binCliOf(pristine);
+  const before = runtime.includes(UA_MARK) ? runtime.replace(/`antigravity\/hub\/[\d.]+ /, () => `${UA_MARK}1.0.0 `) : `${runtime}\n${uaLine("1.0.0")}`;
   const out = K.unitGeminiQuota(before);
-  assert.equal(out.state, before.includes("`antigravity/hub/2.24.0") ? "already" : "patched");
-  assert.ok(out.text.includes("`antigravity/hub/2.24.0 (aidev_client;") && !out.text.includes("antigravity/hub/1.0.0"));
+  assert.equal(out.state, "patched");
+  assert.ok(out.text.includes(`${UA_MARK}2.24.0 (aidev_client;`) && !out.text.includes("antigravity/hub/1.0.0"));
   assert.equal(K.unitGeminiQuota(out.text).state, "already");
   const balanced = K.finishBinCli(out.text, Buffer.byteLength(before), false);
   assert.equal(Buffer.byteLength(balanced), Buffer.byteLength(before));
-  assert.throws(() => K.unitGeminiQuota("const ua = `other`;"), /found 0 times/);
+  assert.ok(balanced.includes(`${UA_MARK}2.24.0 (aidev_client;`));
+});
+
+test("geminiQuota: the old version in the server bundle is reported, never half-patched", { skip: probeTarget(pristine)[0] !== "delegatedTitles" && "this build keeps the probe in the runtime bundle" }, () => {
+  fresh();
+  const fd = fs.openSync(asar, "r+");
+  try {
+    const layout = K.readLayout(fd), rel = K.findTargets(fd, layout).delegatedTitles;
+    const server = K.readEntry(fd, layout, rel).toString("utf8");
+    // Same byte length: the shorter version, padded inside the User-Agent text.
+    const stale = server.replace(/`antigravity\/hub\/([\d.]+) \(aidev_client;/, (all, v) => `${UA_MARK}1.0.0 (aidev_client;${" ".repeat(v.length - 5)}`);
+    assert.equal(Buffer.byteLength(stale), Buffer.byteLength(server));
+    assert.notEqual(stale, server);
+    K.writeEntries(fd, layout, [{ rel, buf: Buffer.from(stale) }]);
+  } finally {
+    fs.closeSync(fd);
+  }
+  const out = K.inspect(asar);
+  assert.equal(out.results.geminiQuota.state, "failed");
+  assert.match(out.results.geminiQuota.error, /server bundle sends the old version/);
+  for (const [name, r] of Object.entries(out.results)) if (name !== "geminiQuota") assert.equal(r.state, "patched", name);
+  assert.ok(!out.files.delegatedTitles || !out.files.delegatedTitles.buf.toString("utf8").includes(`${UA_MARK}2.24.0`));
 });
 
 test("shared minimum clamp keeps all clamps bound to one minimum and refuses drift", () => {
