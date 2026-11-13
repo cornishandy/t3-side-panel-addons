@@ -89,3 +89,88 @@ export function probeFooterLifecycle(sourcePath = new URL('../public/extras.js',
 }
 
 if (!process.env.T3X_FOOTER_LIFECYCLE_PROBE_ONLY) test('footer team list: actual teardown releases guards before a new start-open instance uses the same button', () => probeFooterLifecycle());
+
+function loadWithTeardown(sourcePath = new URL('../public/extras.js', import.meta.url)) {
+  const source = fs.readFileSync(sourcePath, 'utf8');
+  const start = source.indexOf('  W.t3xTeardown = () => {');
+  const terminator = '    delete W.t3xTeardown;\n  };';
+  const end = source.indexOf(terminator, start);
+  const teardown = source.slice(start, end + terminator.length);
+  const earlyReturn = '    W.__T3X_TEST__.core = core;\n    return;';
+  const instrumented = source.replace(earlyReturn, `
+    W.__T3X_TEST__.core = core;
+    (() => {
+      let disposed = false, routeToken = 0, inflight = null, rafId = 0;
+      const requests = new Set(), t3Pending = new Set(), cleanups = [], timers = new Set();
+      const features = {}, OWN = 'data-t3x', ROOT_ATTRS = [], ROLE = {}, roleFaces = {};
+      const D = { querySelectorAll: () => [], documentElement: { removeAttribute() {} }, fonts: { delete() {} } };
+      const teardownVisualization = () => {}, closePopover = () => {}, endInspector = () => {};
+      const closeFontWorkspace = () => {}, closeFontPreviews = () => {};
+      ${teardown}
+    })();
+    return;`);
+  const window = { __T3X_TEST__: {} };
+  vm.runInContext(instrumented, vm.createContext({ window }));
+  return window;
+}
+
+if (!process.env.T3X_FOOTER_LIFECYCLE_PROBE_ONLY) test('footer made list: actual teardown releases an always-open guard', () => {
+  const window = loadWithTeardown();
+  const core = window.__T3X_TEST__.core;
+  let open = true;
+  const button = new EventTarget();
+  const details = {
+    nodeType: 1,
+    getAttribute: (name) => name === 'data-markdown-details-open' ? String(open) : name === 'data-message-id' ? 'msg-1' : null,
+    querySelector: () => button,
+    closest: () => ({ getAttribute: (name) => name === 'data-message-role' ? 'assistant' : 'msg-1' }),
+    addEventListener() {},
+    contains: () => false,
+  };
+  button.textContent = 'Made so far · 2:';
+  const root = { querySelectorAll: selector => selector === core.FOOTER_MADE ? [details] : [] };
+  const state = { choices: new Map(), auto: new Set(), settling: new Set(), settleNode: new Map(), pendingEl: new WeakMap(), gesture: new WeakMap(), threadId: 'thread-a', newestId: 'msg-1', laneWide: () => true };
+  assert.equal(core.madePass(root, 'always-open', state), 0, 'an open list needs no click');
+  const send = (type, key) => {
+    const event = new Event(type, { cancelable: true });
+    if (key !== undefined) Object.defineProperty(event, 'key', { value: key });
+    button.dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+  assert.equal(send('keydown', 'Enter'), true);
+  assert.equal(send('keyup', ' '), true);
+  window.t3xTeardown();
+  assert.equal(send('keydown', 'Enter'), false, 'the old guard is inert');
+  assert.equal(send('keyup', ' '), false);
+});
+
+if (!process.env.T3X_FOOTER_LIFECYCLE_PROBE_ONLY) test('footer made list: a lane that left the document releases its observer and registration', () => {
+  const source = fs.readFileSync(new URL('../public/extras.js', import.meta.url), 'utf8');
+  const body = source.slice(source.indexOf('  function watchMadeLanes(root) {'), source.indexOf('  let macToken = 0;'));
+  assert.ok(body.includes('function watchMadeLanes'), 'production watchMadeLanes found');
+  const ctx = vm.createContext({ assert });
+  vm.runInContext(`
+    const laneWatchers = new WeakMap(), cleanups = [], live = new Set();
+    const FOOTER_MADE = 'made', styleForLane = () => ({ containerName: 't3x-lane' }), rerunMade = () => {};
+    class ResizeObserver { constructor(fn) { this.fn = fn; live.add(this); } observe(node) { this.node = node; } disconnect() { this.node = null; live.delete(this); } }
+    ${body}
+    for (let i = 0; i < 100; i++) {
+      const node = { nodeType: 1, isConnected: true };
+      watchMadeLanes({ querySelectorAll: () => [node] });
+      assert.equal(live.size, 1, 'a connected lane is watched once');
+      watchMadeLanes({ querySelectorAll: () => [node] });
+      assert.equal(live.size, 1, 'a second pass does not watch it again');
+      node.isConnected = false;
+      watchMadeLanes({ querySelectorAll: () => [] });
+    }
+    assert.equal(live.size, 0, 'no observer is left for removed lanes');
+    assert.equal(cleanups.length, 0, 'no cleanup closure is left for removed lanes');
+    const kept = { nodeType: 1, isConnected: true };
+    watchMadeLanes({ querySelectorAll: () => [kept] });
+    watchMadeLanes({ querySelectorAll: () => [kept] });
+    assert.equal(live.size, 1, 'a lane still in the document keeps its observer');
+    assert.equal(cleanups.length, 1);
+    for (const cleanup of cleanups.splice(0)) cleanup();
+    assert.equal(live.size, 0, 'teardown still disconnects what is left');
+  `, ctx);
+});

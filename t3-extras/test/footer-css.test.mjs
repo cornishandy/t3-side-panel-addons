@@ -10,7 +10,8 @@ const start = css.indexOf("/* ---------- reply footer card ----------");
 const block = css.slice(start);
 const code = block.replace(/\/\*[\s\S]*?\*\//g, "");
 const GUARD = '.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3))';
-const TEAM = GUARD + " + div:has(> [data-markdown-details])";
+const MADE = GUARD + ' + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])';
+const TEAM = ':is(' + GUARD + ', ' + MADE + ') + div:has(> [data-markdown-details]):not(:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"]))';
 
 test("footer block is present and last", () => {
   assert.ok(start > 0, "footer block missing");
@@ -34,16 +35,20 @@ test("the rules' hooks are styled: verdict, running, failed, over, saved, done, 
   assert.match(quiet, /\.chat-markdown ins \{ text-decoration: none; \}/, "action words stay plain outside the open-item row");
 });
 
-test("the team list targets T3's collapsible, and the ✦ switch's modes are wired", () => {
+test("the team list and the Made list target T3's collapsible, and the ✦ switches are wired", () => {
   assert.ok(code.includes(TEAM + " {"), "team list rule");
+  assert.ok(code.includes(MADE + " {"), "made list rule");
   assert.ok(!/(^|[\s,>+~(])details\b/.test(code), "T3 renders <details> as its own collapsible, so no rule may target details");
   assert.ok(code.includes(`html[data-t3x-footer-team="always-hide"] ${TEAM} { display: none; }`));
   assert.ok(code.includes(`html[data-t3x-footer-team="always-show"] ${TEAM} [data-markdown-details-summary] { pointer-events: none;`));
+  assert.ok(code.includes(`html[data-t3x-footer-made="hide"] ${MADE} { display: none; }`));
+  assert.ok(code.includes(`html[data-t3x-footer-made="always-open"] ${MADE} [data-markdown-details-summary] { pointer-events: none;`));
+  assert.ok(code.includes(`html[data-t3x-mac-app] ${MADE} [itemprop~="mac-only"] { display: none; }`));
 });
 
 test("no model pills, no !important, no layout outside the footer", () => {
   assert.ok(!/itemprop~="(opus|fable|haiku|sonnet|sol|astra|grok|gemini|flash)"/.test(code), "model pills are gone");
   assert.ok(!code.includes("!important"));
   assert.ok(!/(^|[;}])\s*(body|:root)\b/.test(code));
-  for (const m of code.matchAll(/(^|[;}])\s*html\b([^{]*)\{/g)) assert.match(m[2], /^\[data-t3x-footer-team="[a-z-]+"\] /, "html rule outside the switch");
+  for (const m of code.matchAll(/(^|[;}])\s*html\b([^{]*)\{/g)) assert.match(m[2], /^\[data-t3x-(?:footer-team="[a-z-]+"|footer-made="[a-z-]+"|mac-app)\] /, "html rule outside the switch: " + m[2].slice(0, 60));
 });

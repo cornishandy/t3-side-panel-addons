@@ -563,7 +563,9 @@ test("footer team list: start-folded clicks each footer list once (WeakSet), nev
   for (const mode of ["start-open", "always-hide"]) assert.equal(C.footerPass(root, mode, new WeakSet()), 0, mode);
   assert.equal(C.footerPass(root, "always-show", seen), 2, "switching to always-show opens the folded ones");
   assert.ok([a, b, c].every((x) => x.attrs["data-markdown-details-open"] === "true"));
-  assert.match(C.FOOTER_DETAILS, /^\.chat-markdown > hr:last-of-type \+ \.chat-markdown-table-container:has\(\[itemprop~="settle-yes"\], \[itemprop~="settle-no"\]\) \+ div > \[data-markdown-details\]$/);
+  const madeWrap = C.FOOTER_CARD + ' + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])';
+  assert.equal(C.FOOTER_MADE, madeWrap + " > [data-markdown-details]");
+  assert.equal(C.FOOTER_DETAILS, ":is(" + C.FOOTER_CARD + ", " + madeWrap + ') + div:has(> [data-markdown-details]):not(:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) > [data-markdown-details]');
 });
 
 test("footer team list: saved always-show opens closed lists and new replies on routine passes", () => {
@@ -625,6 +627,393 @@ test("footer team list: installs capture guards once, releases other modes, allo
   el.open = false;
   assert.equal(C.footerPass(root, "always-show", seen), 1, "closed restoration click passes its installed guard");
   btn.click(); assert.equal(el.open, true, "open summary click prevented again");
+});
+
+function madeState(over = {}) {
+  return Object.assign({
+    choices: new Map(), auto: new Set(), held: new Set(), settling: new Set(), settleNode: new Map(),
+    pendingEl: new WeakMap(), gesture: new WeakMap(),
+    threadId: "thread-a", newestId: "msg-1", laneWide: () => true,
+  }, over);
+}
+function madeRoot(made = [], team = []) {
+  return { querySelectorAll: (sel) => (sel === C.FOOTER_MADE ? made : sel === C.FOOTER_DETAILS ? team : []) };
+}
+function madeFold({ id = "msg-1", open = false, summary = "Made so far · 3: 1 page", sync = true } = {}) {
+  const el = { nodeType: 1, clicks: 0, sync, messageId: id, attrs: { "data-markdown-details-open": open ? "true" : "false" }, listeners: { click: [] } };
+  el.getAttribute = (k) => (Object.hasOwn(el.attrs, k) ? el.attrs[k] : null);
+  const btn = {
+    textContent: summary, listeners: {},
+    addEventListener(type, fn, capture) { assert.equal(capture, true); (btn.listeners[type] ||= []).push(fn); },
+    click() { el.clicks++; if (el.sync !== false) el.attrs["data-markdown-details-open"] = el.attrs["data-markdown-details-open"] === "true" ? "false" : "true"; },
+    contains() { return false; },
+  };
+  el.btn = btn;
+  el.querySelector = (sel) => { if (sel === ":scope > [data-markdown-details-summary]") return btn; throw new Error("looked past the summary: " + sel); };
+  el.closest = (sel) => sel === '[data-message-role="assistant"]' ? { getAttribute: (k) => (k === "data-message-role" ? "assistant" : k === "data-message-id" ? el.messageId : null) } : null;
+  el.addEventListener = (type, fn, capture) => { assert.equal(capture, true); el.listeners[type].push(fn); };
+  el.contains = (node) => Boolean(node && node.inside === el);
+  return el;
+}
+function fireSummary(btn, type, key, extra = {}) {
+  const event = Object.assign({ type, key, isTrusted: true, target: null, prevented: false, stopped: false, preventDefault() { this.prevented = true; }, stopImmediatePropagation() { this.stopped = true; } }, extra);
+  for (const fn of btn.listeners[type] || []) fn(event);
+  return event;
+}
+const madeKeyOf = (thread = "thread-a", id = "msg-1") => thread + "\0" + id;
+
+test("footer made list: four choices, open-short by default, always on <html>, mac flag is not a setting", () => {
+  assert.deepEqual(plain(C.FOOTER_MADE_MODES), [["start-folded", "Start folded"], ["open-short", "Open short lists"], ["always-open", "Always open"], ["hide", "Hide"]]);
+  const d = C.readSettings(null);
+  assert.equal(d.footerMade, "open-short");
+  assert.equal(C.rootAttrs(d)["data-t3x-footer-made"], "open-short");
+  assert.equal(Object.hasOwn(C.rootAttrs(d), "data-t3x-mac-app"), false);
+  assert.equal(C.readSettings(JSON.stringify({ footerMade: "hide" })).footerMade, "hide");
+  assert.equal(C.readSettings(JSON.stringify({ footerMade: "always-open" })).footerMade, "always-open");
+  assert.equal(C.readSettings(JSON.stringify({ footerMade: "sideways" })).footerMade, "open-short");
+  assert.equal(C.rootAttrs(C.readSettings(JSON.stringify({ footerMade: "start-folded" })))["data-t3x-footer-made"], "start-folded");
+  assert.equal(src.includes('text: "Footer Made so far list"'), true);
+  assert.equal(src.includes('"aria-label": "Footer Made so far list"'), true);
+});
+
+test("footer made list: count parses only a finished Made so far · N:", () => {
+  assert.equal(C.madeCount(madeFold({ summary: "Made so far · 5: 2 pages" })), 5);
+  assert.equal(C.madeCount(madeFold({ summary: "Made so far · 0:" })), 0);
+  assert.equal(C.madeCount(madeFold({ summary: "Made so far · 14: 3 pages, 3 audio, 8 visuals" })), 14);
+  for (const summary of ["Made so far · 5", "Made so far ·", "Made so far", ""]) assert.equal(C.madeCount(madeFold({ summary })), null, summary);
+});
+
+test("footer made list: open-short opens five or fewer on the newest wide reply only", () => {
+  const five = madeFold({ summary: "Made so far · 5: pages" });
+  const st = madeState();
+  assert.equal(C.madePass(madeRoot([five]), "open-short", st), 1);
+  assert.equal(five.attrs["data-markdown-details-open"], "true");
+  assert.ok(st.auto.has(madeKeyOf()));
+  const six = madeFold({ summary: "Made so far · 6: pages" });
+  assert.equal(C.madePass(madeRoot([six]), "open-short", madeState()), 0);
+  assert.equal(six.clicks, 0);
+  const older = madeFold({ id: "older", summary: "Made so far · 1:" });
+  assert.equal(C.madePass(madeRoot([older]), "open-short", madeState({ newestId: "msg-1" })), 0);
+  const narrow = madeFold({ summary: "Made so far · 1:" });
+  assert.equal(C.madePass(madeRoot([narrow]), "open-short", madeState({ laneWide: () => false })), 0);
+  assert.equal(C.madePass(madeRoot([madeFold()]), "open-short", madeState({ laneWide: null })), 0);
+  assert.equal(C.madePass(madeRoot([madeFold()]), "open-short", madeState({ newestId: null })), 0, "no timeline opens nothing");
+  const none = madeFold();
+  none.closest = () => null;
+  assert.equal(C.madePass(madeRoot([none]), "open-short", madeState()), 0, "no message id opens nothing");
+  assert.equal(C.madePass(madeRoot([madeFold()]), "open-short", madeState({ threadId: null, threadIdOf: () => null })), 0, "not a thread opens nothing");
+  const half = madeFold({ summary: "Made so far · 2", open: false });
+  assert.equal(C.madePass(madeRoot([half]), "open-short", madeState()), 0);
+  assert.equal(C.madePass(madeRoot([half]), "always-open", madeState()), 0, "always-open also waits for · N:");
+});
+
+test("footer made list: a stored choice stays, including across remount, and is per thread", () => {
+  const el = madeFold({ open: true, summary: "Made so far · 2:" });
+  const st = madeState();
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0);
+  fireSummary(el.btn, "click");
+  assert.equal(st.choices.get(madeKeyOf()), "closed");
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0, "waiting on the click");
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0, "still waiting");
+  el.attrs["data-markdown-details-open"] = "false";
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0);
+  assert.equal(el.clicks, 0);
+  const again = madeFold({ open: false, id: "msg-1" });
+  assert.equal(C.madePass(madeRoot([again]), "open-short", st), 0, "stored closed is not reopened");
+  st.choices.set(madeKeyOf(), "open");
+  const folded = madeFold({ open: false });
+  assert.equal(C.madePass(madeRoot([folded]), "start-folded", st), 1, "start-folded still restores a stored open");
+  assert.equal(folded.attrs["data-markdown-details-open"], "true");
+  st.threadId = "thread-b";
+  const other = madeFold({ open: false });
+  assert.equal(C.madePass(madeRoot([other]), "start-folded", st), 0, "thread B does not inherit thread A's choice");
+  st.threadId = "thread-a";
+  const back = madeFold({ open: false });
+  assert.equal(C.madePass(madeRoot([back]), "start-folded", st), 1, "switching back restores");
+});
+
+test("footer made list: a delayed open is restored once on a new element", () => {
+  const el = madeFold({ open: false, sync: false, summary: "Made so far · 2:" });
+  const st = madeState();
+  assert.equal(C.madePass(madeRoot([el]), "start-folded", st), 0);
+  fireSummary(el.btn, "keydown", "Enter");
+  assert.equal(st.choices.get(madeKeyOf()), "open");
+  fireSummary(el.btn, "click");
+  assert.equal(st.choices.get(madeKeyOf()), "open", "the same gesture's click is not stored twice");
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0);
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0);
+  assert.equal(el.clicks, 0);
+  el.attrs["data-markdown-details-open"] = "true";
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0);
+  const remount = madeFold({ open: false, id: "msg-1" });
+  assert.equal(C.madePass(madeRoot([remount]), "start-folded", st), 1);
+  assert.equal(remount.clicks, 1);
+});
+
+test("footer made list: an add-on opening is folded back once when it stops qualifying, then can open again", () => {
+  const el = madeFold({ summary: "Made so far · 2:" });
+  const st = madeState();
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1);
+  st.newestId = "msg-2";
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "newer reply folds it");
+  assert.equal(el.attrs["data-markdown-details-open"], "false");
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0, "folded back only once");
+  st.newestId = "msg-1";
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "it opens again when it is newest");
+  el.btn.textContent = "Made so far · 8: pages";
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "a count past five folds it");
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0);
+  el.btn.textContent = "Made so far · 4:";
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "a short count opens it again");
+  st.laneWide = () => false;
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "a narrow lane folds it");
+  assert.equal(el.attrs["data-markdown-details-open"], "false");
+  const slow = madeFold({ summary: "Made so far · 1:", sync: false });
+  const slowState = madeState();
+  assert.equal(C.madePass(madeRoot([slow]), "open-short", slowState), 1);
+  assert.equal(C.madePass(madeRoot([slow]), "open-short", slowState), 0, "the open click is not repeated");
+  assert.ok(slowState.auto.has(madeKeyOf()));
+  slow.attrs["data-markdown-details-open"] = "true";
+  slow.sync = true;
+  slowState.laneWide = () => false;
+  assert.equal(C.madePass(madeRoot([slow]), "open-short", slowState), 1, "fold-back still happens after the late open");
+  const streaming = madeFold({ open: true, summary: "Made so far · 2:" });
+  const streamState = madeState();
+  streamState.auto.add(madeKeyOf());
+  streaming.btn.textContent = "Made so far ·";
+  assert.equal(C.madePass(madeRoot([streaming]), "open-short", streamState), 0, "a half summary is not clicked");
+  assert.equal(streaming.clicks, 0);
+  assert.ok(streamState.auto.has(madeKeyOf()));
+});
+
+test("footer made list: always-open, hide, and start-folded", () => {
+  const el = madeFold({ open: false, summary: "Made so far · 9:" });
+  const st = madeState();
+  assert.equal(C.madePass(madeRoot([el]), "always-open", st), 1);
+  assert.equal(el.attrs["data-markdown-details-open"], "true");
+  for (const [type, key] of [["keydown", "Enter"], ["keyup", " "], ["keydown", " "], ["keyup", "Spacebar"], ["click", undefined]]) {
+    const event = fireSummary(el.btn, type, key);
+    assert.equal(event.prevented, true, type + " " + key);
+    assert.equal(event.stopped, true, type);
+  }
+  assert.equal(st.choices.size, 0, "a blocked gesture is not stored");
+  el.attrs["data-markdown-details-open"] = "false";
+  const restore = fireSummary(el.btn, "click");
+  assert.equal(restore.prevented, false, "a closed fold can still be clicked");
+  assert.equal(C.madePass(madeRoot([el]), "hide", st), 0);
+  assert.equal(el.clicks, 1, "hide clicks nothing");
+  const released = fireSummary(el.btn, "keydown", "Enter");
+  assert.equal(released.prevented, false, "hide releases the always-open guard");
+  const fresh = madeFold({ open: true, summary: "Made so far · 1:" });
+  assert.equal(C.madePass(madeRoot([fresh]), "start-folded", madeState()), 0);
+  assert.equal(C.madePass(madeRoot([madeFold({ open: false })]), "start-folded", madeState()), 0);
+});
+
+test("footer made list: team and Made passes never click each other's fold", () => {
+  const made = madeFold({ open: false, summary: "Made so far · 1:" });
+  const team = { clicks: 0, open: false, getAttribute: () => String(team.open), querySelector: () => ({ addEventListener() {}, click() { team.open = !team.open; team.clicks++; } }) };
+  const both = madeRoot([made], [team]);
+  assert.equal(C.footerPass(both, "always-show", new WeakSet()), 1);
+  assert.equal(team.clicks, 1);
+  assert.equal(made.clicks, 0);
+  assert.equal(C.madePass(both, "always-open", madeState()), 1);
+  assert.equal(made.clicks, 1);
+  assert.equal(team.clicks, 1);
+  assert.equal(C.footerPass(both, "always-hide", new WeakSet()), 0);
+  assert.equal(made.clicks, 1, "always-hide leaves Made");
+  const only = madeFold({ summary: "Made so far · 2:" });
+  const solo = madeRoot([only]);
+  assert.equal(C.footerPass(solo, "always-show", new WeakSet()), 0, "a footer with no team list");
+  assert.equal(C.madePass(solo, "open-short", madeState()), 1);
+  for (const open of [false, true]) {
+    const panel = madeFold({ open, summary: "Made so far · 1:" });
+    assert.equal(C.madePass(madeRoot([panel]), open ? "start-folded" : "open-short", madeState()), open ? 0 : 1);
+    assert.equal(panel.clicks, open ? 0 : 1);
+  }
+});
+
+const madeLinkClick = (el, extra = {}) => {
+  const link = { inside: el, closest: (sel) => (sel === "a" ? link : null) };
+  el.listeners.click[0](Object.assign({ type: "click", isTrusted: true, target: link }, extra));
+};
+
+test("footer made list: a link click in a list the add-on opened holds it open while that reply is newest", () => {
+  const el = madeFold({ summary: "Made so far · 4:" });
+  const st = madeState();
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "the add-on opens it");
+  madeLinkClick(el);
+  assert.equal(st.held.has(madeKeyOf()), true);
+  assert.equal(st.choices.size, 0, "a hold is not his choice");
+  st.laneWide = () => false;
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0, "a narrower pane does not fold it");
+  assert.equal(el.attrs["data-markdown-details-open"], "true");
+  const redrawn = madeFold({ summary: "Made so far · 4:" });
+  assert.equal(C.madePass(madeRoot([redrawn]), "open-short", st), 1, "a redraw in the narrow pane opens it again");
+  assert.equal(redrawn.attrs["data-markdown-details-open"], "true");
+  redrawn.btn.textContent = "Made so far · 8: pages";
+  assert.equal(C.madePass(madeRoot([redrawn]), "open-short", st), 1, "the hold waives only the width test: a count past five still folds");
+  redrawn.btn.textContent = "Made so far · 4:";
+  assert.equal(C.madePass(madeRoot([redrawn]), "open-short", st), 1);
+  st.newestId = "msg-2";
+  assert.equal(C.madePass(madeRoot([redrawn]), "open-short", st), 1, "a newer reply folds it like any older reply");
+  assert.equal(redrawn.attrs["data-markdown-details-open"], "false");
+  assert.equal(C.madePass(madeRoot([redrawn]), "open-short", st), 0, "folded once");
+  assert.equal(st.held.has(madeKeyOf()), true, "the hold is kept per message for the session");
+  assert.equal(st.choices.size, 0);
+});
+
+test("footer made list: a held list redrawn closed on the same node, before any pass saw it open, opens again", () => {
+  const el = madeFold({ summary: "Made so far · 3:" });
+  const st = madeState();
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "the add-on opens it");
+  madeLinkClick(el);
+  el.attrs["data-markdown-details-open"] = "false";
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "the redraw is undone in the next pass");
+  assert.equal(el.attrs["data-markdown-details-open"], "true");
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0);
+  assert.equal(st.choices.size, 0);
+});
+
+test("footer made list: a link click while a fold-back is still landing does not queue a second toggle", () => {
+  const el = madeFold({ summary: "Made so far · 3:" });
+  const st = madeState();
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "the add-on opens it");
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0);
+  el.sync = false;
+  st.newestId = "msg-2";
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "a newer reply: one fold-back click, not landed yet");
+  madeLinkClick(el);
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0, "no second toggle while the first is in flight");
+  assert.equal(el.clicks, 2, "one open and one fold-back in all");
+  el.attrs["data-markdown-details-open"] = "false";
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0, "once it lands the older reply's list stays folded");
+  assert.equal(el.attrs["data-markdown-details-open"], "false");
+});
+
+test("footer made list: a fold-back still landing is never forgotten, so a newer reply cannot queue a second toggle", () => {
+  for (const withLink of [false, true]) {
+    const el = madeFold({ summary: "Made so far · 3:" });
+    const st = madeState();
+    assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "the add-on opens it");
+    assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0);
+    el.sync = false;
+    st.laneWide = () => false;
+    assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "the pane narrows: one fold-back click, not landed yet");
+    if (withLink) madeLinkClick(el); else st.laneWide = () => true;
+    assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0, "it qualifies again; the fold-back is still in flight");
+    st.newestId = "msg-2";
+    assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0, "a newer reply queues no second toggle");
+    assert.equal(el.clicks, 2, "one open and one fold-back in all");
+    el.attrs["data-markdown-details-open"] = "false";
+    assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0, "the fold-back lands and the older reply's list stays folded");
+    assert.equal(el.attrs["data-markdown-details-open"], "false");
+  }
+});
+
+test("footer made list: a fold-back that lands on a list that qualifies again is undone in the next pass", () => {
+  const el = madeFold({ summary: "Made so far · 3:" });
+  const st = madeState();
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1);
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0);
+  el.sync = false;
+  st.laneWide = () => false;
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "fold-back queued");
+  madeLinkClick(el);
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0);
+  el.attrs["data-markdown-details-open"] = "false";
+  el.sync = true;
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 1, "held and still newest: it opens again");
+  assert.equal(el.attrs["data-markdown-details-open"], "true");
+  assert.equal(C.madePass(madeRoot([el]), "open-short", st), 0);
+});
+
+test("footer made list: a link click changes nothing in a list he opened or closed himself, and his toggle ends a hold", () => {
+  const mine = madeFold({ open: false, summary: "Made so far · 4:" });
+  const st = madeState();
+  assert.equal(C.madePass(madeRoot([mine]), "start-folded", st), 0);
+  madeLinkClick(mine);
+  assert.equal(st.choices.size, 0, "no choice is invented for a list the add-on did not open");
+  assert.equal(st.held.size, 0);
+  assert.equal(C.madePass(madeRoot([mine]), "start-folded", st), 0);
+  fireSummary(mine.btn, "click");
+  mine.btn.click();
+  assert.equal(st.choices.get(madeKeyOf()), "open");
+  madeLinkClick(mine);
+  assert.equal(st.choices.get(madeKeyOf()), "open", "his own open stays his");
+  assert.equal(st.held.size, 0);
+
+  const auto = madeFold({ summary: "Made so far · 2:" });
+  const st2 = madeState();
+  assert.equal(C.madePass(madeRoot([auto]), "open-short", st2), 1);
+  madeLinkClick(auto, { isTrusted: false });
+  assert.equal(st2.held.size, 0, "an untrusted click holds nothing");
+  madeLinkClick(auto);
+  assert.equal(st2.held.has(madeKeyOf()), true);
+  fireSummary(auto.btn, "click");
+  auto.btn.click();
+  assert.equal(st2.choices.get(madeKeyOf()), "closed", "closing it himself is his choice");
+  assert.equal(st2.held.has(madeKeyOf()), false, "and ends the hold");
+  st2.laneWide = () => true;
+  assert.equal(C.madePass(madeRoot([auto]), "open-short", st2), 0, "it stays closed");
+  assert.equal(auto.attrs["data-markdown-details-open"], "false");
+});
+
+test("footer made list: a link in the summary is the toggle; the add-on's own click is not his", () => {
+  const summaryLink = madeFold({ open: true });
+  const quiet = madeState();
+  C.madePass(madeRoot([summaryLink]), "open-short", quiet);
+  summaryLink.btn.contains = () => true;
+  const inside = { inside: summaryLink, closest: (sel) => (sel === "a" ? inside : null) };
+  summaryLink.listeners.click[0]({ type: "click", isTrusted: true, target: inside });
+  assert.equal(quiet.choices.size, 0, "a link in the summary is the toggle, not a use of the list");
+  summaryLink.btn.listeners.click[0]({ type: "click", isTrusted: false, preventDefault() {}, stopImmediatePropagation() {} });
+  assert.equal(quiet.choices.size, 0, "an untrusted click is the add-on's");
+});
+
+test("footer made list: newest reply is the last assistant in the timeline, not DOM order or id order", () => {
+  const data = [
+    { id: "z", kind: "message", message: { id: "z-user", role: "user" } },
+    { id: "m", kind: "message", message: { id: "early", role: "assistant" } },
+    { id: "w", kind: "work" },
+    { id: "a", kind: "message", message: { id: "late", role: "assistant" } },
+  ];
+  assert.equal(C.newestAssistantId(data), "late");
+  assert.equal(C.newestAssistantId([]), null);
+  assert.equal(C.newestAssistantId(null), null);
+  assert.equal(C.newestAssistantId([{ id: "w", kind: "work" }]), null);
+  const list = { memoizedProps: { data, keyExtractor: (row) => row.id }, return: null };
+  const row = { memoizedProps: {}, return: list };
+  assert.equal(C.timelineFromFiber(row, "early"), data);
+  assert.equal(C.timelineFromFiber(row, "missing"), null);
+  const bad = { memoizedProps: { data, keyExtractor: () => "nope" }, return: null };
+  assert.equal(C.timelineFromFiber({ memoizedProps: {}, return: bad }, "late"), null);
+  const host = { __reactFiber$abc: row, closest() { return host; }, getAttribute() { return "late"; } };
+  assert.equal(C.hostNewestId({ querySelector: () => host }), "late");
+  assert.equal(C.readHostTimeline({ querySelector: () => null }), null);
+  assert.equal(C.hostNewestId({ querySelector: () => ({ closest() { return null; } }) }), null);
+});
+
+test("footer made list: lane width is the t3x-lane content box, and the Mac app is only darwin from the bridge", async () => {
+  const up = (styles) => {
+    const nodes = styles.map((style) => ({ nodeType: 1, style }));
+    nodes.forEach((node, i) => { node.parentElement = nodes[i + 1] || null; });
+    return nodes[0];
+  };
+  const read = (node) => node.style;
+  assert.equal(C.laneIsWide(up([{ containerName: "" }, { containerName: "t3x-lane extra", contentWidth: 480, rem: 16 }]), read), true);
+  assert.equal(C.laneIsWide(up([{ containerName: "t3x-lane", contentWidth: 479, rem: 16 }]), read), false);
+  assert.equal(C.laneIsWide(up([{ containerName: "chat", contentWidth: 800, rem: 16 }]), read), null);
+  assert.equal(C.laneIsWide(up([{ containerName: "t3x-lane", contentWidth: 480, rem: 16 }]), null), null);
+  assert.equal(C.laneIsWide(up([{ containerName: "t3x-lane", contentWidth: 480, rem: 16 }]), () => { throw new Error("no style"); }), null);
+  assert.equal(C.macAppOn("darwin"), true);
+  assert.equal(C.macAppOn("Darwin"), false);
+  assert.equal(C.macAppOn("MacIntel"), false);
+  assert.equal(await C.readMacPlatform({ getClientPlatform() { return "darwin"; } }), "darwin");
+  assert.equal(await C.readMacPlatform({ getClientPlatform() { return Promise.resolve("win32"); } }), "win32");
+  assert.equal(await C.readMacPlatform({ getClientPlatform() { throw new Error("missing"); } }), null);
+  assert.equal(await C.readMacPlatform({ getClientPlatform() { return Promise.reject(new Error("missing")); } }), null);
+  assert.equal(await C.readMacPlatform(undefined), null);
+  assert.equal(await C.readMacPlatform({}), null);
 });
 
 test("forecast boundary states: no usage, zero elapsed, limit reached, stale, expired, future start", () => {

@@ -102,6 +102,7 @@
     popMove: true, // popups drag by their top bar and reopen there; Fonts skips the dark wash and offers a small card
     popSpots: Object.freeze({}), // each moved popup's spot, from the window edges nearest it (see readSpots)
     footerTeam: "start-open", // the reply footer's team list: always-show | start-open | start-folded | always-hide
+    footerMade: "open-short", // the reply footer's Made so far list: start-folded | open-short | always-open | hide
     fontTargets: Object.freeze({ composer: true, quotes: true, projects: true, pills: true, headings: true, replies: true, mine: true, ...Object.fromEntries(INTERFACE_TARGETS.map(([key]) => [key, false])) }),
   });
   const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "printOnly", "showPartly", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen", "popMove"];
@@ -121,6 +122,13 @@
     ["start-open", "Start open, click to fold"],
     ["start-folded", "Start folded, click to open"],
     ["always-hide", "Always hide"],
+  ];
+  // Andy's four choices for the Made so far list, in panel order. open-short is the default.
+  const FOOTER_MADE_MODES = [
+    ["start-folded", "Start folded"],
+    ["open-short", "Open short lists"],
+    ["always-open", "Always open"],
+    ["hide", "Hide"],
   ];
   // Round 1's four presets, as heading + body families.
   const LEGACY_PRESETS = { "3A": ["Caveat", "Kalam"], "3B": ["Noteworthy", "Bradley Hand"], "3C": ["Architects Daughter", "Patrick Hand"], "3D": ["SignPainter", "Chalkboard SE"] };
@@ -283,6 +291,7 @@
     for (const k of BOOL_KEYS) if (typeof s[k] === "boolean") out[k] = s[k];
     if (MARKERS.includes(s.marker)) out.marker = s.marker;
     if (FOOTER_TEAM.some(([v]) => v === s.footerTeam)) out.footerTeam = s.footerTeam;
+    if (FOOTER_MADE_MODES.some(([v]) => v === s.footerMade)) out.footerMade = s.footerMade;
     if (OLDER_AFTER.some(([v]) => v === s.olderAfter)) out.olderAfter = s.olderAfter;
     if (TITLE_LINES.includes(s.titleLines)) out.titleLines = s.titleLines;
     out.popSpots = readSpots(s.popSpots);
@@ -1097,11 +1106,16 @@
     return out;
   }
 
-  // ---------- reply footer: the team list's fold state ----------
-  // T3 renders <details> as its own collapsible (open state in React), so folding means clicking
-  // its summary button. Only the collapsible right after the footer's verdict table, after a
-  // reply's last rule; no other collapsible is touched, and no attribute is set on T3's elements.
-  const FOOTER_DETAILS = '.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]) + div > [data-markdown-details]';
+  // ---------- reply footer: the team list and the Made so far list ----------
+  // T3 renders <details> as its own collapsible (open state in React, attribute
+  // data-markdown-details-open). Folding means clicking its summary button. The Made fold is the
+  // collapsible right after the three-column verdict card whose summary carries itemprop=made;
+  // the team fold is the collapsible after the card or after Made, without that hook. Nothing else
+  // is clicked, and no attribute is set on T3's elements.
+  const FOOTER_CARD = '.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3))';
+  const FOOTER_MADE_WRAP = FOOTER_CARD + ' + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])';
+  const FOOTER_MADE = FOOTER_MADE_WRAP + ' > [data-markdown-details]';
+  const FOOTER_DETAILS = ':is(' + FOOTER_CARD + ', ' + FOOTER_MADE_WRAP + ') + div:has(> [data-markdown-details]):not(:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) > [data-markdown-details]';
   const footerControls = new WeakMap();
   let footerControlsActive = true; // Old direct listeners become inert on loader replacement.
   // Capture before T3's delegated handlers: preventing activation keeps the panel mounted
@@ -1145,7 +1159,330 @@
     return clicks;
   }
 
-  /** The <html> attributes for the CSS-only parts (the footer team mode is always set). */
+  // Session memory for the Made list. Keys are thread id + message id. Our own clicks are
+  // untrusted, so they never land in `choices`. A missing timeline or thread id fails closed.
+  // `held` marks a list we opened in which he then clicked a link: it stays ours (not a choice),
+  // and only the width test is waived for it, so it still folds once a newer reply arrives.
+  const madeSession = {
+    choices: new Map(), auto: new Set(), held: new Set(), settling: new Set(), settleNode: new Map(),
+    pendingEl: new WeakMap(), gesture: new WeakMap(), linkWired: new WeakSet(),
+  };
+  let madeBag = madeSession;
+  const madeControls = new WeakMap();
+  const MADE_SUMMARY = ":scope > [data-markdown-details-summary]";
+
+  function madeOpen(el) {
+    return el.getAttribute("data-markdown-details-open") === "true";
+  }
+  function madeSummary(el) {
+    return el.querySelector ? el.querySelector(MADE_SUMMARY) : null;
+  }
+  /** The count only when the summary has a finished "Made so far · N:". A half-written summary counts as unknown. */
+  function madeCount(el) {
+    const btn = madeSummary(el);
+    const text = btn && btn.textContent != null ? String(btn.textContent) : "";
+    const m = /Made so far\s*·\s*(\d+)\s*:/.exec(text);
+    return m ? Number(m[1]) : null;
+  }
+  function madeMessageId(el) {
+    try {
+      const row = el && el.closest ? el.closest('[data-message-role="assistant"]') : null;
+      if (!row || row.getAttribute("data-message-role") !== "assistant") return null;
+      const id = row.getAttribute("data-message-id");
+      return id ? String(id) : null;
+    } catch {
+      return null;
+    }
+  }
+  function madeThreadId(bag) {
+    try {
+      if (bag && typeof bag.threadIdOf === "function") {
+        const id = bag.threadIdOf();
+        return id ? String(id) : null;
+      }
+    } catch {
+      return null;
+    }
+    return bag && bag.threadId ? String(bag.threadId) : null;
+  }
+  function madeKey(bag, el) {
+    const threadId = madeThreadId(bag);
+    const messageId = madeMessageId(el);
+    return threadId && messageId ? threadId + "\0" + messageId : null;
+  }
+  function isTimelineRow(item) {
+    return !!item && typeof item === "object" && typeof item.kind === "string" && Object.prototype.hasOwnProperty.call(item, "id");
+  }
+  /** Last assistant message in T3's timeline array. Messages without a footer still count. Null when there is none. */
+  function newestAssistantId(data) {
+    if (!Array.isArray(data)) return null;
+    for (let i = data.length - 1; i >= 0; i--) {
+      const item = data[i];
+      const message = item && item.kind === "message" ? item.message : null;
+      if (message && message.role === "assistant" && message.id != null && message.id !== "") return String(message.id);
+    }
+    return null;
+  }
+  /** Walk up from a rendered row's React fiber to the virtual list whose `data` is the whole timeline. */
+  function timelineFromFiber(fiber, messageId) {
+    let withAssistant = null;
+    for (let f = fiber, hops = 0; f && hops < 400; f = f.return, hops++) {
+      const props = f.memoizedProps;
+      const data = props && props.data;
+      if (!Array.isArray(data) || typeof props.keyExtractor !== "function") continue;
+      if (!data.some(isTimelineRow)) continue;
+      const sample = data.find(isTimelineRow);
+      try {
+        if (sample && props.keyExtractor(sample) !== sample.id) continue;
+      } catch {
+        continue;
+      }
+      if (messageId && data.some((item) => item && item.kind === "message" && item.message && String(item.message.id) === String(messageId))) return data;
+      if (!withAssistant && data.some((item) => item && item.kind === "message" && item.message && item.message.role === "assistant")) withAssistant = data;
+    }
+    return messageId ? null : withAssistant;
+  }
+  function reactFiber(node) {
+    if (!node || typeof node !== "object") return null;
+    let names;
+    try {
+      names = Object.getOwnPropertyNames(node);
+    } catch {
+      return null;
+    }
+    const key = names.find((k) => k.startsWith("__reactFiber$"));
+    if (!key) return null;
+    try {
+      return node[key];
+    } catch {
+      return null;
+    }
+  }
+  /** The list's `data`, or null when no mounted row exposes it. Never the DOM order. */
+  function readHostTimeline(root, fiberOf) {
+    const find = fiberOf || reactFiber;
+    const host = root && root.querySelector ? root.querySelector("[data-timeline-row-id], [data-timeline-root], [data-message-id]") : null;
+    if (!host) return null;
+    const fiber = find(host);
+    if (!fiber) return null;
+    let id = null;
+    try {
+      const row = host.closest ? host.closest("[data-message-id]") || host : host;
+      id = row.getAttribute ? row.getAttribute("data-message-id") : null;
+    } catch {
+      id = null;
+    }
+    return timelineFromFiber(fiber, id || null);
+  }
+  function hostNewestId(root, fiberOf) {
+    const data = readHostTimeline(root, fiberOf);
+    return Array.isArray(data) ? newestAssistantId(data) : null;
+  }
+  /** True when the t3x-lane content box is at least 30rem. Null when the container can't be measured. */
+  function laneIsWide(el, getStyle) {
+    if (!el || typeof getStyle !== "function") return null;
+    let node = el;
+    for (let hops = 0; node && node.nodeType === 1 && hops < 40; hops++) {
+      let cs;
+      try {
+        cs = getStyle(node) || {};
+      } catch {
+        return null;
+      }
+      const name = String(cs.containerName || "");
+      if (name.split(/\s+/).includes("t3x-lane")) {
+        const rem = parseFloat(cs.rem);
+        const content = Number(cs.contentWidth);
+        if (!Number.isFinite(rem) || rem <= 0 || !Number.isFinite(content)) return null;
+        return content / rem >= 30;
+      }
+      node = node.parentElement || node.parent || null;
+    }
+    return null;
+  }
+  /** Confirmed only for the string the Mac app's bridge returns. A promise result is unwrapped by readMacPlatform. */
+  function macAppOn(platform) {
+    return platform === "darwin";
+  }
+  async function readMacPlatform(bridge) {
+    try {
+      const get = bridge && bridge.getClientPlatform;
+      if (typeof get !== "function") return null;
+      const value = get.call(bridge);
+      return value && typeof value.then === "function" ? await value : value;
+    } catch {
+      return null;
+    }
+  }
+  function madeToggleEvent(event) {
+    if (!event) return false;
+    if (event.type === "click") return true;
+    if (event.type === "keydown" && event.key === "Enter") return true;
+    if (event.type === "keyup" && (event.key === " " || event.key === "Spacebar")) return true;
+    return false;
+  }
+  function madeActivation(event) {
+    if (!event) return false;
+    if (event.type !== "click" && event.type !== "keydown" && event.type !== "keyup") return false;
+    return event.type === "click" || event.key === "Enter" || event.key === " " || event.key === "Spacebar";
+  }
+  function noteMadeToggle(el, event, bag) {
+    if (!event || event.isTrusted !== true || !madeToggleEvent(event)) return;
+    const key = madeKey(bag, el);
+    if (!key) return;
+    const open = madeOpen(el);
+    const prev = bag.gesture.get(el);
+    if (prev && prev.key === key && prev.open === open) return;
+    bag.gesture.set(el, { key, open });
+    bag.choices.set(key, open ? "closed" : "open");
+    bag.settling.add(key);
+    bag.settleNode.set(key, el);
+    bag.auto.delete(key);
+    if (bag.held) bag.held.delete(key);
+    bag.pendingEl.delete(el);
+  }
+  /** A trusted click on a link in the list's rows. Only a list we opened ourselves is held;
+   *  a list he opened or closed already has his choice, and that stays as it is. */
+  function noteMadeLink(el, event, bag) {
+    if (!event || event.isTrusted !== true || event.type !== "click") return;
+    const target = event.target;
+    const link = target && target.closest ? target.closest("a") : null;
+    if (!link) return;
+    try {
+      if (el.contains && !el.contains(link)) return;
+    } catch {
+      return;
+    }
+    const btn = madeSummary(el);
+    if (btn && btn.contains && btn.contains(link)) return;
+    const key = madeKey(bag, el);
+    if (!key || !bag.auto || !bag.auto.has(key) || !madeOpen(el)) return;
+    bag.held = bag.held || new Set();
+    bag.held.add(key);
+    // He clicked inside the open list, so our open click has landed: retire it. Without this,
+    // the same node redrawn closed before the next pass would never reopen. A fold-back still
+    // in flight (false) stays recorded, so the next pass can't queue a second toggle.
+    if (bag.pendingEl.get(el) === true) bag.pendingEl.delete(el);
+  }
+  function madeControl(el, btn, mode) {
+    let rec = madeControls.get(btn);
+    if (!rec) {
+      rec = { mode };
+      const onSummary = (event) => {
+        if (!footerControlsActive) return;
+        if (rec.mode === "always-open" && madeOpen(el)) {
+          if (!madeActivation(event)) return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
+        noteMadeToggle(el, event, madeBag);
+      };
+      for (const type of ["click", "keydown", "keyup"]) btn.addEventListener(type, onSummary, true);
+      madeControls.set(btn, rec);
+    }
+    rec.mode = mode;
+    if (madeSession.linkWired.has(el)) return;
+    if (el.addEventListener) {
+      el.addEventListener("click", (event) => {
+        if (!footerControlsActive) return;
+        noteMadeLink(el, event, madeBag);
+      }, true);
+      madeSession.linkWired.add(el);
+    }
+  }
+  function madeEligible(el, bag, count, key) {
+    if (count === null || count > 5 || !key) return false;
+    const messageId = key.slice(key.indexOf("\0") + 1);
+    if (bag.newestId == null || messageId !== String(bag.newestId)) return false;
+    if (bag.held && bag.held.has(key)) return true;
+    let wide = null;
+    try {
+      wide = typeof bag.laneWide === "function" ? bag.laneWide(el) : bag.laneWide;
+    } catch {
+      wide = null;
+    }
+    return wide === true;
+  }
+  function madeClick(el, btn, bag, want) {
+    if (!btn || madeCount(el) === null) return 0;
+    if (bag.pendingEl.get(el) === want) return 0;
+    btn.click();
+    bag.pendingEl.set(el, want);
+    return 1;
+  }
+  /** Open or fold Made lists. Returns how many summaries it clicked. hide is CSS only.
+   *  A stored choice (except always-open and hide) wins. open-short opens five or fewer on the
+   *  newest assistant reply in a lane of at least 30rem, and folds that opening back once when
+   *  any of those stops holding; a held list (a link click in one we opened) skips the lane test.
+   *  Never clicks while the count isn't a finished "· N:". */
+  function madePass(root, mode, state) {
+    const bag = state || madeSession;
+    madeBag = bag;
+    bag.choices = bag.choices || new Map();
+    bag.auto = bag.auto || new Set();
+    bag.held = bag.held || new Set();
+    bag.settling = bag.settling || new Set();
+    bag.settleNode = bag.settleNode || new Map();
+    bag.pendingEl = bag.pendingEl || new WeakMap();
+    bag.gesture = bag.gesture || new WeakMap();
+    bag.threadId = madeThreadId(bag);
+    let clicks = 0;
+    for (const el of root.querySelectorAll(FOOTER_MADE)) {
+      const btn = madeSummary(el);
+      if (btn) madeControl(el, btn, mode);
+      if (mode === "hide") continue;
+      const open = madeOpen(el);
+      const count = madeCount(el);
+      const key = madeKey(bag, el);
+      if (mode === "always-open") {
+        if (open) bag.pendingEl.delete(el);
+        else clicks += madeClick(el, btn, bag, true);
+        continue;
+      }
+      if (key && bag.choices.has(key)) {
+        const want = bag.choices.get(key) === "open";
+        if (open === want) {
+          bag.settling.delete(key);
+          bag.settleNode.delete(key);
+          bag.pendingEl.delete(el);
+          continue;
+        }
+        if (bag.settling.has(key) && bag.settleNode.get(key) === el) continue;
+        const restored = madeClick(el, btn, bag, want);
+        clicks += restored;
+        if (restored) bag.settling.delete(key);
+        continue;
+      }
+      if (mode !== "open-short" || !key) continue;
+      const eligible = madeEligible(el, bag, count, key);
+      if (bag.auto.has(key)) {
+        if (open) {
+          // One click. pendingEl stops a second click while the attribute is still open.
+          if (!eligible) clicks += madeClick(el, btn, bag, false);
+          // Our open has landed: retire it. A fold-back still in flight (false) stays recorded
+          // even when the list qualifies again, so nothing can queue a second toggle beside it;
+          // once it lands, the closed fold opens again below if it still qualifies.
+          else if (bag.pendingEl.get(el) === true) bag.pendingEl.delete(el);
+          continue;
+        }
+        // Keep the flag while our own open click has not landed.
+        if (bag.pendingEl.get(el) === true) continue;
+        // A closed fold with no in-flight open is no longer one we opened (our fold-back landed,
+        // or T3 redrew it closed). If it still qualifies, it opens again below, in this pass.
+        bag.pendingEl.delete(el);
+        bag.auto.delete(key);
+      }
+      if (eligible && !open) {
+        const opened = madeClick(el, btn, bag, true);
+        clicks += opened;
+        if (opened) bag.auto.add(key);
+      }
+    }
+    return clicks;
+  }
+
+  /** The <html> attributes for the CSS-only parts (the footer team and Made modes are always set). */
   function rootAttrs(st) {
     const out = {
       "data-t3x-tight": st.tighter ? "" : null,
@@ -1162,6 +1499,7 @@
       "data-t3x-working": st.workingHeader ? "" : null,
       "data-t3x-marker": st.marker !== "off" ? st.marker : null,
       "data-t3x-footer-team": st.footerTeam,
+      "data-t3x-footer-made": st.footerMade,
     };
     for (const t of TARGETS) out[`data-t3x-ft-${t}`] = st.fontTargets[t] ? "" : null;
     return out;
@@ -1251,7 +1589,7 @@
     rowAgeHours, olderCutoff, olderRows, olderTitle, OLDER_AFTER, TITLE_LINES, titleSuffix, gapsBefore,
     DEFAULTS, POP_KINDS, readSpots, spotFrom, clearSpot, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, FONT_SIMILAR_GROUPS, similarFontAreas, usagePageHash, usageContainerMatches,
-    FOOTER_TEAM, FOOTER_DETAILS, footerPass, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
+    FOOTER_TEAM, FOOTER_MADE_MODES, FOOTER_CARD, FOOTER_MADE, FOOTER_DETAILS, footerPass, madePass, madeCount, newestAssistantId, timelineFromFiber, readHostTimeline, hostNewestId, laneIsWide, macAppOn, readMacPlatform, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
     forecast, seriesSegments, mergeSeries, dGeometry, fmtClock, lowRefills, compactParts, composerLabel, labUsageFailedSince, toolGates, labsForMerge, labFailure, handoverGate, HANDOVER_REQUEST, chainLabel, contrast, STALE_MS, T3_STALE_MS,
   };
   if (W.__T3X_TEST__) {
@@ -1366,7 +1704,7 @@
 
   // ---------- <html> switches for the CSS-only parts ----------
 
-  const ROOT_ATTRS = ["data-t3x-selecting", "data-t3x-tight", "data-t3x-compact", "data-t3x-pinned-label", "data-t3x-fold", "data-t3x-older-open", "data-t3x-onerow", "data-t3x-gaps", "data-t3x-inline-icon", "data-t3x-project-full", "data-t3x-working", "data-t3x-marker", "data-t3x-footer-team", "data-t3x-fh", "data-t3x-fb", "data-t3x-fm", ...TARGETS.map((t) => `data-t3x-ft-${t}`)];
+  const ROOT_ATTRS = ["data-t3x-selecting", "data-t3x-tight", "data-t3x-compact", "data-t3x-pinned-label", "data-t3x-fold", "data-t3x-older-open", "data-t3x-onerow", "data-t3x-gaps", "data-t3x-inline-icon", "data-t3x-project-full", "data-t3x-working", "data-t3x-marker", "data-t3x-footer-team", "data-t3x-footer-made", "data-t3x-mac-app", "data-t3x-fh", "data-t3x-fb", "data-t3x-fm", ...TARGETS.map((t) => `data-t3x-ft-${t}`)];
   function applyRootAttrs() {
     const r = D.documentElement;
     for (const [name, value] of Object.entries(rootAttrs(settings))) (value === null ? r.removeAttribute(name) : r.setAttribute(name, value));
@@ -2625,12 +2963,95 @@
     burnCounts.rows = keep.size;
   }
 
+  function styleForLane(node) {
+    const view = node && node.ownerDocument && node.ownerDocument.defaultView;
+    if (!view || typeof view.getComputedStyle !== "function") return null;
+    const cs = view.getComputedStyle(node);
+    const root = view.getComputedStyle(node.ownerDocument.documentElement);
+    const padL = parseFloat(cs.paddingLeft) || 0;
+    const padR = parseFloat(cs.paddingRight) || 0;
+    const containerName = cs.containerName || (typeof cs.getPropertyValue === "function" ? cs.getPropertyValue("container-name") : "");
+    return { containerName, contentWidth: node.clientWidth - padL - padR, rem: parseFloat(root.fontSize) };
+  }
+  const laneWatchers = new WeakMap();
+  let madeResizePending = false;
+  function syncMadeHost() {
+    madeSession.threadIdOf = () => (route && route.kind === "thread" ? route.threadId : null);
+    madeSession.newestId = hostNewestId(D);
+    madeSession.laneWide = (el) => laneIsWide(el, styleForLane);
+  }
+  function rerunMade() {
+    if (madeResizePending || disposed || paused) return;
+    madeResizePending = true;
+    const kick = () => {
+      madeResizePending = false;
+      if (disposed || paused) return;
+      try {
+        syncMadeHost();
+        madePass(D, settings.footerMade, madeSession);
+      } catch (e) {
+        noteError("footer", e);
+      }
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(kick);
+    else kick();
+  }
+  function watchMadeLanes(root) {
+    if (typeof ResizeObserver !== "function") return;
+    for (const [lane, off] of watchedLanes) {
+      if (lane.isConnected) continue;
+      off();
+      watchedLanes.delete(lane);
+      laneWatchers.delete(lane);
+      const at = cleanups.indexOf(off);
+      if (at >= 0) cleanups.splice(at, 1);
+    }
+    let folds;
+    try {
+      folds = root.querySelectorAll(FOOTER_MADE);
+    } catch {
+      return;
+    }
+    for (const fold of folds) {
+      let node = fold;
+      for (let hops = 0; node && node.nodeType === 1 && hops < 40; hops++) {
+        const named = styleForLane(node);
+        const name = named && named.containerName || "";
+        if (String(name).split(/\s+/).includes("t3x-lane")) {
+          if (!laneWatchers.has(node)) {
+            const ro = new ResizeObserver(() => rerunMade());
+            ro.observe(node);
+            laneWatchers.set(node, ro);
+            const off = () => ro.disconnect();
+            cleanups.push(off);
+            watchedLanes.set(node, off);
+          }
+          break;
+        }
+        node = node.parentElement;
+      }
+    }
+  }
+  const watchedLanes = new Map();
+  let macToken = 0;
+  function syncMacApp() {
+    const token = ++macToken;
+    readMacPlatform(W.desktopBridge).then((platform) => {
+      if (disposed || token !== macToken) return;
+      if (macAppOn(platform)) D.documentElement.setAttribute("data-t3x-mac-app", "");
+      else D.documentElement.removeAttribute("data-t3x-mac-app");
+    }, () => {});
+  }
+
   const ORDER = ["panel", "bars", "header", "composer", "older"];
   const insertCounts = {};
   function ensure() {
     if (paused || disposed) return;
     try {
       footerPass(D, settings.footerTeam, footerSeen);
+      syncMadeHost();
+      madePass(D, settings.footerMade, madeSession);
+      watchMadeLanes(D);
     } catch (e) {
       noteError("footer", e);
     }
@@ -3378,7 +3799,10 @@
       h("section", {}, h("h3", { text: "Replies" }),
         h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: "Footer team list" }),
           h("div", { class: "t3x-radios t3x-col t3x-indent", role: "radiogroup", "aria-label": "Footer team list" },
-            FOOTER_TEAM.map(([value, label]) => radio("footerTeam", value, settings.footerTeam, label, (v) => change({ footerTeam: v })))))),
+            FOOTER_TEAM.map(([value, label]) => radio("footerTeam", value, settings.footerTeam, label, (v) => change({ footerTeam: v }))))),
+        h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: "Footer Made so far list" }),
+          h("div", { class: "t3x-radios t3x-col t3x-indent", role: "radiogroup", "aria-label": "Footer Made so far list" },
+            FOOTER_MADE_MODES.map(([value, label]) => radio("footerMade", value, settings.footerMade, label, (v) => change({ footerMade: v })))))),
       h("section", {}, h("h3", { text: "Popups" }),
         sw("Move popups out of the way", "popMove", "Drag a popup by its top bar (⠿); it reopens there. Double-click the bar, or press Home on ⠿, to put it back. Fonts stops dimming the screen and gets a Small card button.")),
       h("section", {}, h("h3", { text: "Fonts on screen" }),
@@ -3996,6 +4420,25 @@
   });
   observer.observe(D.body, { childList: true, subtree: true, characterData: true });
   cleanups.push(() => observer.disconnect());
+  // React writes data-markdown-details-open a tick after the click. Re-read then, so a stored
+  // choice is confirmed and an in-flight click is not repeated.
+  const madeAttrObserver = new MutationObserver((records) => {
+    for (const r of records) {
+      if (r.attributeName !== "data-markdown-details-open" || !r.target) continue;
+      let made = false;
+      try {
+        made = r.target.matches(FOOTER_MADE);
+      } catch {
+        made = true;
+      }
+      if (made) {
+        rerunMade();
+        return;
+      }
+    }
+  });
+  madeAttrObserver.observe(D.body, { subtree: true, attributes: true, attributeFilter: ["data-markdown-details-open"] });
+  cleanups.push(() => madeAttrObserver.disconnect());
 
   // Theme changes: recompute the marker colour (attributes on <html> only, cheap).
   const themeObserver = new MutationObserver(guarded("theme", () => later(50, updateMarkColor)));
@@ -4130,6 +4573,7 @@
   };
 
   applyRootAttrs();
+  syncMacApp();
   applyFonts();
   syncUsageMarker();
   updateMarkColor();

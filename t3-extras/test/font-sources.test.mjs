@@ -197,11 +197,11 @@ test("font CSS names the verified leaves and does not claim controls, toggles, o
   assert.equal(leaves.includes("!important"), false);
   assert.equal(nestedHas(leaves), false);
   const block = css.slice(css.indexOf("/* ---------- reply footer card"));
-  assert.equal(crypto.createHash("sha256").update(block).digest("hex"), "4ece878db8cac2ea91d09f1213d6c605b251ac996c258d4a84a0db9c9a3a1a4c");
+  assert.equal(crypto.createHash("sha256").update(block).digest("hex"), "04e67e02e306f9d072830ef6dc09c1a4798b73d9d01f8731e28b0a9bead39062");
   const readme = fs.readFileSync(new URL("../README.md", import.meta.url), "utf8");
   const at = readme.indexOf("**Reply footer card.**");
   const paragraph = readme.slice(at, readme.indexOf("\n\n", at));
-  assert.equal(crypto.createHash("sha256").update(paragraph).digest("hex"), "56d0e3c3fa807418159d6f7ebcfa88f5637a75bafcb1a6a9abb3b4ce28184c9e");
+  assert.equal(crypto.createHash("sha256").update(paragraph).digest("hex"), "04f34b8d981aa00900da08fb43bcc9a328b474da48d7ec63b154f5ae51797363");
 });
 
 function nestedHas(text) {

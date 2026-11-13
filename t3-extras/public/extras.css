@@ -1240,11 +1240,18 @@ html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar 
 @keyframes t3x-footer-pulse { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) [itemprop~="running"]::before { animation: none; } }
 
-/* the team rundown under the card. T3 draws a reply's <details> as its own collapsible: a wrapper <div>, then
- * [data-markdown-details] holding a trigger button ([data-markdown-details-summary], chevron + summary text) and a panel
- * whose [data-markdown-details-content] holds the table. The ✦ panel's "Footer team list" switch sets
- * html[data-t3x-footer-team]: always-show (can't fold), start-open (default), start-folded (the add-ons fold it once), always-hide. */
-.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]) {
+/* the two folds under the card: the Made so far list (once the thread has made something Andy opens), then the team
+ * rundown. T3 draws a reply's <details> as its own collapsible: a wrapper <div>, then [data-markdown-details] holding a
+ * trigger button ([data-markdown-details-summary], chevron + summary text) and a panel whose
+ * [data-markdown-details-content] holds the table. The Made fold is the one right after the card whose summary carries
+ * itemprop="made"; the team rundown is the fold without that hook, right after the card or right after the Made fold.
+ * Both wear the same small plain look, each in its own block (a shared :is() block would outrank the rules of the
+ * fold with the shorter selector).
+ *
+ * The team rundown. The ✦ panel's "Footer team list" switch sets html[data-t3x-footer-team]: always-show (CSS blocks
+ * pointer clicks and hides the chevron), start-open (default), start-folded (the external add-on folds it once),
+ * always-hide. The add-on must keep always-show open, including against keyboard toggling. */
+:is(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)), .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) + div:has(> [data-markdown-details]):not(:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) {
   margin: .45rem 0 0;
   border: 0;
   font-size: .75rem;
@@ -1268,20 +1275,60 @@ html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar 
   & em { font-style: normal; color: var(--muted-foreground); }
   & [itemprop~="failed"] { color: color-mix(in srgb, var(--destructive, #dc2626) 85%, var(--foreground)); }
 }
-html[data-t3x-footer-team="always-hide"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]) { display: none; }
-html[data-t3x-footer-team="always-show"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]) [data-markdown-details-summary] { pointer-events: none; cursor: default; }
-html[data-t3x-footer-team="always-show"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]) [data-markdown-details-summary] > svg { display: none; }
+html[data-t3x-footer-team="always-hide"] :is(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)), .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) + div:has(> [data-markdown-details]):not(:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) { display: none; }
+html[data-t3x-footer-team="always-show"] :is(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)), .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) + div:has(> [data-markdown-details]):not(:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) [data-markdown-details-summary] { pointer-events: none; cursor: default; }
+html[data-t3x-footer-team="always-show"] :is(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)), .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) + div:has(> [data-markdown-details]):not(:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) [data-markdown-details-summary] > svg { display: none; }
 
-/* the small line, right after the card or after the rundown (a bare <sub> when the blank line before it was left out) */
+/* the Made so far list (Andy, 12 Nov 2026): one thing per row, the kind on the first row of its group, the name as the
+ * link, then a note that stays on one line. Agents write it folded; the ✦ panel's switch sets
+ * html[data-t3x-footer-made]: start-folded, open-short (default: the add-on opens a list of five or fewer on the newest
+ * reply in a wide lane), always-open (CSS blocks pointer clicks and hides the chevron; the add-on keeps it open),
+ * hide. "Mac only" words are hidden once the add-on has confirmed the Mac app (html[data-t3x-mac-app]). */
+.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"]) {
+  margin: .45rem 0 0;
+  border: 0;
+  font-size: .75rem;
+  color: var(--muted-foreground);
+  & [data-markdown-details-summary] {
+    width: fit-content;
+    gap: .3rem;
+    padding: .1rem 0;
+    font-size: .75rem;
+    line-height: 1.25rem;
+    font-weight: 400;
+    color: var(--muted-foreground);
+  }
+  & [data-markdown-details-summary] > svg { width: .875rem; height: .875rem; }
+  & [data-markdown-details-content] { padding: .15rem 0 .1rem 1.15rem; color: var(--muted-foreground); }
+  & .chat-markdown-table-container { margin: 0; width: fit-content; max-width: 100%; }
+  & .chat-markdown-table-container > :not(:first-child) { display: none; }
+  & table { min-width: 0; font-size: .75rem; }
+  & [data-markdown-details-summary] [itemprop~="made"] { color: var(--foreground); }
+  & :is(th, td) { padding: .08rem 1rem .08rem 0; border: 0; background: transparent; white-space: normal; max-width: none; overflow: visible; text-overflow: clip; font-weight: 400; line-height: 1.25rem; vertical-align: top; color: var(--muted-foreground); }
+  & :is(th, td):nth-child(2) { color: var(--foreground); }
+  & :is(th, td):nth-child(2) a { font-size: .8125rem; }
+  & :is(th, td):nth-child(3) { white-space: nowrap; }
+}
+/* with a Made fold above it, the team rundown sits close */
+.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"]) + div:has(> [data-markdown-details]):not(:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) { margin-top: .1rem; }
+html[data-t3x-footer-made="hide"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"]) { display: none; }
+html[data-t3x-footer-made="hide"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"]) + div:has(> [data-markdown-details]):not(:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) { margin-top: .45rem; }
+html[data-t3x-footer-made="always-open"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"]) [data-markdown-details-summary] { pointer-events: none; cursor: default; }
+html[data-t3x-footer-made="always-open"] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"]) [data-markdown-details-summary] > svg { display: none; }
+html[data-t3x-mac-app] .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"]) [itemprop~="mac-only"] { display: none; }
+
+/* the small line, right after the card or after the last fold (a bare <sub> when the blank line before it was left out) */
 :is(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)),
-    .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]))
+    .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"]),
+    :is(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)), .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) + div:has(> [data-markdown-details]):not(:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])))
   + p:has(> sub:only-child) {
   margin: .35rem 0 0;
   line-height: 1.35;
   & > sub { font-size: 11px; vertical-align: baseline; color: var(--muted-foreground); }
 }
 :is(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)),
-    .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details]))
+    .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"]),
+    :is(.chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)), .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) + div:has(> [data-markdown-details]):not(:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])))
   + sub {
   display: block;
   margin: .35rem 0 0;
@@ -1300,6 +1347,18 @@ html[data-t3x-footer-team="always-show"] .chat-markdown > hr:last-of-type + .cha
     & td:first-child { flex-basis: 4.9rem; min-width: 0; white-space: normal; }
     & td:nth-child(2) { flex: 1 1 0; }
     & td:last-child { flex: 1 0 100%; margin-left: 0; padding: 0 .75rem .2rem calc(4.9rem + .75rem); text-align: left; text-wrap: wrap; line-height: 1.4; }
+  }
+}
+
+/* the Made so far list in a narrow lane: the note drops under the name, in line with it */
+@container t3x-lane (width < 30rem) {
+  .chat-markdown > hr:last-of-type + .chat-markdown-table-container:has([itemprop~="settle-yes"], [itemprop~="settle-no"]):has(thead th:nth-child(3)) + div:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"]) {
+    & .chat-markdown-table-container { width: 100%; }
+    & :is(table, thead, tbody) { display: block; width: 100%; }
+    & tr { display: flex; flex-wrap: wrap; }
+    & :is(th, td):first-child { flex: 0 0 3.7rem; padding-right: 0; }
+    & :is(th, td):nth-child(2) { flex: 1 1 0; min-width: 0; padding-right: 0; }
+    & :is(th, td):nth-child(3) { flex: 1 0 100%; padding: 0 0 .3rem 3.7rem; white-space: normal; }
   }
 }
 
