@@ -6,7 +6,10 @@
 # The job runs the discovered node directly, so that exact binary needs App
 # Management (System Settings > Privacy & Security > App Management). A node
 # update can switch that off; the keeper then posts a notification.
-# T3X_NODE, when set, is that binary (absolute path, not resolved).
+# T3X_NODE, when set, is that binary (absolute path, not resolved). Without it,
+# an update keeps the binary the existing install recorded in node-path, so a
+# different node first on PATH cannot silently move the job off the binary
+# that holds App Management.
 # Reminder state (snooze, interval, pending) is not part of this install and
 # is never rolled back with the code.
 # Usage: install.sh            install or update
@@ -43,6 +46,15 @@ discover_node() {
   if [[ -n "${T3X_NODE:-}" ]]; then
     printf '%s\n' "$T3X_NODE"
     return
+  fi
+  c="$(head -n 1 "$HOME_DIR/node-path" 2>/dev/null || true)"
+  if [[ -n "$c" ]]; then
+    if [[ "$c" == /* && -x "$c" ]] && "$c" "$EXTRAS_SRC/node-probe.mjs" >/dev/null 2>&1; then
+      echo "Keeping the Node binary this install already uses: $c (set T3X_NODE to change it)" >&2
+      printf '%s\n' "$c"
+      return
+    fi
+    echo "warning: the Node binary this install used is missing or no longer suitable: $c. Choosing another; grant App Management to the one printed below." >&2
   fi
   c="$(command -v node 2>/dev/null || true)"
   if [[ -n "$c" && "$c" == /* ]]; then

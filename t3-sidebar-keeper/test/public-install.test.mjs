@@ -110,6 +110,64 @@ test("an existing keeper with no disabled.json gets no fresh defaults", () => {
   assert.equal(read(path.join(home, "node-path")), `${process.execPath}\n`);
 });
 
+// A second node, first on PATH, standing for an agent shell or a version manager.
+function otherNode(root) {
+  const dir = path.join(root, "other-bin");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.symlinkSync(fs.realpathSync(process.execPath), path.join(dir, "node"));
+  return { dir, node: path.join(dir, "node") };
+}
+const plistOf = (root) => read(path.join(root, "Library/LaunchAgents/com.cornishandy.t3-sidebar-keeper.plist"));
+
+test("an update without T3X_NODE keeps the recorded node, not the one first on PATH", () => {
+  const root = fs.mkdtempSync(path.join(scratch, "keep-node-"));
+  const granted = path.join(root, "granted-bin", "node");
+  fs.mkdirSync(path.dirname(granted), { recursive: true });
+  fs.symlinkSync(fs.realpathSync(process.execPath), granted);
+  assert.equal(install(root, granted).status, 0);
+  const other = otherNode(root);
+  const result = install(root, "", { PATH: `${other.dir}:${process.env.PATH}` });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /Keeping the Node binary this install already uses/);
+  assert.equal(read(path.join(homeOf(root), "node-path")), `${granted}\n`);
+  assert.ok(plistOf(root).includes(`<string>${granted}</string>`));
+  assert.ok(!plistOf(root).includes(other.node));
+});
+
+test("T3X_NODE still replaces the recorded node", () => {
+  const root = fs.mkdtempSync(path.join(scratch, "replace-node-"));
+  assert.equal(install(root, process.execPath).status, 0);
+  const other = otherNode(root);
+  const result = install(root, other.node);
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /Keeping the Node binary/);
+  assert.equal(read(path.join(homeOf(root), "node-path")), `${other.node}\n`);
+  assert.ok(plistOf(root).includes(`<string>${other.node}</string>`));
+});
+
+test("a recorded node that is gone falls back to PATH with a warning", () => {
+  const root = fs.mkdtempSync(path.join(scratch, "gone-node-"));
+  const gone = path.join(root, "gone-bin", "node");
+  fs.mkdirSync(path.dirname(gone), { recursive: true });
+  fs.symlinkSync(fs.realpathSync(process.execPath), gone);
+  assert.equal(install(root, gone).status, 0);
+  fs.rmSync(gone);
+  const other = otherNode(root);
+  const result = install(root, "", { PATH: `${other.dir}:${process.env.PATH}` });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /missing or no longer suitable/);
+  assert.equal(read(path.join(homeOf(root), "node-path")), `${other.node}\n`);
+});
+
+test("a first install without T3X_NODE still takes the node first on PATH", () => {
+  const root = fs.mkdtempSync(path.join(scratch, "first-node-"));
+  const other = otherNode(root);
+  const result = install(root, "", { PATH: `${other.dir}:${process.env.PATH}` });
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /Keeping the Node binary|missing or no longer suitable/);
+  assert.equal(read(path.join(homeOf(root), "node-path")), `${other.node}\n`);
+});
+
 test("a marker alone still writes both default files", () => {
   const root = fs.mkdtempSync(path.join(scratch, "marker-"));
   const home = homeOf(root);
