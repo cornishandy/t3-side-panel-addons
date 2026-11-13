@@ -100,7 +100,7 @@ test("use for similar areas: optional, applies on click, undoes", { timeout: 90_
     // The ✦ panel: an optional button on the Replies row; nothing changes until it's clicked.
     await ev(`window.__T3X_PICK_TEST__.openPanel(document.getElementById("anchor")), 1`); await frames();
     const row = await ev(`(() => { const b = document.querySelector('[data-focus="fs-similar-main"]'); return b && { text: b.textContent, title: b.title, w: b.getBoundingClientRect().width,
-      rowW: b.closest(".t3x-fs-area").getBoundingClientRect().width, scrollW: b.closest(".t3x-fs-area").scrollWidth }; })()`);
+      rowW: b.closest(".t3x-fs-head").getBoundingClientRect().width, scrollW: b.closest(".t3x-fs-head").scrollWidth }; })()`);
     assert.ok(row, "Replies row offers similar areas");
     assert.equal(row.text, "Use for similar");
     assert.match(row.title, /Reasoning, Plans and Questions/);

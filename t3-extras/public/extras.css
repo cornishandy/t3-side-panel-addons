@@ -1059,19 +1059,44 @@ html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar 
 .t3x-pick .t3x-pick-label { position:fixed; height:18px; padding:0 6px; border:0; border-radius:4px; background:var(--primary,#7aa2ff); color:var(--primary-foreground,#0b1020); font:600 11px/18px var(--font-sans); white-space:nowrap; cursor:pointer!important; box-shadow:0 2px 6px #0005; }
 
 /* ---------- ✦ panel "Your fonts": each pick's name in its own face, with Previous/Next ---------- */
-.t3x-fs-row { display: flex; flex-direction: column; padding: 2px 0; }
-.t3x-fs-area { display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: center; min-height: 18px; color: var(--muted-foreground); font: 11px var(--font-sans); }
-.t3x-fs-also, .t3x-fs-gap { min-width: 0; flex: 1 1 3.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.t3x-fs-tail { flex: none; margin-left: auto; display: flex; align-items: center; gap: 6px; }
-.t3x-fs-pos { flex: none; font-variant-numeric: tabular-nums; opacity: .75; }
+/* Three fixed lines per font, a hairline between fonts: (1) the area and "Use for similar", always top right;
+   (2) the font; (3) − n% +, Default and its place in the list. Nothing's position depends on what fits. */
+.t3x-fs-row { display: flex; flex-direction: column; padding: 9px 0 8px; }
+.t3x-fs-row:first-of-type { padding-top: 2px; }
+.t3x-fs-row + .t3x-fs-row { border-top: 1px solid var(--border); }
+.t3x-fs-head { display: flex; align-items: flex-start; gap: 8px; min-height: 18px; }
+/* The area and the areas that follow it wrap in the left column; they are never cut off. */
+.t3x-fs-lead { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; color: var(--muted-foreground); font: 11px/18px var(--font-sans); }
+.t3x-fs-label { margin-right: 6px; color: var(--popover-foreground, var(--foreground)); font: 600 12px/18px var(--font-sans); }
+.t3x-fs-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-height: 18px; color: var(--muted-foreground); font: 11px var(--font-sans); }
+/* In a panel too narrow for the line, "24 of 53" alone wraps beneath it, on the right; size and Default stay
+   together (they part only in a panel too narrow for the two of them). Every row reserves the same widths
+   (a fixed-width percentage, the Default slot's sizer, the position's min-width; a row with no size keeps an
+   unseen copy), so every row wraps together or none does, and a click never reflows one. */
+.t3x-fs-sizeline { flex: 0 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+.t3x-fs-ghost { visibility: hidden; }
+.t3x-fs-pos { flex: none; margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; opacity: .75; }
 .t3x-fs-size { display: flex; align-items: center; gap: 3px; }
 .t3x-fs-sz {
-  flex: none; width: 20px; height: 18px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: transparent;
+  flex: none; box-sizing: border-box; width: 20px; height: 18px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: transparent;
   color: var(--popover-foreground, var(--foreground)); cursor: pointer; font: 13px/16px var(--font-sans);
 }
 .t3x-fs-sz[disabled] { opacity: .35; cursor: default; }
-.t3x-fs-size-val { min-width: 4ch; text-align: center; font-variant-numeric: tabular-nums; }
-.t3x-fs-pick { display: flex; align-items: center; gap: 2px; }
+.t3x-fs-size-val { box-sizing: border-box; width: 5ch; text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Default: a ring when the size differs (click for the default), a dot when it is the default. Text colour,
+   not the accent: in this panel the accent means a feature is on. */
+.t3x-fs-defslot { display: inline-grid; justify-items: start; }
+.t3x-fs-defslot > * { grid-area: 1 / 1; }
+.t3x-fs-def {
+  display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 999px; background: transparent; color: inherit;
+  padding: 1px 7px 1px 5px; font: 11px/16px var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+button.t3x-fs-def { cursor: pointer; }
+.t3x-fs-def i { flex: none; box-sizing: border-box; width: 8px; height: 8px; border: 1px solid currentColor; border-radius: 50%; }
+.t3x-fs-def-on { color: var(--popover-foreground, var(--foreground)); }
+.t3x-fs-def-on i { background: currentColor; }
+.t3x-fs-def-sizer { visibility: hidden; }
+.t3x-fs-pick { display: flex; align-items: center; gap: 2px; margin: 2px 0 3px; }
 .t3x-fs-step {
   flex: none; width: 28px; height: 30px; border: 1px solid var(--border); border-radius: 8px;
   background: transparent; color: inherit; cursor: pointer; font: 17px/1 var(--font-sans);
@@ -1083,10 +1108,10 @@ html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar 
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .t3x-fs-similar {
-  flex: none; border: 1px solid var(--border); border-radius: 999px; background: transparent;
+  flex: none; margin-top: 1px; border: 1px solid var(--border); border-radius: 999px; background: transparent;
   color: inherit; cursor: pointer; padding: 0 7px; font: 10.5px/16px var(--font-sans);
 }
-.t3x-fs-step:hover:not([disabled]), .t3x-fs-name:hover, .t3x-fs-similar:hover, .t3x-fs-sz:hover:not([disabled]) { background: var(--accent); }
+.t3x-fs-step:hover:not([disabled]), .t3x-fs-name:hover, .t3x-fs-similar:hover, .t3x-fs-sz:hover:not([disabled]), button.t3x-fs-def:hover { background: var(--accent); }
 .t3x-fs button:focus-visible { outline: 2px solid var(--ring, currentColor); outline-offset: 1px; }
 
 /* ---------- reply tables fit the chat lane ----------

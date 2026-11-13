@@ -50,7 +50,8 @@ test("settings: defaults, bad values ignored, unknown keys dropped", () => {
   assert.equal(s.fontTargets.composer, false);
   assert.equal("extra" in s, false);
   assert.equal(C.readSettings("{not json").fontHead.family, "off");
-  for (const bad of [79, 155, 101, "120"]) assert.equal(C.readSettings(JSON.stringify({ fontHead: { family: "Neucha", size: bad } })).fontHead.size, null);
+  for (const bad of [79, 75, 205, 101, "120"]) assert.equal(C.readSettings(JSON.stringify({ fontHead: { family: "Neucha", size: bad } })).fontHead.size, null);
+  for (const ok of [80, 155, 200]) assert.equal(C.readSettings(JSON.stringify({ fontHead: { family: "Neucha", size: ok } })).fontHead.size, ok, "sizes run 80–200% in 5% steps");
 });
 
 test("round 1's 3A-3D presets migrate to heading + body families, targets kept", () => {

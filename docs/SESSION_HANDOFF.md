@@ -2,6 +2,7 @@
 
 ## History
 
+- 13 Nov: ✦ panel "Your fonts" rows rebuilt after Andy asked why "Use for similar" sat in a different place on one row (the label line wrapped by label length). Three fixed lines per font with hairlines; sizes to 200% (the name stops growing at 150%); a two-way Default on each row and in Fonts, remembered until T3 reloads. Design agreed by a six-seat consensus team in three rounds; Andy confirmed ("Yes, build it").
 - 7 Nov: ✦ panel "Your fonts" rows get − n% + size buttons (5% steps, 80–150%, the source area's size); the 26 Oct "Use for similar" option committed.
 - 7 Nov: Andy requested unrestricted sidebar title rows. Added No limit beside 2/3 lines under compact threads, with One-row titles off. Saved setting "unlimited" disables the CSS line clamp; existing defaults remain. 58 targeted core/browser tests passed; narrow 160px sidebar shows the full long title and preserves choice across the one-row switch. Installed only the narrow title patch into the existing signed bundle; no service/app restart, no key change. That session left it uncommitted; the font-size thread committed and pushed it the same morning.
 - 7 Nov: popups move out of the way (Andy picked "Drag + small card" from a mock): ⠿ on every popup's top bar, spots remembered, no dark wash in Fonts, and a Small card button that places the card clear of the area's text; switch `popMove`. Astra pre-OK; 241 add-on tests pass.

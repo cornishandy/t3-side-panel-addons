@@ -1,4 +1,4 @@
-// The ✦ panel's "Your fonts" size buttons (− n% +), in headless Chromium against the real extras.css/extras.js. Never attaches to T3.
+// The ✦ panel's "Your fonts" rows: three fixed lines, the size buttons (− n% +) and the two-way Default, in headless Chromium against the real extras.css/extras.js. Never attaches to T3.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -34,7 +34,7 @@ const CATALOG = [
   { name: "Georgia", source: "mac", local: ["Georgia"], style: "print", group: "hand", width: 100, size: 110 },
 ];
 
-test("Your fonts size buttons: step the source area, clamp, focus, T3 fonts have none", { timeout: 90_000 }, async () => {
+test("Your fonts rows: fixed places, size steps to 200%, Default both ways, T3 fonts have none", { timeout: 90_000 }, async () => {
   assert.ok(fs.existsSync(CHROME), `headless Chrome missing: ${CHROME}`);
   const server = http.createServer((req, res) => {
     const name = new URL(req.url, "http://x").pathname;
@@ -93,10 +93,10 @@ test("Your fonts size buttons: step the source area, clamp, focus, T3 fonts have
     await send("Page.navigate", { url });
     await new Promise((r) => setTimeout(r, 500));
     // Replies: Arial (Quotes follows it). Message composer: Georgia, whose catalog default is 110% (Headings follows it).
-    // Sidebar labels: Arial at 150% (Tooltips follows it). Questions: T3's own code font. Most rows also offer "Use for similar".
+    // Sidebar labels: Arial at 150% (Tooltips follows it). Questions: T3's own code font. Plans: Georgia at 120%. Most rows also offer "Use for similar".
     await ev(`localStorage.setItem("t3x:settings:v1", JSON.stringify({ fontSchema: 2, fontMain: { family: "Arial", size: null }, fontComposer: { family: "Georgia", size: null },
-      fontQuestions: { family: "T3 code font", size: null }, fontSidebar: { family: "Arial", size: 150 },
-      fontSources: { main: "own", quotes: "link:main", reasoning: "native", plans: "native", questions: "own", composer: "own", head: "link:composer", prompts: "native",
+      fontQuestions: { family: "T3 code font", size: null }, fontSidebar: { family: "Arial", size: 150 }, fontPlans: { family: "Georgia", size: 120 },
+      fontSources: { main: "own", quotes: "link:main", reasoning: "native", plans: "own", questions: "own", composer: "own", head: "link:composer", prompts: "native",
         sidebar: "own", tooltips: "link:sidebar", interface: "native", usage: "native" } })), 1`);
     await send("Page.navigate", { url });
     assert.equal(await ev(`(async () => { for (let i = 0; i < 100; i++) { if (window.__T3X_PICK_TEST__?.openPanel) return "ready"; await new Promise((r) => setTimeout(r, 50)); } return "missing"; })()`), "ready");
@@ -106,26 +106,38 @@ test("Your fonts size buttons: step the source area, clamp, focus, T3 fonts have
     const val = (id) => ev(`${row(id)}.querySelector(".t3x-fs-size-val")?.textContent ?? null`);
     const until = (expr, what) => ev(`(async () => { for (let i = 0; i < 80; i++) { if (${expr}) return true; await new Promise((r) => setTimeout(r, 50)); } return ${JSON.stringify(what)}; })()`);
     const face = (alias, pct) => `[...document.fonts].some((f) => f.family.replace(/"/g, "") === ${JSON.stringify(alias)} && f.sizeAdjust === "${pct}%" && f.status === "loaded")`;
-    // Every label line: nothing spills out of the row, nothing overlaps, followers stay readable, a wrapped tail sits on the right.
-    const geometry = () => ev(`[...document.querySelectorAll(".t3x-fs-area")].map((a) => {
-      const A = a.getBoundingClientRect(), parts = [...a.querySelectorAll(":scope > span, :scope > button, .t3x-fs-tail > *, .t3x-fs-size > *")].filter((e) => !e.matches(".t3x-fs-tail, .t3x-fs-size"));
-      const boxes = parts.map((e) => ({ cls: e.className || e.textContent, r: e.getBoundingClientRect() })).filter((b) => b.r.width > 0);
-      const out = boxes.filter((b) => b.r.left < A.left - 0.5 || b.r.right > A.right + 0.5).map((b) => b.cls);
+    // Every row: nothing spills out or overlaps; "Use for similar" is pinned top right whatever the label's length;
+    // the position sits on the right, on the same line in every row that has a size.
+    const geometry = () => ev(`[...document.querySelectorAll(".t3x-fs-row")].map((row) => {
+      const R = row.getBoundingClientRect(), box = (e) => e.getBoundingClientRect();
+      const parts = [...row.querySelectorAll(".t3x-fs-lead, .t3x-fs-similar, .t3x-fs-step, .t3x-fs-name, .t3x-fs-sz, .t3x-fs-size-val, .t3x-fs-defslot > :not(.t3x-fs-def-sizer), .t3x-fs-pos")];
+      const boxes = parts.map((e) => ({ cls: e.className || e.textContent, r: box(e) })).filter((b) => b.r.width > 0);
+      const out = boxes.filter((b) => b.r.left < R.left - 0.5 || b.r.right > R.right + 0.5).map((b) => b.cls);
       const overlap = [];
       for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) { const p = boxes[i].r, q = boxes[j].r;
         if (p.left < q.right - 0.5 && q.left < p.right - 0.5 && p.top < q.bottom - 0.5 && q.top < p.bottom - 0.5) overlap.push(boxes[i].cls + " / " + boxes[j].cls); }
-      const also = a.querySelector(".t3x-fs-also"), tail = a.querySelector(".t3x-fs-tail"), first = a.firstElementChild.getBoundingClientRect();
-      return { label: a.firstElementChild.textContent, out, overlap, scroll: a.scrollWidth - a.clientWidth, alsoW: also ? also.getBoundingClientRect().width : null,
-        wrapped: !!tail && tail.getBoundingClientRect().top > first.bottom - 1, tailRight: tail ? A.right - tail.getBoundingClientRect().right : null };
+      const similar = row.querySelector(".t3x-fs-similar"), head = box(row.querySelector(".t3x-fs-head")), pos = row.querySelector(".t3x-fs-pos"), meta = row.querySelector(".t3x-fs-meta");
+      return { label: row.querySelector(".t3x-fs-label").textContent, out, overlap, scroll: row.scrollWidth - row.clientWidth, h: R.height, sized: !!row.querySelector(".t3x-fs-size[role]"),
+        together: Math.abs(box(row.querySelector(".t3x-fs-size")).top + box(row.querySelector(".t3x-fs-size")).height / 2 - box(row.querySelector(".t3x-fs-defslot")).top - box(row.querySelector(".t3x-fs-defslot")).height / 2) < 4,
+        lineW: Math.round(box(row.querySelector(".t3x-fs-sizeline")).width * 10),
+        order: [...row.children].map((c) => c.className),
+        similarRight: similar ? R.right - box(similar).right : null, similarTop: similar ? box(similar).top - head.top : null,
+        posRight: pos ? R.right - box(pos).right : null, posDy: pos && meta ? box(pos).top - box(meta).top : null };
     })`);
     const checkLines = (lines, when) => {
       for (const l of lines) {
         assert.deepEqual(l.out, [], `${when}: ${l.label} spills out of its row`);
         assert.deepEqual(l.overlap, [], `${when}: ${l.label} has overlapping parts`);
         assert.ok(l.scroll <= 1, `${when}: ${l.label} scrolls sideways`);
-        if (l.alsoW !== null) assert.ok(l.alsoW >= 30, `${when}: ${l.label} followers squeezed to ${l.alsoW}px`);
-        if (l.tailRight !== null) assert.ok(l.tailRight <= 1, `${when}: ${l.label} size and position not on the right`);
+        assert.deepEqual(l.order.slice(0, 2), ["t3x-fs-head", "t3x-fs-pick"], `${when}: ${l.label} is area line, then the font`);
+        if (l.similarRight !== null) assert.ok(Math.abs(l.similarRight) <= 1 && l.similarTop >= 0 && l.similarTop <= 3, `${when}: ${l.label}: "Use for similar" not pinned top right (${l.similarRight}, ${l.similarTop})`);
+        if (l.posRight !== null) assert.ok(Math.abs(l.posRight) <= 1, `${when}: ${l.label} position not on the right`);
       }
+      // Every row, T3's own fonts included, reserves the same width and puts the position on the same line.
+      const dys = lines.map((l) => Math.round(l.posDy)), widths = lines.map((l) => l.lineW);
+      assert.ok(dys.length >= 4 && dys.every((d) => d === dys[0]), `${when}: the position isn't on the same line in every row: ${dys}`);
+      assert.ok(widths.every((w) => w === widths[0]), `${when}: rows reserve different widths for size and Default: ${widths}`);
+      return { dy: dys[0], together: lines.every((l) => l.together) };
     };
 
     await ev(`window.__T3X_PICK_TEST__.openPanel(document.getElementById("anchor")), 1`); await frames();
@@ -133,13 +145,15 @@ test("Your fonts size buttons: step the source area, clamp, focus, T3 fonts have
     assert.equal(await val("main"), "100%");
     assert.equal(await val("composer"), "110%", "a font's catalog default size shows until changed");
     assert.equal(await val("sidebar"), "150%");
-    assert.equal(await ev(`${row("questions")}.querySelector(".t3x-fs-size")`), null, "T3's own fonts take T3's size: no buttons");
+    assert.equal(await ev(`${row("questions")}.querySelector("button.t3x-fs-sz, .t3x-fs-size[role]")`), null, "T3's own fonts take T3's size: no buttons");
+    assert.equal(await ev(`getComputedStyle(${row("questions")}.querySelector(".t3x-fs-sizeline")).visibility`), "hidden", "…but the row keeps the same room on line 3, unseen");
     const lines = await geometry();
-    assert.ok(lines.filter((l) => l.alsoW !== null).length >= 3 && (await ev(`document.querySelectorAll(".t3x-fs-area .t3x-fs-similar").length`)) >= 3, "crowded rows: followers and the similar pill");
-    checkLines(lines, "as rendered");
+    assert.ok((await ev(`document.querySelectorAll(".t3x-fs-also").length`)) >= 3 && (await ev(`document.querySelectorAll(".t3x-fs-head > .t3x-fs-similar").length`)) >= 3, "crowded rows: followers and the similar pill");
+    const wide = checkLines(lines, "as rendered");
+    assert.ok(wide.dy < 8 && wide.together, "a panel this wide keeps size, Default and the position on one line");
     await shot("font-size-strip.png");
     // Stress: the widest values every row could show at once.
-    await ev(`document.querySelectorAll(".t3x-fs-pos").forEach((e) => { e.textContent = "12 of 51"; }), document.querySelectorAll(".t3x-fs-size-val").forEach((e) => { e.textContent = "150%"; }), 1`); await frames();
+    await ev(`document.querySelectorAll(".t3x-fs-pos").forEach((e) => { e.textContent = "12 of 51"; }), document.querySelectorAll(".t3x-fs-size-val").forEach((e) => { e.textContent = "200%"; }), 1`); await frames();
     const stressed = await geometry();
     checkLines(stressed, "widest values");
     await shot("font-size-strip-widest.png");
@@ -159,15 +173,24 @@ test("Your fonts size buttons: step the source area, clamp, focus, T3 fonts have
     await frames();
     assert.equal(await ev(`document.activeElement?.dataset.focus`), "plus-main", "focus stays on + after the face loads");
 
-    // Up to 150: + turns off and focus moves to −, also after the face loads.
-    for (let i = 0; i < 12; i++) { await ev(`(() => { const b = document.querySelector('[data-focus="plus-main"]'); if (!b.disabled) b.click(); })(), 1`); await frames(); }
+    // At 150% the name is still drawn at its real size.
+    for (let i = 0; i < 9; i++) { await ev(`document.querySelector('[data-focus="plus-main"]').click(), 1`); await frames(); }
     assert.deepEqual(await saved("fontMain"), { family: "Arial", size: 150 });
     assert.equal(await until(face("T3X Main", 150), "Replies face not at 150%"), true); await frames();
+    assert.equal(await ev(`document.querySelector('[data-focus="fs-name-main"]').style.fontSize`), "", "150%: the name isn't scaled down");
+    // Up to 200: + turns off and focus moves to −, also after the face loads.
+    for (let i = 0; i < 12; i++) { await ev(`(() => { const b = document.querySelector('[data-focus="plus-main"]'); if (!b.disabled) b.click(); })(), 1`); await frames(); }
+    assert.deepEqual(await saved("fontMain"), { family: "Arial", size: 200 });
+    assert.equal(await until(face("T3X Main", 200), "Replies face not at 200%"), true); await frames();
     assert.equal(await ev(`document.querySelector('[data-focus="plus-main"]').disabled`), true);
     assert.equal(await ev(`document.activeElement?.dataset.focus`), "minus-main", "focus falls back to − at the top");
-    assert.equal(await val("main"), "150%");
+    assert.equal(await val("main"), "200%");
+    // Past 150% the name stops growing: 20px × 150/200, so its 30px line (and the buttons under it) stay put.
+    const capped = await ev(`(() => { const n = document.querySelector('[data-focus="fs-name-main"]'); return { fs: n.style.fontSize, h: n.getBoundingClientRect().height, title: n.title }; })()`);
+    assert.equal(capped.fs, "15px"); assert.equal(capped.h, 30);
+    assert.match(capped.title, /^Arial\. Shown at 150% here; the app uses 200%\./);
     // Down to 80: − turns off and focus moves to +.
-    for (let i = 0; i < 16; i++) { await ev(`(() => { const b = document.querySelector('[data-focus="minus-main"]'); if (!b.disabled) b.click(); })(), 1`); await frames(); }
+    for (let i = 0; i < 26; i++) { await ev(`(() => { const b = document.querySelector('[data-focus="minus-main"]'); if (!b.disabled) b.click(); })(), 1`); await frames(); }
     assert.deepEqual(await saved("fontMain"), { family: "Arial", size: 80 });
     assert.equal(await until(face("T3X Main", 80), "Replies face not at 80%"), true); await frames();
     assert.equal(await ev(`document.querySelector('[data-focus="minus-main"]').disabled`), true);
@@ -179,6 +202,106 @@ test("Your fonts size buttons: step the source area, clamp, focus, T3 fonts have
     assert.equal(await until(face("T3X Heading", 105), "Headings (following Message composer) not at 105%"), true);
     assert.equal(await ev(`document.querySelector('[data-focus="plus-composer"]').getAttribute("aria-label")`), "Larger font for Message composer, now 105%");
     assert.equal(await ev(`document.querySelector('[data-focus="plus-composer"]').title`), "Larger (105% → 110%)");
+
+    // Default, both ways. Replies is at 80% (Arial's default is 100%): a ring and "Default 100%".
+    const def = (id) => ev(`(() => { const c = ${row("ID")}.querySelector(".t3x-fs-defslot > :not(.t3x-fs-def-sizer)"); return c && { tag: c.tagName, text: c.textContent, on: c.classList.contains("t3x-fs-def-on"), title: c.title }; })()`.replace("ID", id));
+    const heights = async () => (await geometry()).map((l) => Math.round(l.h * 10));
+    assert.deepEqual(await def("main"), { tag: "BUTTON", text: "Default 100%", on: false, title: "Use the default size, 100%" });
+    const h0 = await heights();
+    await ev(`(() => { const b = document.querySelector('[data-focus="fs-def-main"]'); b.focus(); b.click(); })(), 1`); await frames();
+    assert.deepEqual(await saved("fontMain"), { family: "Arial", size: null }, "Default stores \"follow this font's default\"");
+    assert.equal(await val("main"), "100%");
+    assert.deepEqual(await def("main"), { tag: "BUTTON", text: "Default · back to 80%", on: true, title: "Back to 80%" });
+    assert.equal(await ev(`document.activeElement?.dataset.focus`), "fs-def-main", "focus stays on Default");
+    assert.deepEqual(await heights(), h0, "a click on Default moves nothing");
+    checkLines(await geometry(), "after Default");
+    // The memory outlives closing the panel.
+    await ev(`window.__T3X_PICK_TEST__.openPanel(document.getElementById("anchor")), 1`); await frames();
+    await ev(`window.__T3X_PICK_TEST__.openPanel(document.getElementById("anchor")), 1`); await frames();
+    assert.equal((await def("main")).text, "Default · back to 80%");
+    await ev(`document.querySelector('[data-focus="fs-def-main"]').click(), 1`); await frames();
+    assert.deepEqual(await saved("fontMain"), { family: "Arial", size: 80 }, "and back");
+    assert.equal((await def("main")).text, "Default 100%");
+    // − or + drops the remembered size: at the default again there is nothing to go back to, and no button.
+    await ev(`document.querySelector('[data-focus="fs-def-main"]').click(), 1`); await frames();
+    await ev(`document.querySelector('[data-focus="plus-main"]').click(), 1`); await frames();
+    await ev(`document.querySelector('[data-focus="minus-main"]').click(), 1`); await frames();
+    assert.deepEqual(await saved("fontMain"), { family: "Arial", size: 100 });
+    assert.deepEqual(await def("main"), { tag: "SPAN", text: "Default", on: true, title: "100% is this font's default size" });
+    assert.equal(await ev(`${row("questions")}.querySelector(".t3x-fs-defslot > :not(.t3x-fs-def-sizer)")`), null, "T3's own fonts have no Default");
+
+    // "Use for similar" gives the followers this font, so a follower's remembered size is gone; Undo doesn't bring it back.
+    await ev(`document.querySelector('[data-focus="fs-def-plans"]').click(), 1`); await frames();
+    assert.equal((await def("plans")).text, "Default · back to 120%");
+    await ev(`document.querySelector('[data-focus="fs-similar-main"]').click(), 1`); await frames();
+    assert.equal(await ev(`document.querySelector('[data-focus="fs-name-plans"]')`), null, "Plans now follows Replies");
+    await ev(`document.querySelector('[data-focus="fs-similar-main"]').click(), 1`); await frames();
+    assert.deepEqual(await def("plans"), { tag: "SPAN", text: "Default", on: true, title: "110% is this font's default size" });
+
+    // Mixed digits (80%, 105%, 200%) reserve the same widths at every width in between.
+    for (let i = 0; i < 20; i++) { await ev(`(() => { const b = document.querySelector('[data-focus="plus-plans"]'); if (!b.disabled) b.click(); })(), 1`); await frames(); }
+    for (let i = 0; i < 4; i++) { await ev(`document.querySelector('[data-focus="minus-main"]').click(), 1`); await frames(); }
+    assert.deepEqual([await val("main"), await val("plans")], ["80%", "200%"]);
+    // Another T3 window pressing + then − leaves an explicit size at the default: that ends the remembered size here too.
+    await ev(`document.querySelector('[data-focus="fs-def-composer"]').click(), 1`); await frames();
+    assert.equal((await def("composer")).text, "Default · back to 105%");
+    const fromOtherWindow = async (size) => { await ev(`(() => { const next = { ...JSON.parse(localStorage.getItem("t3x:settings:v1")), fontComposer: { family: "Georgia", size: ${size} } };
+      localStorage.setItem("t3x:settings:v1", JSON.stringify(next)); window.dispatchEvent(new StorageEvent("storage", { key: "t3x:settings:v1", newValue: JSON.stringify(next) })); })(), 1`); await frames(); };
+    await fromOtherWindow(110);
+    assert.deepEqual(await def("composer"), { tag: "SPAN", text: "Default", on: true, title: "110% is this font's default size" });
+    await fromOtherWindow(105);
+    assert.equal((await def("composer")).text, "Default 110%");
+    // A narrow panel: the position alone wraps under the size line, in every row at once (size and Default stay together),
+    // and Default still moves nothing.
+    let dropAt = null;
+    for (let w = 340; w >= 250; w -= 6) {
+      await ev(`document.querySelector(".t3x-pop").style.width = "${w}px", 1`); await frames();
+      const g = checkLines(await geometry(), `panel ${w}px`);
+      if (g.dy > 10 && g.together && dropAt === null) dropAt = w;
+    }
+    assert.ok(dropAt !== null, "some width drops only the position, with size and Default still side by side");
+    await ev(`document.querySelector(".t3x-pop").style.width = "${dropAt}px", 1`); await frames();
+    const narrow = checkLines(await geometry(), "narrow panel");
+    const h1 = await heights();
+    await ev(`document.querySelector('[data-focus="fs-def-composer"]').click(), 1`); await frames();
+    assert.equal((await def("composer")).text, "Default · back to 105%");
+    assert.deepEqual(await heights(), h1, "narrow panel: a click on Default moves nothing");
+    assert.deepEqual(checkLines(await geometry(), "narrow panel after Default"), narrow);
+    await shot("font-size-strip-narrow.png");
+    // Narrower than size and Default together: they part, still alike in every row.
+    await ev(`document.querySelector(".t3x-pop").style.width = "216px", 1`); await frames();
+    assert.equal(checkLines(await geometry(), "very narrow panel").together, false);
+    await ev(`document.querySelector(".t3x-pop").style.width = "340px", 1`); await frames();
+
+    // The Fonts editor's Default button goes both ways too, on the same memory.
+    await ev(`window.__T3X_PICK_TEST__.openFontsAt("composer"), 1`); await frames();
+    const reset = () => ev(`(() => { const b = window.__T3X_PICK_TEST__.workspace().reset; return { text: b.textContent, disabled: b.disabled }; })()`);
+    assert.deepEqual(await reset(), { text: "Back to 105%", disabled: false }, "the row's Default left 105% behind: the editor offers the way back");
+    await ev(`window.__T3X_PICK_TEST__.workspace().reset.click(), 1`); await frames();
+    assert.deepEqual(await saved("fontComposer"), { family: "Georgia", size: 105 });
+    assert.deepEqual(await reset(), { text: "Default 110%", disabled: false });
+    await ev(`window.__T3X_PICK_TEST__.workspace().reset.click(), 1`); await frames();
+    assert.deepEqual(await saved("fontComposer"), { family: "Georgia", size: null });
+    assert.deepEqual(await reset(), { text: "Back to 105%", disabled: false });
+    await ev(`window.__T3X_PICK_TEST__.workspace().reset.click(), 1`); await frames();
+    assert.deepEqual(await saved("fontComposer"), { family: "Georgia", size: 105 });
+    assert.deepEqual(await reset(), { text: "Default 110%", disabled: false });
+    await ev(`window.__T3X_PICK_TEST__.workspace().plus.click(), 1`); await frames();
+    assert.deepEqual(await reset(), { text: "Default 110%", disabled: true }, "at the default with nothing to go back to: greyed out");
+    for (let i = 0; i < 20; i++) { await ev(`(() => { const b = window.__T3X_PICK_TEST__.workspace().plus; if (!b.disabled) b.click(); })(), 1`); await frames(); }
+    assert.deepEqual(await saved("fontComposer"), { family: "Georgia", size: 200 }, "the editor steps to 200% too");
+    assert.equal(await ev(`window.__T3X_PICK_TEST__.workspace().plus.disabled`), true);
+    // Following another area, even for a moment, shows another font: the remembered size is gone for good.
+    await ev(`window.__T3X_PICK_TEST__.workspace().reset.click(), 1`); await frames();
+    assert.deepEqual(await reset(), { text: "Back to 200%", disabled: false });
+    const source = async (v) => { await ev(`(() => { const s = document.getElementById("t3x-font-source"); s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event("change", { bubbles: true })); })(), 1`); await frames(); };
+    await source("link:main");
+    assert.equal((await saved("fontSources")).composer, "link:main");
+    await source("own");
+    assert.equal((await saved("fontSources")).composer, "own");
+    assert.deepEqual(await reset(), { text: "Default 110%", disabled: true }, "own → follows Replies → own: nothing to go back to");
+    await ev(`window.__T3X_PICK_TEST__.openPanel(document.getElementById("anchor")), 1`); await frames();
+    if (!(await ev(`!!document.querySelector('[data-focus="fs-next-composer"]')`))) { await ev(`window.__T3X_PICK_TEST__.openPanel(document.getElementById("anchor")), 1`); await frames(); }
     // A different family: the old face isn't shown under the new name while it loads.
     const afterFamily = await ev(`(() => { document.querySelector('[data-focus="fs-next-composer"]').click(); const n = document.querySelector('[data-focus="fs-name-composer"]'); return { text: n.textContent, font: n.style.fontFamily }; })()`);
     if (afterFamily.text !== "Georgia") assert.doesNotMatch(afterFamily.font, /T3X Composer/, "new family: fallback font until its face loads");

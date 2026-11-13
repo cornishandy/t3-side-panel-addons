@@ -133,7 +133,9 @@
   // Round 1's four presets, as heading + body families.
   const LEGACY_PRESETS = { "3A": ["Caveat", "Kalam"], "3B": ["Noteworthy", "Bradley Hand"], "3C": ["Architects Daughter", "Patrick Hand"], "3D": ["SignPainter", "Chalkboard SE"] };
   const familyName = (v) => (typeof v === "string" && (v === "off" || /^[A-Za-z0-9 ]{2,40}$/.test(v)) ? v : null);
-  const sizePct = (v) => (Number.isInteger(v) && v >= 80 && v <= 150 && v % 5 === 0 ? v : null);
+  // Font sizes: 5% steps from 80% to 200%. "Your fonts" stops drawing a name bigger at NAME_CAP so its line keeps its height.
+  const SIZE_MIN = 80, SIZE_MAX = 200, NAME_CAP = 150;
+  const sizePct = (v) => (Number.isInteger(v) && v >= SIZE_MIN && v <= SIZE_MAX && v % 5 === 0 ? v : null);
   const fontPick = (v) => ({ family: familyName(v?.family) ?? "off", size: sizePct(v?.size) });
 
 
@@ -3842,6 +3844,32 @@
     if (typeof writeDyn === "function") writeDyn();
   }
   const sizeOf = (f, pick) => pick.size ?? (sizePct(f?.size) ?? 100);
+  const defaultSizeOf = (f) => sizePct(f?.size) ?? 100;
+  // "Default" on a size goes both ways. The size it left is kept here per area until T3 reloads (never saved),
+  // so it outlives closing the panel; a new font, − or +, or "Use for similar" drops it.
+  const sizeBack = new Map(); // area id -> { family, size }
+  /** The size Default would go back to for this area: only while the area still follows that font's default. */
+  function sizeBackFor(id) {
+    const pick = settings[ROLE[id]?.key], back = sizeBack.get(id);
+    return back && back.family === pick?.family && pick.size === null ? back.size : null;
+  }
+  /** Default, both ways: to the font's own default size (stored as "follow the default"), or back to the size it left. */
+  function toggleDefaultSize(id) {
+    const r = ROLE[id], pick = r && settings[r.key], f = catalog?.find((x) => x.name === pick?.family);
+    if (!f || f.source === "t3") return;
+    const n = sizeOf(f, pick), back = sizeBackFor(id);
+    if (n !== defaultSizeOf(f)) { sizeBack.set(id, { family: pick.family, size: n }); change({ [r.key]: { family: pick.family, size: null } }); }
+    else if (back !== null) { sizeBack.delete(id); change({ [r.key]: { family: pick.family, size: back } }); }
+  }
+  /** A remembered size lasts only while its area keeps that font at "follow the default" (what Default stores).
+   *  Any other state ends it for good, however it came about: a new font, following another area even for a
+   *  moment, or a size set by − or +, here or in another T3 window. Runs on every settings change. */
+  function pruneSizeBack() {
+    for (const [id, back] of sizeBack) {
+      const pick = settings[ROLE[id]?.key];
+      if (settings.fontSources?.[id] !== "own" || pick?.family !== back.family || pick.size !== null) sizeBack.delete(id);
+    }
+  }
 
   /** Errors are handled here, with the same token and disposal checks as success, so a late
    *  failure can never switch off a newer choice or a newer copy of the add-ons. */
@@ -4127,10 +4155,10 @@
     const prev=h("button",{type:"button",class:"t3x-btn","aria-label":"Previous font",onclick:()=>choose(fontNeighbor(catalog,settings,settings[ROLE[fontNav.role].key].family,-1,nativeAvailable,fontNav.role))},"Previous");
     const next=h("button",{type:"button",class:"t3x-btn","aria-label":"Next font",onclick:()=>choose(fontNeighbor(catalog,settings,settings[ROLE[fontNav.role].key].family,1,nativeAvailable,fontNav.role))},"Next");
     const size=h("output",{id:"t3x-font-size","aria-live":"polite"});
-    const step=d=>{const r=ROLE[fontNav.role],pick=settings[r.key],f=catalog?.find(f=>f.name===pick.family);change({[r.key]:{family:pick.family,size:clamp(sizeOf(f,pick)+d,80,150)}});};
+    const step=d=>{const r=ROLE[fontNav.role],pick=settings[r.key],f=catalog?.find(f=>f.name===pick.family);sizeBack.delete(fontNav.role);change({[r.key]:{family:pick.family,size:clamp(sizeOf(f,pick)+d,SIZE_MIN,SIZE_MAX)}});};
     const minus=h("button",{type:"button",class:"t3x-btn","aria-label":"Smaller font",onclick:()=>step(-5)},"−");
     const plus=h("button",{type:"button",class:"t3x-btn","aria-label":"Larger font",onclick:()=>step(5)},"+");
-    const reset=h("button",{type:"button",class:"t3x-btn",onclick:()=>{const r=ROLE[fontNav.role];change({[r.key]:{...settings[r.key],size:null}});}},"Default size");
+    const reset=h("button",{type:"button",class:"t3x-btn",onclick:()=>toggleDefaultSize(fontNav.role)},"Default size");
     const filter=(key,label)=>h("button",{type:"button",class:"t3x-chipbtn","data-filter":key,"aria-pressed":String(settings[key]),onclick:()=>change({[key]:!settings[key]})},label);
     const own=h("div",{class:"t3x-font-own"},h("div",{class:"t3x-chips"},filter("printOnly","Print only"),filter("showPartly","Show semi-cursive")),h("p",{class:"t3x-note",text:"Turn both off to include script fonts. Narrowest first; ★ marks a good fit."}),h("label",{for:"t3x-font-family",text:"Font family"}),h("div",{class:"t3x-workspace-browse"},prev,family,next),h("div",{class:"t3x-workspace-size",role:"group","aria-label":"Font size"},h("span",{text:"Size"}),minus,size,plus,reset));
     const fontNote=h("p",{class:"t3x-note"});
@@ -4227,7 +4255,10 @@
     ui.family.style.fontFamily=f?.source==="t3"?f.css:f?`"${nameAlias(f.name)}",var(--font-sans)`:"var(--font-sans)";
     ui.prev.disabled=!fontNeighbor(catalog,settings,pick.family,-1,nativeAvailable,id);ui.next.disabled=!fontNeighbor(catalog,settings,pick.family,1,nativeAvailable,id);
     const n=sizeOf(f,pick),disabled=pick.family==="off"||!f||f.source==="t3";
-    ui.size.textContent=disabled?"—":`${n}%`;ui.minus.disabled=disabled||n<=80;ui.plus.disabled=disabled||n>=150;ui.reset.disabled=disabled||pick.size===null;ui.reset.textContent=`Default ${sizePct(f?.size)??100}%`;
+    const def=defaultSizeOf(f),back=disabled?null:sizeBackFor(id);
+    ui.size.textContent=disabled?"—":`${n}%`;ui.minus.disabled=disabled||n<=SIZE_MIN;ui.plus.disabled=disabled||n>=SIZE_MAX;
+    // Default goes both ways: after it, the same button reads "Back to 130%"; with nothing to go back to it greys out.
+    ui.reset.disabled=disabled||(n===def&&back===null);ui.reset.textContent=n===def&&back!==null?`Back to ${back}%`:`Default ${def}%`;
     for(const filter of ui.own.querySelectorAll("[data-filter]"))filter.setAttribute("aria-pressed",String(settings[filter.dataset.filter]));
     const ef=catalog?.find(f=>f.name===effective.family),t3=ef?.source==="t3"&&id!=="viz";
     const loaded=t3||roleFaces[id]?.key===`${effective.family}|${sizeOf(ef,effective)}`;
@@ -4318,6 +4349,7 @@
   function change(patch) {
     const wasTeam = settings.footerTeam;
     settings = patch === null ? readSettings("{}") : readSettings(JSON.stringify({ ...settings, ...patch }));
+    pruneSizeBack();
     if (settings.footerTeam === "always-show" && wasTeam !== "always-show") {
       try {
         footerPass(D, "always-show", footerSeen);
@@ -4816,9 +4848,11 @@
   function fontPickList() {
     const groups = fontStripGroups();
     if (!groups.length) return null;
+    const lists = new Map(groups.map(({ id }) => [id, catalog ? fontOptions(catalog, settings, settings[ROLE[id].key].family, nativeAvailable, id).flatMap((g) => g.options) : []]));
+    const posCh = Math.max(0, ...[...lists.values()].map((e) => 2 * String(e.length).length + 4));
     return h("section", { class: "t3x-fs", "aria-label": "Your fonts" }, h("h3", { text: "Your fonts" }), groups.map(({ id, followers }) => {
       const pick = settings[ROLE[id].key], f = catalog?.find((x) => x.name === pick.family);
-      const entries = catalog ? fontOptions(catalog, settings, pick.family, nativeAvailable, id).flatMap((g) => g.options) : [];
+      const entries = lists.get(id);
       const at = entries.findIndex((o) => o.name === pick.family);
       const t3 = f?.source === "t3" && id !== "viz";
       // The face stays registered under the alias until a new size's face loads, so a size-only
@@ -4841,38 +4875,63 @@
         onclick: () => offer.areas.length ? applySimilar(id) : undoSimilar(),
       }, offer.areas.length ? "Use for similar" : "Undo");
       // − n% +: the same size as Fonts' Size, on the source area, so areas that follow it change too.
-      // T3's own fonts take T3's size, so they have none.
-      let size = null;
+      // T3's own fonts take T3's size, so they have neither the buttons nor Default.
+      // The widest label a row can show holds the Default slot's width in every row.
+      const dot = () => h("i", { "aria-hidden": "true" });
+      const defSizer = () => h("span", { class: "t3x-fs-def t3x-fs-def-sizer", "aria-hidden": "true" }, dot(), `Default · back to ${SIZE_MAX}%`);
+      // A row with no size (T3's own fonts) still reserves the same room on line 3, unseen, so its
+      // place in the list wraps exactly where the other rows' does.
+      let sizeLine = h("span", { class: "t3x-fs-sizeline t3x-fs-ghost", "aria-hidden": "true" },
+        h("span", { class: "t3x-fs-size" }, h("span", { class: "t3x-fs-sz" }), h("span", { class: "t3x-fs-size-val", text: "100%" }), h("span", { class: "t3x-fs-sz" })),
+        h("span", { class: "t3x-fs-defslot" }, defSizer()));
       if (f && f.source !== "t3") {
-        const n = sizeOf(f, pick), def = sizePct(f.size) ?? 100;
+        const n = sizeOf(f, pick), def = defaultSizeOf(f), back = sizeBackFor(id);
         const step = (d) => {
           const cur = settings[ROLE[id].key], cf = catalog?.find((x) => x.name === cur.family);
-          change({ [ROLE[id].key]: { family: cur.family, size: clamp(sizeOf(cf, cur) + d, 80, 150) } });
+          sizeBack.delete(id);
+          change({ [ROLE[id].key]: { family: cur.family, size: clamp(sizeOf(cf, cur) + d, SIZE_MIN, SIZE_MAX) } });
         };
         const sizeBtn = (d) => h("button", {
           type: "button", class: "t3x-fs-sz", "data-focus": `${d < 0 ? "minus" : "plus"}-${id}`,
           "aria-label": `${d < 0 ? "Smaller" : "Larger"} font for ${label}, now ${n}%`,
-          title: `${d < 0 ? "Smaller" : "Larger"} (${n}% → ${clamp(n + d, 80, 150)}%)`,
-          disabled: (d < 0 ? n <= 80 : n >= 150) ? true : null, onclick: () => step(d),
+          title: `${d < 0 ? "Smaller" : "Larger"} (${n}% → ${clamp(n + d, SIZE_MIN, SIZE_MAX)}%)`,
+          disabled: (d < 0 ? n <= SIZE_MIN : n >= SIZE_MAX) ? true : null, onclick: () => step(d),
         }, d < 0 ? "−" : "+");
-        size = h("span", { class: "t3x-fs-size", role: "group", "aria-label": `Size for ${label}` }, sizeBtn(-5),
-          h("span", { class: "t3x-fs-size-val", text: `${n}%`, title: `Size ${n}%, default ${def}%. To go back to the default, click the font name, then Default ${def}%.` }),
+        const size = h("span", { class: "t3x-fs-size", role: "group", "aria-label": `Size for ${label}` }, sizeBtn(-5),
+          h("span", { class: "t3x-fs-size-val", text: `${n}%`, title: `Size ${n}%, default ${def}%. The Default control on this row sets it.` }),
           sizeBtn(5));
+        // Default, both ways. A ring: the size differs, click for the default. A dot: this is the default,
+        // and when a size was left behind the same control goes back to it.
+        const def2 = n !== def
+          ? h("button", { type: "button", class: "t3x-fs-def", "data-focus": `fs-def-${id}`, "aria-label": `Use the default size for ${label}, ${def}%`, title: `Use the default size, ${def}%`, onclick: () => toggleDefaultSize(id) }, dot(), `Default ${def}%`)
+          : back !== null
+            ? h("button", { type: "button", class: "t3x-fs-def t3x-fs-def-on", "data-focus": `fs-def-${id}`, "aria-label": `${label} is at its default size, ${def}%. Back to ${back}%`, title: `Back to ${back}%`, onclick: () => toggleDefaultSize(id) }, dot(), `Default · back to ${back}%`)
+            : h("span", { class: "t3x-fs-def t3x-fs-def-on", title: `${def}% is this font's default size` }, dot(), "Default");
+        // Size and Default stay together; the slot is always as wide as the widest label, so line 3 wraps
+        // (or not) the same way in every row, and a click on Default never moves anything.
+        sizeLine = h("span", { class: "t3x-fs-sizeline" }, size, h("span", { class: "t3x-fs-defslot" }, defSizer(), def2));
+        // Past NAME_CAP the name stops growing: its line keeps its height, so − and + stay under the pointer.
+        // (The size drawn is the loaded face's: a new size keeps the old face until its own has loaded.)
+        const shown = loaded ? Number(faceKey.slice(faceKey.lastIndexOf("|") + 1)) : 0;
+        if (shown > NAME_CAP) name.style.fontSize = `${Math.round(2000 * NAME_CAP / shown) / 100}px`;
+        if (n > NAME_CAP) name.title = `${pick.family}. Shown at ${NAME_CAP}% here; the app uses ${n}%. Click to edit in Fonts; ← → try the previous or next font.`;
       }
       const pos = at >= 0 ? h("span", { class: "t3x-fs-pos", text: `${at + 1} of ${entries.length}` }) : null;
+      if (pos) pos.style.minWidth = `${posCh}ch`;
+      // Three fixed lines: the area and its action; the font; its size, Default and place in the list.
       return h("div", { class: "t3x-fs-row" },
-        // The followers span always takes the line's spare room (and keeps a little even when it's
-        // crowded); a crowded line moves the size and position to a second line on the right.
-        h("div", { class: "t3x-fs-area" }, h("span", { text: label }),
-          also.length ? h("span", { class: "t3x-fs-also", text: `+ ${also.join(", ")}`, title: `+ ${also.join(", ")}` }) : h("span", { class: "t3x-fs-gap", "aria-hidden": "true" }),
-          similar, size || pos ? h("span", { class: "t3x-fs-tail" }, size, pos) : null),
-        h("div", { class: "t3x-fs-pick" }, arrow(-1), name, arrow(1)));
+        h("div", { class: "t3x-fs-head" },
+          h("span", { class: "t3x-fs-lead" }, h("span", { class: "t3x-fs-label", text: label }), also.length ? h("span", { class: "t3x-fs-also", text: `+\u00a0${also.join(", ")}` }) : null),
+          similar),
+        h("div", { class: "t3x-fs-pick" }, arrow(-1), name, arrow(1)),
+        h("div", { class: "t3x-fs-meta" }, sizeLine, pos));
     }));
   }
 
   listen(W, "storage", (e) => {
     if (e.key === SETTINGS_KEY) {
       settings = readSettings(e.newValue);
+      pruneSizeBack();
       applyRootAttrs();
       applyFonts();
       if (pop?.kind === "panel") fillPopover();
