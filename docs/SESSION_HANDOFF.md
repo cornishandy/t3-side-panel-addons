@@ -15,6 +15,7 @@
 - 31 Oct: the Older threads section folds by a set age (default 2 days; 12 hours to 1 week or Auto in the ✦ panel), under an "Older than 2 days" header shaped like T3's shelf headers.
 
 - 6 Nov: keeper v14 supports Nightly .4247: runtimeLayer/server split, shared sidebar minimum, server indentation reclaim. Native title setting compared; Andy chose to keep rule/fit/titleGuide in the keeper and leave native threadTitleInstructions unset. Gemini version is already 2.24.0 upstream in this build.
+- 9–12 Nov: a showcase page of the sidebar title rules was built for T3 Code's maintainers (page, ten screenshots of invented threads, a README picture). Not published and not sent: on 12 Nov upstream said it takes only bug fixes from outside (see DECISIONS, 12 Nov). The page is parked on the local branch `sidebar-titles-page`, unpushed. Before any reuse: it shows an invented 101-character title and wrongly calls it a failed title (a design round settled on an invented 40-character one, labelled as invented; never built), and with thread burn tells on, the burn chip covers most of a compact-row title at 256 px (a bug, not fixed).
 
 ## Where things live
 
