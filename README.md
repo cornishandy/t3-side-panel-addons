@@ -65,6 +65,7 @@ Quit and reopen T3 after `--restore`. The keeper's uninstall only removes its ba
 - [x] Keeper `minWidth` supports nightly `0.1.8-nightly.20261106.4247`; older keeper/build combinations can still fail to apply the width patch
 - [x] Compact sidebar usage in a short window (under 800 px tall)
 - [x] Fable's own weekly limit inside Claude's usage item: thin twin bar, label, chip, detail row (13 Nov 2026)
+- [x] Claude without a 5-hour window: no tank or `5h` number in its item, and the legend names the tank only while a lab has one (13 Nov 2026)
 - [x] Find fonts on screen: hover names the font area, Shift labels every area, a click opens Fonts beside the text, Show on screen — each with its own switch
 - [x] Move popups out of the way: every popup drags by its top bar and reopens there; Fonts stops dimming, and its Small card sits clear of the text
 - [x] Committed add-on tests cover usage, fonts and sidebar behavior (browser tests use the newest installed headless Chrome)

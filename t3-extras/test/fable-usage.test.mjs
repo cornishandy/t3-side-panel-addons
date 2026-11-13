@@ -103,7 +103,9 @@ test("parity: labs without a per-model limit match the previous file", () => {
     assert.equal(C.shortBarText(b, NOW), old.shortBarText(a, NOW), `${name} one-line`);
     assert.deepEqual(plain(C.composerLabel(b, NOW)), plain(old.composerLabel(a, NOW)), `${name} chip`);
     assert.equal(C.bTooltip(b, NOW), old.bTooltip(a, NOW), `${name} tooltip`);
-    assert.equal(C.bLegend([b]), old.bLegend([a]), `${name} legend`);
+    // 13 Nov 2026: with no short window the legend no longer names a tank. The file before that change did.
+    const oldLegend = b.short ? old.bLegend([a]) : old.bLegend([a]).replace(" Tank level: 5-hour remaining, a separate limit.", "");
+    assert.equal(C.bLegend([b]), oldLegend, `${name} legend`);
     assert.deepEqual(plain(C.forecast(b, NOW)), plain(old.forecast(a, NOW)), `${name} forecast`);
     for (const size of ["md", "sm", "lg"]) {
       const h = size === "lg" ? 22 : size === "sm" ? 12 : 17;

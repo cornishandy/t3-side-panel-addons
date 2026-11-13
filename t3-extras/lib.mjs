@@ -26,6 +26,8 @@ export function guard(headers, port = PORT) {
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const pct = (v) => (num(v) === null ? null : Math.max(0, Math.min(100, v)));
 
+// Claude's plan has had no 5-hour window since 13 Nov 2026 (lab-usage lists the week alone); the
+// name stays so a reading that lists one is still drawn.
 const CLAUDE_WINDOW_NAMES = { "5-hour": ["c5h", "Claude 5-hour"], week: ["cwk", "Claude week"] };
 const CODEX_WINDOW_NAMES = { "5-hour": ["x5h", "Codex 5-hour"], weekly: ["xwk", "Codex week"], week: ["xwk", "Codex week"] };
 

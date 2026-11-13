@@ -853,8 +853,9 @@
     const age = known(lab.fetchedAt) ? now - lab.fetchedAt : null;
     const failed = lab.source === "t3" ? fails.t3 : fails.labUsage;
     const stale = age === null || age > (lab.source === "t3" ? T3_STALE_MS : STALE_MS) || Boolean(failed) || lab.live === false;
-    // T3's rule: once Claude's week or Codex's weekly limit is used up, the 5-hour window shows
-    // as fully used, with no pace, until the weekly reset.
+    // T3's rule: once Claude's week or Codex's weekly limit is used up, a 5-hour window shows
+    // as fully used, with no pace, until the weekly reset. Only for a reading that lists one:
+    // Claude's has listed none since 13 Nov 2026, so its used-up week reads "0% left" alone.
     const blocked = Boolean(short && (lab.id === "claude" || lab.id === "codex") && long.usedPct >= 100);
     const sp = !short ? null : blocked ? { used: 100, left: 0, leftExact: 0, elapsed: null, timeLeft: null, timeLeftExact: null, pace: null, bounds: windowBounds(short) } : paceOf(short, now);
     const scopedPack = collectScoped(lab, long, now, fails);
@@ -1055,7 +1056,7 @@
     const wrap = Boolean(groups) && typeof px === "number" && typeof measure === "function" && measure(text) > px;
     return { text, parts, wrap, keep, lines: wrap ? groups : null };
   }
-  /** The composer chip: "Claude 5h 12%" (the tightest limit), plus "· refills 12:00 AM" when that
+  /** The composer chip: "Gemini 5h 12%" (the tightest limit), plus "· refills 12:00 AM" when that
    *  one runs low; a refill on another day keeps its day ("Fri 12:00 AM"). A per-model limit
    *  at zero is left out of the comparison. */
   function composerLabel(v, now = Date.now()) {
@@ -1175,8 +1176,10 @@
     const shorts = [...new Set(shown.filter((v) => v.short).map((v) => v.shortWord))];
     const unit = longs.length === 1 ? longs[0] : longs.length ? longs.join(" or ") : "week";
     const adj = longs.length === 1 ? (shown[0].longAdj) : longs.length ? shown.map((v) => v.longAdj).filter((a, i, all) => all.indexOf(a) === i).join(" or ") : "weekly";
-    const short = shorts.length === 1 ? shorts[0] : shorts.length ? shorts.join(" or ") : "5-hour";
-    return `Bar: ${unit} remaining. Needle position: even ${adj} pace. Tank level: ${short} remaining, a separate limit.`;
+    // The tank sentence only while a shown lab has a short window (Claude's plan has had none
+    // since 13 Nov 2026): the legend never names a tank that isn't drawn.
+    const tank = shorts.length ? ` Tank level: ${shorts.join(" or ")} remaining, a separate limit.` : "";
+    return `Bar: ${unit} remaining. Needle position: even ${adj} pace.${tank}`;
   }
 
   /** B, "pace needle with a 5-hour tank": track; fill = long window left; the even-pace line at
@@ -3027,7 +3030,8 @@
     },
   };
 
-  // Sidebar footer: one row per lab with data, "Claude 63% left · 5h 70%" over its B glyph.
+  // Sidebar footer: one row per lab with data, "Gemini 63% left · 5h 70%" over its B glyph
+  // (a lab with no short window, like Claude since 13 Nov 2026, has no "5h" part).
   // In a short window (switch on), one line per lab instead: name, a small glyph, "63% · 5h 70%".
   const SHORT_WINDOW = 800;
   const barsCompact = () => settings.usageSidebarShort && (W.innerHeight || 1000) < SHORT_WINDOW;
