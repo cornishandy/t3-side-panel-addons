@@ -649,7 +649,11 @@
       }
       for (const [id, mine] of parts) {
         if (!LABS.some((l) => l.id === id)) continue;
-        const ws = mine.filter((w) => known(w.usedPercent));
+        // A listed per-model week with no percentage is kept (usedPct null) so the popover can
+        // say it has no reading. It is never chosen as the long or short window.
+        const readable = mine.filter((w) => known(w.usedPercent));
+        const unreadScoped = mine.filter((w) => !known(w.usedPercent) && /^seven_day_[a-z0-9]+$/.test(w.id));
+        const ws = readable;
         const byId = (map) => (map[id] ? map[id].map((x) => ws.find((w) => w.id === x)).find(Boolean) ?? null : undefined);
         const long = byId(LONG_ID) !== undefined ? byId(LONG_ID) : ws.find((w) => w.kind === "weekly") ?? ws.find((w) => w.kind === "monthly") ?? ws.find((w) => w.kind === "other") ?? null;
         const short = byId(SHORT_ID) !== undefined ? byId(SHORT_ID) : ws.find((w) => w.kind === "session" && w !== long) ?? null;
@@ -667,7 +671,18 @@
           assumeLength: id === "grok" && w.durationAbsent,
           fetchedAt: checkedAt,
           live: !stale,
-        }));
+        })).concat(unreadScoped.map((w) => ({
+          id: w.id,
+          role: "extra",
+          kind: w.kind,
+          label: w.label,
+          usedPct: null,
+          resetsAt: w.resetsAt,
+          lengthSec: w.durationMins ? w.durationMins * 60 : null,
+          assumeLength: false,
+          fetchedAt: checkedAt,
+          live: !stale,
+        })));
         const entry = {
           ...LABS.find((l) => l.id === id),
           source: "t3",
@@ -705,7 +720,11 @@
             ? { ...w, projection: sw.projection, projectionAt: sw.projectionAt, projectionUsed: sw.projectionUsed, projectionResetsAt: sw.resetsAt ?? null, projectionFrom: { live: s.live !== false && sw.live !== false, at: s.fetchedAt ?? null } }
             : w;
         });
-        return { ...t, windows, verdict: s?.verdict ?? null, verdictLive: s?.live ?? null, verdictAt: s?.fetchedAt ?? null };
+        // lab-usage's own week bounds travel with its verdict: a per-model reading that only
+        // lab-usage reports is dated by them, never by T3's week.
+        const sLong = s?.windows?.find((x) => x.role === "long") ?? null;
+        const verdictWeek = sLong ? { resetsAt: sLong.resetsAt ?? null, lengthSec: sLong.lengthSec ?? null } : null;
+        return { ...t, windows, verdict: s?.verdict ?? null, verdictLive: s?.live ?? null, verdictAt: s?.fetchedAt ?? null, verdictWeek };
       }
       // lab-usage stands in when T3 has no reading, but never for a provider turned off in T3.
       if (s && t?.enabled !== false && (s.windows ?? []).some((w) => w.role === "long" && known(w.usedPct))) {
@@ -739,6 +758,86 @@
   }
   const NO_PROJECTION = { projection: null, projectionAt: null, projectionUsed: null, projectionResetsAt: null, projectionFrom: null };
 
+  /** "seven_day_fable" -> "fable". The all-model week "seven_day" is not a per-model limit. */
+  function scopedModelOf(id) {
+    const m = /^seven_day_([a-z0-9]+)$/.exec(String(id ?? ""));
+    return m ? m[1] : null;
+  }
+  const modelName = (model) => (model ? model.charAt(0).toUpperCase() + model.slice(1) : "");
+  /** Lab-usage's numeric stop is fresh on the same test as the tier line. Out of 0–100: no stop. */
+  function stopLeftOf(lab, now, fails) {
+    const vd = lab?.verdict;
+    const at = lab?.verdictAt;
+    const fresh = vd && lab.verdictLive !== false && known(at) && now - at <= STALE_MS && !fails.labUsage;
+    if (!fresh || !known(vd.fableStop) || vd.fableStop < 0 || vd.fableStop > 100) return null;
+    return 100 - vd.fableStop;
+  }
+  function scopedEntry(w, model, source, lab, now, fails) {
+    const pace = paceOf(w, now);
+    const fetchedAt = source === "lab-usage" ? (lab.verdictAt ?? w.fetchedAt ?? null) : (w.fetchedAt ?? null);
+    const age = known(fetchedAt) ? now - fetchedAt : null;
+    const stale = source === "lab-usage"
+      ? age === null || age > STALE_MS || lab.verdictLive === false || Boolean(fails.labUsage)
+      : age === null || age > T3_STALE_MS || w.live === false || Boolean(fails.t3);
+    return {
+      model,
+      name: modelName(model),
+      used: w.usedPct,
+      left: pace?.left ?? Math.round(100 - clamp(w.usedPct, 0, 100)),
+      leftExact: pace?.leftExact ?? (100 - clamp(w.usedPct, 0, 100)),
+      resetsAt: known(w.resetsAt) ? w.resetsAt : null,
+      lengthSec: known(w.lengthSec) && w.lengthSec > 0 ? w.lengthSec : null,
+      pace,
+      source,
+      fetchedAt,
+      live: w.live !== false && lab.live !== false,
+      stale,
+      age,
+      epochStart: pace?.bounds?.start ?? null,
+    };
+  }
+  /** Per-model weeks. T3's reading wins; lab-usage fills a model T3 did not read, with its own reset. */
+  function collectScoped(lab, long, now, fails) {
+    const by = new Map();
+    const unread = new Map();
+    for (const w of lab.windows ?? []) {
+      const fromRole = typeof w.role === "string" && /^scoped:([a-z0-9]+)$/.exec(w.role);
+      const model = scopedModelOf(w.id) || (fromRole ? fromRole[1] : null);
+      if (!model) continue;
+      if (!known(w.usedPct)) {
+        if (!by.has(model)) unread.set(model, { model, name: modelName(model) });
+        continue;
+      }
+      by.set(model, scopedEntry(w, model, lab.source === "lab-usage" ? "lab-usage" : "t3", lab, now, fails));
+      unread.delete(model);
+    }
+    // lab-usage's reading is dated by lab-usage's own week: the stand-in lab's long window, or the
+    // bounds the merge carried beside the verdict. T3's week is never lent to it.
+    const week = lab.source === "lab-usage" ? (long ?? lab.windows?.find((w) => w.role === "long") ?? null) : (lab.verdictWeek ?? null);
+    for (const s of lab.verdict?.scoped ?? []) {
+      const model = String(s?.model ?? "").trim().toLowerCase();
+      if (!/^[a-z0-9]+$/.test(model) || by.has(model)) continue;
+      if (!known(s.usedPct)) {
+        if (!unread.has(model)) unread.set(model, { model, name: modelName(model) });
+        continue;
+      }
+      const w = {
+        id: `seven_day_${model}`,
+        usedPct: s.usedPct,
+        resetsAt: week?.resetsAt ?? null,
+        lengthSec: week?.lengthSec ?? null,
+        fetchedAt: lab.verdictAt ?? null,
+        live: lab.verdictLive !== false,
+      };
+      by.set(model, scopedEntry(w, model, "lab-usage", lab, now, fails));
+      unread.delete(model);
+    }
+    const scoped = [...by.values()].sort((a, b) => a.name.localeCompare(b.name));
+    const scopedNoReading = [...unread.values()].filter((e) => !by.has(e.model)).sort((a, b) => a.name.localeCompare(b.name));
+    const barScoped = scoped.slice().sort((a, b) => a.leftExact - b.leftExact || a.name.localeCompare(b.name))[0] ?? null;
+    return { scoped, scopedNoReading, barScoped, fable: scoped.find((e) => e.model === "fable") ?? null };
+  }
+
   /** What every place shows for one lab. fails: {labUsage, t3} = when that source last failed. */
   function labView(lab, now, fails = {}) {
     if (!lab?.hasMeter) {
@@ -758,7 +857,9 @@
     // as fully used, with no pace, until the weekly reset.
     const blocked = Boolean(short && (lab.id === "claude" || lab.id === "codex") && long.usedPct >= 100);
     const sp = !short ? null : blocked ? { used: 100, left: 0, leftExact: 0, elapsed: null, timeLeft: null, timeLeftExact: null, pace: null, bounds: windowBounds(short) } : paceOf(short, now);
-    const limits = [lp.leftExact, short && !blocked ? sp?.leftExact : null].filter(known);
+    const scopedPack = collectScoped(lab, long, now, fails);
+    // A per-model limit at zero leaves the tightest-limit comparison. It never sets blocked.
+    const limits = [lp.leftExact, short && !blocked ? sp?.leftExact : null, ...scopedPack.scoped.filter((e) => e.leftExact > 0).map((e) => e.leftExact)].filter(known);
     // The usage epoch: lab-usage's projection P = u·(end−s)/(t−s) gives its start s (it moves
     // after a manual Codex reset); otherwise the window start, unless the lab has manual resets.
     let epochStart = null;
@@ -783,6 +884,11 @@
       epochStart,
       epochUnknown: lab.id === "codex" || Boolean(lab.resetCredits),
       minLeft: limits.length ? Math.min(...limits) : null,
+      scoped: scopedPack.scoped,
+      scopedNoReading: scopedPack.scopedNoReading,
+      barScoped: scopedPack.barScoped,
+      fable: scopedPack.fable,
+      stopLeft: stopLeftOf(lab, now, fails),
       longWord: long.kind === "monthly" ? "Month" : long.kind === "weekly" ? "Week" : "Window",
       longAdj: long.kind === "monthly" ? "monthly" : long.kind === "weekly" ? "weekly" : "main",
       shortWord: shortHours ? (Number.isInteger(shortHours) ? `${shortHours}-hour` : `${Math.round(shortHours * 60)}-minute`) : "Short window",
@@ -822,24 +928,192 @@
     }
     return parts;
   }
-  /** The composer chip: "Claude 5h 12%" (the tightest limit), plus "· refills 12:00 AM" when that
-   *  one runs low; a refill on another day keeps its day ("Fri 12:00 AM"). */
-  function composerLabel(v, now = Date.now()) {
-    const tight = v.short && !v.blocked && known(v.sp?.leftExact) && v.sp.leftExact < v.lp.leftExact;
-    const low = lowRefills(v).find((r) => (tight ? r.which === "short" : r.which === "long"));
-    const sameDay = low && new Date(low.at).toDateString() === new Date(now).toDateString();
-    return { main: `${v.name} ${tight ? `${v.shortTag} ` : ""}${fmtPct(v.minLeft)}`, refill: low ? (sameDay ? fmtTime(low.at) : fmtWhen(low.at)) : null };
+  const part = (t, low = false) => ({ t, low: Boolean(low) });
+  const plain = (parts) => (Array.isArray(parts) ? parts : []).map((p) => p.t).join(" · ");
+  /** First candidate that fits. No width: the fullest. None fit: the last. */
+  function fitParts(cands, px, measure) {
+    if (!cands?.length) return [];
+    cands = cands.filter((c, i) => cands.findIndex((x) => plain(x) === plain(c)) === i);
+    if (typeof px !== "number" || typeof measure !== "function") return cands[0];
+    for (const c of cands) if (measure(plain(c)) <= px) return c;
+    return cands[cands.length - 1];
   }
-  /** The short-window sidebar line: "63% · 5h 70%", plus the refill clock when one runs low. */
-  function shortBarText(v, now) {
-    if (!v?.hasData) return v?.showUnknown ? "—" : "";
+  function scopedPart(entry, stopLeft) {
+    if (!entry) return null;
+    if (entry.leftExact <= 0) return part(`${entry.name} out`, entry.model === "fable");
+    const showLeft = entry.leftExact <= 15;
+    const warn = entry.model === "fable" && known(stopLeft) && entry.leftExact <= stopLeft;
+    return part(`${entry.name} ${fmtPct(entry.left)}${showLeft ? " left" : ""}`, warn);
+  }
+  const lowScoped = (e) => Boolean(e && e.leftExact <= 15);
+  /** The whole percent a limit shows. Limits are compared by it, and a tie goes to the broader
+   *  limit: the week, then the short window, then a per-model limit. */
+  const shownLeft = (p) => (p && known(p.leftExact) ? Math.round(p.leftExact) : Infinity);
+  const shortShown = (v) => (!v?.short || !v.sp ? Infinity : v.blocked ? 0 : shownLeft(v.sp));
+  const lowShort = (v) => Boolean(v?.short && v.sp && (v.blocked || v.sp.leftExact <= 25 || v.sp.pace === "ahead"));
+  const clockPart = (at, now, withWord) => (known(at) ? part(withWord ? `refills ${fmtClock(at, now)}` : fmtClock(at, now)) : null);
+  /** Sidebar candidates, fullest first, only when a per-model reading is drawn. Every limit is
+   *  its own part, so a number at or below the stop keeps its warning colour on every candidate. */
+  function sidebarCands(v, now) {
+    if (!v?.barScoped) return null;
+    const wk = part(`${fmtPct(v.lp.left)} left`);
+    const wkS = part(`${fmtPct(v.lp.left)}`);
+    const five = v.short ? part(`${v.shortTag} ${v.blocked ? "blocked" : fmtPct(v.sp?.left)}`) : null;
+    const bar = v.barScoped;
+    const f = scopedPart(bar, v.stopLeft);
+    const lowF = lowScoped(bar);
+    const lowS = lowShort(v);
+    // A week at 15% left or less is itself a low limit: its number never gives way.
+    const lowWeek = v.lp.leftExact <= 15;
+    const withWeek = (cands) => (lowWeek ? cands.filter((c) => c.includes(wk) || c.includes(wkS)) : cands);
+    const L = (...a) => a.filter(Boolean);
+    if (lowF && lowS) {
+      // The sooner refill is shown, directly after the limit it belongs to, and that limit goes last.
+      const fiveAt = v.blocked ? v.long?.resetsAt : v.short?.resetsAt;
+      const fableSooner = known(bar.resetsAt) && (!known(fiveAt) || bar.resetsAt < fiveAt);
+      const sooner = fableSooner ? bar.resetsAt : known(fiveAt) ? fiveAt : null;
+      const pair = fableSooner ? [five, f] : [f, five];
+      const clkR = clockPart(sooner, now, true);
+      const clk = clockPart(sooner, now, false);
+      return withWeek([L(wk, ...pair, clkR), L(wk, ...pair, clk), L(wkS, ...pair, clk), L(...pair, clk), L(wkS, ...pair), L(...pair)]);
+    }
+    if (lowF) {
+      const clk = clockPart(bar.resetsAt, now, false);
+      const clkR = clockPart(bar.resetsAt, now, true);
+      const bare = part(String(f.t).replace(" left", ""), f.low);
+      return withWeek([L(wk, five, f, clkR), L(wk, f, clkR), L(wk, f, clk), L(wkS, f, clk), L(wkS, bare, clk), L(wkS, f), L(f)]);
+    }
+    if (lowS) {
+      // Healthy per-model text is inserted, then gives way to today's wide line, then today's narrow line.
+      const wideParts = compactParts(v, now);
+      const wide = wideParts.map((p) => p.t).join("");
+      const narrow = wideParts.filter((p) => !p.rw).map((p) => p.t).join("");
+      const i = wide.indexOf(" · ");
+      const head = i >= 0 ? wide.slice(0, i) : wide;
+      const tail = i >= 0 ? wide.slice(i + 3) : "";
+      return [[part(head), f, tail ? part(tail) : null].filter(Boolean), [part(wide)], [part(narrow)]];
+    }
+    if (lowWeek) {
+      const longR = lowRefills(v).find((r) => r.which === "long");
+      const clock = longR ? fmtClock(longR.at, now) : null;
+      const ref = clock ? part(`${longR.word} refills ${clock}`) : null;
+      const refBare = clock ? part(`${longR.word} ${clock}`) : null;
+      return [L(wk, f, five, ref), L(wk, ref), L(wk, refBare), L(wkS, refBare)];
+    }
+    // All healthy: the secondary numbers give way one at a time, the less tight first (a tie
+    // keeps the short window), then the week's word "left".
+    const tighter = five && shortShown(v) <= shownLeft(bar) ? five : f;
+    return [L(wk, f, five), five ? L(wk, tighter) : null, L(wk), L(wkS)].filter(Boolean);
+  }
+  /** Today's one-line text: "63% · 5h 70%", plus the refill clock when one runs low. */
+  function todayLine(v, now) {
     const low = lowRefills(v)[0];
     return `${fmtPct(v.lp.left)}${v.short ? ` · ${v.shortTag} ${v.blocked ? "blocked" : fmtPct(v.sp?.left)}` : ""}${low ? ` · ${fmtClock(low.at, now)}` : ""}`;
   }
-  /** "63% left · 5h 70%" (+ refill times when low); narrow drops the "refills" words. */
-  function compactLabel(v, now = Date.now(), narrow = false) {
+  /** One-line mode with a low per-model limit: the groups that share the line when they fit and
+   *  take a line each when they do not (never a third line). The week at 15% left or less: its
+   *  number, with the short window when that is low too, then the per-model limit. A healthy week
+   *  and a low short window: the two named limits, tighter first. Otherwise null. */
+  function lineGroups(v) {
+    const bar = v?.barScoped;
+    if (!lowScoped(bar)) return null;
+    const f = scopedPart(bar, v.stopLeft);
+    const five = lowShort(v) ? part(`${v.shortTag} ${v.blocked ? "blocked" : fmtPct(v.sp?.left)}`) : null;
+    if (v.lp.leftExact <= 15) return [[part(`${fmtPct(v.lp.left)}`), five].filter(Boolean), [f]];
+    if (!five) return null;
+    return shortShown(v) <= shownLeft(bar) ? [[five], [f]] : [[f], [five]];
+  }
+  /** One-line candidates, or null for today's line word for word. No per-model limit low: today's
+   *  line whenever it carries a refill clock or "blocked" (5-hour low or ahead of its clock, week
+   *  low, week used up); otherwise the week plus the tighter of the per-model limit and the short
+   *  window, and when that does not fit with the per-model limit second, that limit alone if its
+   *  number is lower than the week's, else today's line. A per-model limit low: lineGroups, or
+   *  with nothing else low, that limit first and the week's number, which gives way. */
+  function lineCands(v) {
+    if (!v?.barScoped) return null;
+    const bar = v.barScoped;
+    const f = scopedPart(bar, v.stopLeft);
+    const five = v.short ? part(`${v.shortTag} ${v.blocked ? "blocked" : fmtPct(v.sp?.left)}`) : null;
+    const wk = part(`${fmtPct(v.lp.left)}`);
+    if (!lowScoped(bar)) {
+      if (v.blocked || lowRefills(v).length) return null;
+      if (five && shortShown(v) <= shownLeft(bar)) return [[wk, five]];
+      return [[wk, f], shownLeft(bar) < shownLeft(v.lp) ? [f] : [wk, five].filter(Boolean)];
+    }
+    const groups = lineGroups(v);
+    return groups ? [groups.flat()] : [[f, wk], [f]];
+  }
+  /** keep: a per-model limit is low, so the text is never ellipsized. wrap: the groups do not
+   *  fit on one line; the caller draws `lines`, one group per line. */
+  function lineLayout(v, now, px, measure) {
+    const cands = v?.barScoped ? lineCands(v) : null;
+    if (!cands) return { text: todayLine(v, now), parts: null, wrap: false, keep: false, lines: null };
+    const parts = fitParts(cands, typeof px === "number" ? px : null, measure);
+    const text = plain(parts);
+    const keep = lowScoped(v.barScoped);
+    const groups = keep ? lineGroups(v) : null;
+    const wrap = Boolean(groups) && typeof px === "number" && typeof measure === "function" && measure(text) > px;
+    return { text, parts, wrap, keep, lines: wrap ? groups : null };
+  }
+  /** The composer chip: "Claude 5h 12%" (the tightest limit), plus "· refills 12:00 AM" when that
+   *  one runs low; a refill on another day keeps its day ("Fri 12:00 AM"). A per-model limit
+   *  at zero is left out of the comparison. */
+  function composerLabel(v, now = Date.now()) {
+    let which = "long";
+    // Compared by the whole percent shown; a narrower limit is named only when strictly lower.
+    let left = shownLeft(v.lp);
+    let scopedTight = null;
+    if (v.short && !v.blocked && known(v.sp?.leftExact) && shownLeft(v.sp) < left) {
+      which = "short";
+      left = shownLeft(v.sp);
+    }
+    for (const e of v.scoped ?? []) {
+      if (e.leftExact > 0 && shownLeft(e) < left) {
+        which = "scoped";
+        left = shownLeft(e);
+        scopedTight = e;
+      }
+    }
+    let refill = null;
+    if (which === "scoped" && scopedTight.leftExact <= 15 && known(scopedTight.resetsAt)) {
+      const same = new Date(scopedTight.resetsAt).toDateString() === new Date(now).toDateString();
+      refill = same ? fmtTime(scopedTight.resetsAt) : fmtWhen(scopedTight.resetsAt);
+    } else if (which !== "scoped") {
+      const low = lowRefills(v).find((r) => r.which === which);
+      if (low) {
+        const same = new Date(low.at).toDateString() === new Date(now).toDateString();
+        refill = same ? fmtTime(low.at) : fmtWhen(low.at);
+      }
+    }
+    const num = which === "scoped" ? fmtPct(scopedTight.left) : fmtPct(v.minLeft);
+    const mid = which === "short" ? `${v.shortTag} ` : which === "scoped" ? `${scopedTight.name} ` : "";
+    const out = { main: `${v.name} ${mid}${num}`, refill };
+    if (scopedTight) out.scopedTight = scopedTight;
+    return out;
+  }
+  /** The short-window sidebar line: "63% · 5h 70%", plus the refill clock when one runs low.
+   *  With a per-model reading, the one-line candidates; pass a width and a measurer to fit. */
+  function shortBarText(v, now, px, measure) {
+    if (!v?.hasData) return v?.showUnknown ? "—" : "";
+    return lineLayout(v, now, px, measure).text;
+  }
+  /** "63% left · 5h 70%" (+ refill times when low); narrow drops the "refills" words.
+   *  With a per-model reading, a numeric third argument is the pixel width to fit. */
+  function compactLabel(v, now = Date.now(), narrow = false, measure = null) {
     if (!v?.hasData && !v?.showUnknown) return null;
-    return compactParts(v, now).filter((p) => !(narrow && p.rw)).map((p) => p.t).join("");
+    if (!v?.barScoped) return compactParts(v, now).filter((p) => !(narrow === true && p.rw)).map((p) => p.t).join("");
+    const px = typeof narrow === "number" ? narrow : null;
+    return plain(fitParts(sidebarCands(v, now), px, measure));
+  }
+  /** Spoken label: every reading, each named, including ones the fitted line gave way. */
+  function spokenUsage(v) {
+    if (!v?.hasData) return null;
+    if (!v.barScoped && !(v.scopedNoReading ?? []).length) return null;
+    const bits = [`${v.longWord} ${fmtPct(v.lp.left)} left`];
+    if (v.short) bits.push(v.blocked ? `${v.shortWord} blocked` : `${v.shortWord} ${fmtPct(v.sp.left)} left`);
+    for (const e of v.scoped ?? []) bits.push(`${e.name} ${fmtPct(e.left)} left`);
+    for (const e of v.scopedNoReading ?? []) bits.push(`${e.name}: no reading`);
+    return bits.join(", ");
   }
 
   // Keep the tightest measured limit, with explicit notices for missing quota readings.
@@ -851,7 +1125,9 @@
     if (!view) return null;
     const c = measured ? composerLabel(measured, now) : { main: `${view.name} —`, refill: null };
     const extra = unknown.filter((v) => v !== view).map((v) => `${v.name} —`);
-    return { view, main: [c.main, ...extra].join(" · "), refill: c.refill, unknown };
+    const summary = { view, main: [c.main, ...extra].join(" · "), refill: c.refill, unknown };
+    if (c.scopedTight) summary.scopedTight = c.scopedTight;
+    return summary;
   }
 
   /** B's tooltip (Astra round 2, exact wording; "Week" becomes "Month" for monthly plans). */
@@ -873,8 +1149,24 @@
       out.push(`Amber tank means spending more than 5 percentage points ahead of the ${v.shortWord} clock.`);
     }
     if (lp.bounds?.assumed) out.push(`Pace assumed: ${v.name} doesn't report its window length.`);
+    for (const e of v.scoped ?? []) out.push(`${e.name}: ${fmtPct(e.left)} left${known(e.resetsAt) ? `; resets ${fmtWhen(e.resetsAt)}` : ""}.`);
+    for (const e of v.scopedNoReading ?? []) out.push(`${e.name}: no reading.`);
     out.push(`Updated ${fmtAge(v.age)}${v.stale ? " (stale)" : ""}.`);
     return out.join(" ");
+  }
+  /** Legend lines added when a Fable reading is drawn. The tick sentence only while the tick is drawn. */
+  function fableLegend(vs) {
+    const shown = (Array.isArray(vs) ? vs : []).filter((v) => v?.hasData && v.fable);
+    if (!shown.length) return [];
+    const lines = ["Strip: thick line = all models, thin line = Fable, both % used."];
+    const bar = shown.find((v) => v.barScoped?.model === "fable");
+    if (!bar) return lines;
+    let thin = resetsTogether(bar.long?.resetsAt, bar.fable.resetsAt)
+      ? "Thin bar: Fable's own weekly limit, same refill."
+      : "Thin bar: Fable's own weekly limit.";
+    if (bar.fable.leftExact > 0 && known(bar.stopLeft)) thin += ` Tick: your rules stop ordinary Fable work at ${Math.round(bar.stopLeft)}% left.`;
+    lines.push(thin);
+    return lines;
   }
   /** B's legend (Astra round 2), in the shown windows' own words ("month" for monthly plans). */
   function bLegend(vs) {
@@ -890,21 +1182,56 @@
   /** B, "pace needle with a 5-hour tank": track; fill = long window left; the even-pace line at
    *  the long window's time left; a tank there whose level is the short window left (its own
    *  scale). No short-window reading: the plain line, never an empty tank. */
+  /** Both resets are known and within 2 minutes of each other. An unknown reset is never "together". */
+  function resetsTogether(weekAt, modelAt) {
+    return known(weekAt) && known(modelAt) && Math.abs(weekAt - modelAt) <= 2 * MIN;
+  }
+  function addFableTrack(out, v, width, size, y, trackH, gap, fH) {
+    const bar = v.barScoped;
+    const left = bar.leftExact;
+    const fy = y + trackH + gap;
+    const zero = left <= 0;
+    out.fable = {
+      track: { x: 0, y: fy, w: width, h: fH, r: fH / 2 },
+      fillW: zero ? 0 : Math.max(fH, (width * left) / 100),
+      zero: zero ? { x: 0, y: fy - 1, w: size === "lg" ? 3 : 2, h: fH + 2 } : null,
+    };
+    // The stop tick is the popover's big bar only, and only on Fable while it is above zero.
+    const showStop = size === "lg" && bar.model === "fable" && known(v.stopLeft) && left > 0;
+    out.stop = showStop ? { x: (width * v.stopLeft) / 100, y1: fy - 1.5, y2: fy + fH + 1.5 } : null;
+  }
   function bGeometry(v, width, height, size = "md") {
     const trackH = size === "lg" ? 10 : size === "sm" ? 5 : 7;
     const tankW = size === "lg" ? 8 : size === "sm" ? 5 : 6;
-    const y = (height - trackH) / 2;
+    const twin = Boolean(v?.barScoped);
+    const fH = size === "lg" ? 6 : size === "sm" ? 3 : 4;
+    const gap = size === "lg" ? 3 : 2;
+    const y = twin ? (height - trackH - gap - fH) / 2 : (height - trackH) / 2;
     const out = { width, height, track: { x: 0, y, w: width, h: trackH, r: trackH / 2 }, fillW: 0, needle: null, tank: null };
     if (!v?.hasData) return out;
     out.fillW = (width * v.lp.leftExact) / 100;
-    if (!known(v.lp.timeLeftExact)) return out;
+    const finish = () => {
+      if (twin) addFableTrack(out, v, width, size, y, trackH, gap, fH);
+      return out;
+    };
+    if (!known(v.lp.timeLeftExact)) return finish();
     const x = clamp((width * v.lp.timeLeftExact) / 100, tankW / 2, width - tankW / 2);
     if (v.short && v.sp && known(v.sp.leftExact)) {
-      out.tank = { x: x - tankW / 2, cx: x, w: tankW, h: height, r: tankW / 2, level: v.sp.leftExact / 100, amber: v.sp.pace === "ahead", blocked: v.blocked };
-    } else {
+      if (!twin) {
+        out.tank = { x: x - tankW / 2, cx: x, w: tankW, h: height, r: tankW / 2, level: v.sp.leftExact / 100, amber: v.sp.pace === "ahead", blocked: v.blocked };
+      } else {
+        const wkBot = Math.min(height, y + trackH + 1.5);
+        out.tank = { x: x - tankW / 2, cx: x, w: tankW, h: wkBot - 0.5, y: 0.5, r: tankW / 2, level: v.sp.leftExact / 100, amber: v.sp.pace === "ahead", blocked: v.blocked, twin: true };
+        if (resetsTogether(v.long?.resetsAt, v.barScoped.resetsAt)) out.needleBelow = { x, y1: wkBot, y2: height };
+      }
+    } else if (!twin) {
       out.needle = { x, y1: Math.max(0, y - 3), y2: Math.min(height, y + trackH + 3) };
+    } else if (resetsTogether(v.long?.resetsAt, v.barScoped.resetsAt)) {
+      out.needle = { x, y1: 0, y2: height };
+    } else {
+      out.needle = { x, y1: 0, y2: Math.min(height, y + trackH + 1.5) };
     }
-    return out;
+    return finish();
   }
 
   /** One projection for D's line, crossing and words. lab-usage's projection P is the % used AT
@@ -941,6 +1268,67 @@
       return { state: "out", anchor, rate, crossing, endUsed, source, text: crossing <= now ? `Estimated to run out about now at this pace${assumed}` : `Estimated to run out ${fmtWhen(crossing)} at this pace${assumed}` };
     }
     return { state: "lasts", anchor, rate, crossing, endUsed, source, text: `Estimated to last until reset at this pace${assumed}.` };
+  }
+
+  /** Fable's own forecast. Its bounds, epoch and freshness are its own, never the week's. */
+  function fableForecast(entry, now) {
+    if (!entry) return null;
+    const synthetic = {
+      name: entry.name,
+      long: { usedPct: entry.used, resetsAt: entry.resetsAt, lengthSec: entry.lengthSec, fetchedAt: entry.fetchedAt, projection: null },
+      lp: entry.pace,
+      stale: entry.stale,
+      age: entry.age,
+      epochStart: entry.epochStart,
+      epochUnknown: false,
+    };
+    return forecast(synthetic, now);
+  }
+  function fableForecastLine(entry, fc, now) {
+    const when = known(entry.resetsAt) ? fmtWhen(entry.resetsAt) : "unknown";
+    if (entry.leftExact <= 0) return { kind: "out", text: `Fable: limit reached; refills ${when}` };
+    if (!fc || fc.state === "stale" || fc.state === "unavailable" || fc.state === "none" || fc.state === "limit") {
+      if (fc?.state === "limit") return { kind: "out", text: `Fable: limit reached; refills ${when}` };
+      return { kind: "none", text: "Fable: no estimate yet" };
+    }
+    if (fc.state === "out") {
+      const at = known(fc.crossing) && fc.crossing <= now ? "about now" : fmtWhen(fc.crossing);
+      return { kind: "out", text: `Fable: estimated to run out ${at} at this pace` };
+    }
+    return { kind: "lasts", text: "Fable: estimated to last until reset at this pace." };
+  }
+  /** Week line, plus a Fable line when Fable is at its stop, at zero, or projected to run out. */
+  function forecastBlocks(v, now) {
+    const week = forecast(v, now);
+    const weekLine = { kind: week.state, text: week.text };
+    const entry = v?.fable;
+    if (!entry) return { lines: [weekLine] };
+    const fc = fableForecast(entry, now);
+    const atStop = known(v.stopLeft) && entry.leftExact > 0 && entry.leftExact <= v.stopLeft;
+    const alarm = entry.leftExact <= 0 || atStop || fc?.state === "out";
+    if (!alarm) return { lines: [weekLine] };
+    return { lines: [{ kind: week.state, text: `All models: ${week.text.charAt(0).toLowerCase()}${week.text.slice(1)}` }, fableForecastLine(entry, fc, now)] };
+  }
+  /** One popover row for a per-model limit. The about-clause uses that limit's own forecast. */
+  function scopedRowText(entry, v, now) {
+    if (!entry) return null;
+    const used = known(entry.used) ? Math.round(entry.used) : null;
+    if (entry.leftExact <= 0) return { lead: "0% left", rest: "100% used", second: null, warn: false };
+    const lead = `${fmtPct(entry.left)} left`;
+    let rest = `${used}% used`;
+    if (entry.leftExact <= 15) rest += known(entry.resetsAt) ? ` · refills ${fmtWhen(entry.resetsAt)}` : "";
+    else {
+      const fc = fableForecast(entry, now);
+      if (fc && known(fc.endUsed) && (fc.state === "lasts" || fc.state === "out")) rest += ` · about ${Math.round(fc.endUsed)}% used at reset`;
+    }
+    let second = null;
+    if (entry.model === "fable" && known(v?.stopLeft) && entry.leftExact > 0) {
+      const n = Math.round(v.stopLeft);
+      second = entry.leftExact <= v.stopLeft
+        ? `At or below your ${n}% stop: your rules don't allow ordinary Fable work`
+        : `Your rules stop ordinary Fable work at ${n}% left`;
+    }
+    return { lead, rest, second, warn: false };
   }
 
   /** Measured history as unbroken runs. A run never crosses a change of reset epoch (reset times
@@ -985,7 +1373,7 @@
 
   /** D, the run-out strip. x = the long window from start to reset; y = % used (drawing clamped
    *  to 0–100); a lane below for the short window at its true time. */
-  function dGeometry(v, samples, now, width, height) {
+  function dGeometry(v, samples, now, width, height, fableSamples) {
     const b = v?.lp?.bounds;
     if (!v?.hasData || !b || !(b.end > b.start)) return null;
     const laneH = v.short ? 9 : 0;
@@ -1019,7 +1407,21 @@
       const x1 = X(Math.min(sb.end, b.end));
       if (x1 > x0) lane = { x: x0, w: x1 - x0, hitX: Math.min(x0, (x0 + x1) / 2 - 4), hitW: Math.max(8, x1 - x0), fill: clamp(v.sp.used, 0, 100) / 100, amber: v.sp.pace === "ahead", blocked: v.blocked };
     }
-    return { width, height, plotH, laneY: plotH + gap, laneH, pace: [[0, plotH], [width, 0]], segs, estimate, proj, cross, cur: cur ? [X(cur.t), Y(cur.u)] : null, lane, nowX: X(now), fc };
+    const out = { width, height, plotH, laneY: plotH + gap, laneH, pace: [[0, plotH], [width, 0]], segs, estimate, proj, cross, cur: cur ? [X(cur.t), Y(cur.u)] : null, lane, nowX: X(now), fc };
+    const fb = v.fable?.pace?.bounds;
+    if (v.fable && fb && fb.end > fb.start) {
+      const fcur = known(v.fable.fetchedAt) && known(v.fable.used) ? { t: v.fable.fetchedAt, u: v.fable.used } : null;
+      const fruns = seriesSegments(fableSamples, fb, fcur);
+      out.fableSegs = fruns.map((seg) => seg.map((p) => [X(p.t), Y(p.u)]));
+      out.fableEstimate = null;
+      const es = v.fable.epochStart;
+      if (known(es) && es >= now - HIST.keepMs) {
+        const first = fruns.flat().find((p) => p.t >= es && p.epoch === epochMinute(fb.end));
+        if (first && first.t - es > HIST.gapMs) out.fableEstimate = [[X(es), Y(0)], [X(first.t), Y(first.u)]];
+      }
+      out.fableCur = fcur ? [X(fcur.t), Y(fcur.u)] : null;
+    }
+    return out;
   }
 
   const HANDOVER_REQUEST =
@@ -1591,6 +1993,7 @@
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, FONT_SIMILAR_GROUPS, similarFontAreas, usagePageHash, usageContainerMatches,
     FOOTER_TEAM, FOOTER_MADE_MODES, FOOTER_CARD, FOOTER_MADE, FOOTER_DETAILS, footerPass, madePass, madeCount, newestAssistantId, timelineFromFiber, readHostTimeline, hostNewestId, laneIsWide, macAppOn, readMacPlatform, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
     forecast, seriesSegments, mergeSeries, dGeometry, fmtClock, lowRefills, compactParts, composerLabel, labUsageFailedSince, toolGates, labsForMerge, labFailure, handoverGate, HANDOVER_REQUEST, chainLabel, contrast, STALE_MS, T3_STALE_MS,
+    sidebarCands, lineCands, lineGroups, lineLayout, fitParts, plain, forecastBlocks, fableForecast, fableLegend, scopedRowText, spokenUsage, shortBarText, scopedModelOf, resetsTogether, stopLeftOf, lowScoped,
   };
   if (W.__T3X_TEST__) {
     W.__T3X_TEST__.core = core;
@@ -2125,8 +2528,10 @@
     for (const lab of Object.values(labs ?? {})) {
       if (!lab.live) continue;
       for (const w of lab.windows) {
-        if ((w.role !== "long" && w.role !== "short") || !known(w.fetchedAt) || !known(w.usedPct)) continue;
-        samples.push({ s: `${lab.id}:${w.role}`, ts: w.fetchedAt, used: Math.round(w.usedPct * 100) / 100, resetsAt: w.resetsAt ?? null, lengthSec: w.lengthSec ?? null });
+        const model = scopedModelOf(w.id);
+        const role = w.role === "long" || w.role === "short" ? w.role : model ? `scoped:${model}` : null;
+        if (!role || !known(w.fetchedAt) || !known(w.usedPct)) continue;
+        samples.push({ s: `${lab.id}:${role}`, ts: w.fetchedAt, used: Math.round(w.usedPct * 100) / 100, resetsAt: w.resetsAt ?? null, lengthSec: w.lengthSec ?? null });
       }
     }
     histWrite(samples);
@@ -2144,7 +2549,7 @@
       .then((j) => (Array.isArray(j?.samples) ? j.samples.slice(-HIST.maxPerSeries * 8) : []))
       .catch(() => [])
       .finally(() => requests.delete(ctrl));
-    const ids = compactLabs(vs).map((v) => `${v.id}:long`);
+    const ids = compactLabs(vs).flatMap((v) => [`${v.id}:long`, ...(v.fable ? [`${v.id}:scoped:fable`] : [])]);
     history.loading = Promise.all([srv, ...ids.map((id) => histRead(id, since))])
       .then(guarded("history", ([server, ...mine]) => {
         if (disposed) return;
@@ -2178,8 +2583,16 @@
       s("rect", { class: "t3x-b-track", x: g.track.x, y: g.track.y, width: g.track.w, height: g.track.h, rx: g.track.r }),
     ];
     if (g.fillW > 0) kids.push(s("rect", { class: "t3x-b-fill", x: 0, y: g.track.y, width: g.fillW, height: g.track.h, rx: g.track.r, fill: v.colour }));
+    if (g.fable) {
+      const f = g.fable;
+      kids.push(s("rect", { class: "t3x-b-track", x: f.track.x, y: f.track.y, width: f.track.w, height: f.track.h, rx: f.track.r }));
+      if (f.zero) kids.push(s("rect", { class: "t3x-b-zero", x: f.zero.x, y: f.zero.y, width: f.zero.w, height: f.zero.h, rx: 1 }));
+      if (f.fillW > 0) kids.push(s("rect", { class: "t3x-b-fill", x: 0, y: f.track.y, width: f.fillW, height: f.track.h, rx: f.track.r, fill: v.colour }));
+    }
+    if (g.stop) kids.push(s("line", { class: "t3x-b-stop", x1: g.stop.x, x2: g.stop.x, y1: g.stop.y1, y2: g.stop.y2 }));
     if (g.needle) kids.push(s("line", { class: "t3x-b-needle", x1: g.needle.x, x2: g.needle.x, y1: g.needle.y1, y2: g.needle.y2 }));
-    if (g.tank) {
+    if (g.needleBelow) kids.push(s("line", { class: "t3x-b-needle", x1: g.needleBelow.x, x2: g.needleBelow.x, y1: g.needleBelow.y1, y2: g.needleBelow.y2 }));
+    if (g.tank && !g.tank.twin) {
       const t = g.tank;
       const lh = t.h * t.level;
       kids.push(
@@ -2187,14 +2600,22 @@
         lh > 0 ? s("rect", { class: `t3x-b-level${t.amber ? " t3x-amber" : ""}`, x: t.x + 1, y: t.h - 0.5 - Math.max(0, lh - 1), width: t.w - 2, height: Math.max(0, lh - 1), rx: Math.max(0, t.r - 1), fill: t.amber ? null : v.colour }) : null,
         t.blocked ? s("line", { class: "t3x-b-blocked", x1: t.x, x2: t.x + t.w, y1: t.h - 1, y2: 1 }) : null,
       );
+    } else if (g.tank) {
+      const t = g.tank;
+      const lh = t.h * t.level;
+      kids.push(
+        s("rect", { class: "t3x-b-tank", x: t.x, y: 0.5, width: t.w, height: t.h, rx: t.r }),
+        lh > 1 ? s("rect", { class: `t3x-b-level${t.amber ? " t3x-amber" : ""}`, x: t.x + 1, y: t.h - Math.max(0, lh - 1), width: t.w - 2, height: Math.max(0, lh - 1), rx: Math.max(0, t.r - 1), fill: t.amber ? null : v.colour }) : null,
+        t.blocked ? s("line", { class: "t3x-b-blocked", x1: t.x, x2: t.x + t.w, y1: 0.5 + t.h, y2: 1 }) : null,
+      );
     }
     return s("svg", { class: `t3x-b${v.stale ? " t3x-dim" : ""}`, width, height, viewBox: `0 0 ${width} ${height}`, "aria-hidden": "true", focusable: "false" }, kids);
   }
 
   // ---------- D strips ----------
 
-  function dSvg(v, samples, now, width, height) {
-    const g = dGeometry(v, samples, now, width, height);
+  function dSvg(v, samples, now, width, height, fableSamples) {
+    const g = dGeometry(v, samples, now, width, height, fableSamples);
     if (!g) return null;
     const kids = [
       s("rect", { class: "t3x-d-bg", x: 0, y: 0, width, height: g.plotH, rx: 3 }),
@@ -2206,7 +2627,16 @@
       kids.push(seg.length > 1 ? s("polyline", { class: "t3x-d-run", points: pts(seg), stroke: v.colour }) : s("circle", { class: "t3x-d-dot", cx: seg[0][0], cy: seg[0][1], r: 1.4, fill: v.colour }));
     }
     if (g.proj) kids.push(s("polyline", { class: "t3x-d-proj", points: pts(g.proj), stroke: v.colour }));
+    if (g.fableEstimate) kids.push(s("polyline", { class: "t3x-d-est t3x-d-fable", points: pts(g.fableEstimate), stroke: v.colour }));
+    for (const seg of g.fableSegs ?? []) {
+      kids.push(seg.length > 1 ? s("polyline", { class: "t3x-d-fable", points: pts(seg), stroke: v.colour }) : s("circle", { class: "t3x-d-dot", cx: seg[0][0], cy: seg[0][1], r: 1.2, fill: v.colour }));
+    }
+    if (g.fableCur) {
+      kids.push(s("circle", { class: "t3x-d-fable-cur", cx: g.fableCur[0], cy: g.fableCur[1], r: 2, fill: "var(--t3x-surface)", stroke: v.colour }));
+      kids.push(s("text", { class: "t3x-d-name", x: g.fableCur[0] - 6, y: g.fableCur[1] - 5, "text-anchor": "end", text: "Fable" }));
+    }
     if (g.cur) kids.push(s("circle", { class: "t3x-d-cur", cx: g.cur[0], cy: g.cur[1], r: 2.6, fill: v.colour }));
+    if (g.fableCur && g.cur) kids.push(s("text", { class: "t3x-d-name", x: g.cur[0] - 6, y: g.cur[1] + 11, "text-anchor": "end", text: "All models" }));
     if (g.cross) {
       const { x, y } = g.cross;
       kids.push(s("path", { class: "t3x-d-cross", d: `M${x - 3.5} ${y - 3.5} L${x + 3.5} ${y + 3.5} M${x + 3.5} ${y - 3.5} L${x - 3.5} ${y + 3.5}` }));
@@ -2419,6 +2849,16 @@
       }
       if (gates.labUsage && fc.source === "lab-usage") rows.push(h("div", { class: "t3x-row" }, h("span", { class: "t3x-row-name", text: "Projection" }), h("span", { class: "t3x-row-val", text: `about ${Math.round(v.long.projection)}% used at reset (lab-usage, allowing for manual resets)` })));
       else if (fc.source === "average") rows.push(h("div", { class: "t3x-row" }, h("span", { class: "t3x-row-name", text: "Projection" }), h("span", { class: "t3x-row-val", text: `about ${Math.round(fc.endUsed)}% used at reset (average since the window started)` })));
+      for (const e of v.scoped ?? []) {
+        const row = scopedRowText(e, v, now);
+        rows.push(h("div", { class: "t3x-row" }, h("span", { class: "t3x-row-name", text: e.name }),
+          h("span", { class: "t3x-row-val" }, h("b", { text: row.lead }), row.rest ? ` · ${row.rest}` : "",
+            row.second ? h("div", { text: row.second }) : null)));
+      }
+      for (const e of v.scopedNoReading ?? []) {
+        rows.push(h("div", { class: "t3x-row" }, h("span", { class: "t3x-row-name", text: e.name }),
+          h("span", { class: "t3x-row-val", text: `${e.name}: no reading` })));
+      }
       if (lp.bounds?.assumed) rows.push(h("div", { class: "t3x-muted", text: `Pace assumed: ${v.name} doesn't report its window length (taken as ${lp.bounds.assumed === "week" ? "7 days" : "the calendar month"} before the reset).` }));
       // Claude's tier and today's share; Codex's gate, level and resets (lab-usage), shown only from a fresh read.
       const vd = v.verdict;
@@ -2435,14 +2875,19 @@
           known(v.resetCredits?.availableCount) ? ` · banked resets ${v.resetCredits.availableCount}${known(v.resetCredits.nextExpiresAt) ? ` (next expires ${new Date(v.resetCredits.nextExpiresAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })})` : ""}` : vd && vFresh && known(vd.resetsAvailable) ? ` · banked resets ${vd.resetsAvailable}` : "",
           vd && vFresh && known(vd.resetsAtRisk) ? (vd.resetsAtRisk ? ` · ${vd.resetsAtRisk} at risk` : " · none at risk") : ""));
       }
-      const extras = v.windows.filter((w) => w.role === "extra" && known(w.usedPct));
-      if (extras.length) rows.push(h("div", { class: "t3x-muted" }, `Also: ${extras.map((w) => `${w.label ?? w.id} ${Math.round(100 - clamp(w.usedPct, 0, 100))}% left`).join(" · ")}`));
+      // Also keeps only a per-model limit that has no row of its own. Each read limit has a row.
+      const rowed = new Set([...(v.scoped ?? []), ...(v.scopedNoReading ?? [])].map((e) => e.model));
+      // An extra window that is not a per-model limit stays here under its own label, as before.
+      const extras = (v.windows ?? []).filter((w) => w.role === "extra" && known(w.usedPct) && !(scopedModelOf(w.id) && rowed.has(scopedModelOf(w.id))));
+      if (extras.length) rows.push(h("div", { class: "t3x-muted" }, `Also: ${extras.map((w) => `${scopedModelOf(w.id) ? modelName(scopedModelOf(w.id)) : (w.label ?? w.id)} ${Math.round(100 - clamp(w.usedPct, 0, 100))}% left`).join(" · ")}`));
       if (v.note) rows.push(h("div", { class: "t3x-muted", text: v.note }));
+      const blocks = forecastBlocks(v, now);
+      const fableSamples = history.bySeries[`${v.id}:scoped:fable`] ?? [];
       return h("section", { class: `t3x-lab${v.stale ? " t3x-stale" : ""}` },
         h("h3", {}, h("span", { class: "t3x-swatch", style: `background:${v.colour}` }), v.name, v.stale ? h("span", { class: "t3x-tag", text: "stale" }) : null),
         h("div", { class: "t3x-b-big", title: bTooltip(v, now) }, bSvg(v, width, 22, "lg")),
-        dSvg(v, samples, now, width, 64),
-        h("div", { class: `t3x-fc t3x-fc-${fc.state}`, text: fc.text }),
+        dSvg(v, samples, now, width, 64, fableSamples),
+        blocks.lines.map((line) => h("div", { class: `t3x-fc t3x-fc-${line.kind}`, text: line.text })),
         rows,
         h("div", { class: "t3x-muted", text: `${v.source === "t3" ? "T3's reading" : "lab-usage's reading"} ${fmtAge(v.age)}` }));
     };
@@ -2457,7 +2902,8 @@
     return [
       h("header", { class: "t3x-pop-head" }, h("strong", { text: "Usage · This Mac" }),
         h("span", { class: "t3x-muted", text: t3.readAt ? `T3 cache read ${fmtAge(now - t3.readAt)}` : lu.fetchedAt ? `lab-usage updated ${fmtAge(now - lu.fetchedAt)}` : "not read yet" })),
-      h("div", { class: "t3x-legend" }, h("div", { text: bLegend(withData) }), h("div", { text: `Strip: time across the window, height = % used. Dashed diagonal = even pace; solid = measured; faint dashes = estimated before logging; dots = projection; ✕ = estimated run-out.${withData.some((v) => v.short) ? ` Lane below: the ${[...new Set(withData.filter((v) => v.short).map((v) => v.shortWord))].join(" or ")} window at its real time, filled to its own % used.` : ""}` })),
+      h("div", { class: "t3x-legend" }, h("div", { text: bLegend(withData) }), ...fableLegend(withData).filter((text) => text.startsWith("Thin bar")).map((text) => h("div", { text })), h("div", { text: `Strip: time across the window, height = % used. Dashed diagonal = even pace; solid = measured; faint dashes = estimated before logging; dots = projection; ✕ = estimated run-out.${withData.some((v) => v.short) ? ` Lane below: the ${[...new Set(withData.filter((v) => v.short).map((v) => v.shortWord))].join(" or ")} window at its real time, filled to its own % used.` : ""}` }),
+        ...fableLegend(withData).filter((text) => !text.startsWith("Thin bar")).map((text) => h("div", { text }))),
       lastState?.transportFailedAt ? h("div", { class: "t3x-warn", text: `Couldn't reach the add-ons service ${fmtAge(now - lastState.transportFailedAt)}; its numbers are marked stale.` })
         : luFailed ? h("div", { class: "t3x-warn", text: `lab-usage's last refresh failed ${fmtAge(now - luFailed)}; its numbers are marked stale.` }) : null,
       t3Note ? h("div", { class: "t3x-warn", text: t3Note + (withData.some((v) => v.source === "lab-usage") ? " Showing lab-usage readings." : "") }) : null,
@@ -2489,7 +2935,7 @@
     node.__t3xSig = key;
     return true;
   };
-  const viewKey = (v) => `${v.id}|${v.hasData}|${v.noMeter}|${!v.hasData ? v.fetchedAt : ""}|${v.lp?.leftExact?.toFixed(1)}|${v.lp?.timeLeftExact?.toFixed(1)}|${v.sp?.leftExact?.toFixed(1)}|${v.sp?.pace}|${v.blocked}|${v.stale}`;
+  const viewKey = (v) => `${v.id}|${v.hasData}|${v.noMeter}|${!v.hasData ? v.fetchedAt : ""}|${v.lp?.leftExact?.toFixed(1)}|${v.lp?.timeLeftExact?.toFixed(1)}|${v.sp?.leftExact?.toFixed(1)}|${v.sp?.pace}|${v.blocked}|${v.stale}|${v.barScoped?.model ?? ""}|${(v.scoped ?? []).map((e) => `${e.model}:${e.left}:${e.leftExact.toFixed(1)}:${e.resetsAt ?? ""}`).join(",")}|${v.stopLeft ?? ""}|${(v.scopedNoReading ?? []).map((e) => e.model).join(",")}`;
 
   // Header: the chain pill, and one compact B glyph per lab with data (no labels; tooltips).
   features.header = {
@@ -2540,7 +2986,8 @@
           ? labs.map((v) => h("span", { class: "t3x-glyph", title: bTooltip(v, now) }, bSvg(v, 34, 14, "sm")))
           : [h("span", { text: "Usage —" })]));
       }
-      usage.setAttribute("aria-label", labs.length ? `Usage on this Mac: ${labs.map((v) => `${v.name} ${compactLabel(v, now)}${v.stale ? " (stale)" : ""}`).join("; ")}. Click for details.` : "Usage on this Mac: no readings yet. Click for details.");
+      const spoken = (v) => spokenUsage(v) ?? compactLabel(v, now);
+      usage.setAttribute("aria-label", labs.length ? `Usage on this Mac: ${labs.map((v) => `${v.name} ${spoken(v)}${v.stale ? " (stale)" : ""}`).join("; ")}. Click for details.` : "Usage on this Mac: no readings yet. Click for details.");
       usage.title = labs.length ? "" : "Usage on this Mac: no readings yet. Click for details.";
     },
   };
@@ -2574,7 +3021,8 @@
         meters.replaceChildren(bSvg(v, 40, 14, "sm"), h("span", { class: `t3x-meter-text${v.stale ? " t3x-dim" : ""}` }, c.main,
           c.refill ? [" · ", h("span", { class: "t3x-rw", text: "refills " }), c.refill] : null));
       }
-      meters.title = `${v.hasData ? "Most constrained measured lab right now. " : ""}${bTooltip(v, now)} ${c.unknown.filter((u) => u !== v).map((u) => bTooltip(u, now)).join(" ")} Click for details.`;
+      const own = c.scopedTight ? `${c.scopedTight.name}'s own weekly limit, ${fmtPct(c.scopedTight.left)} left; it counts only ${c.scopedTight.name} work. ` : "";
+      meters.title = `${own}${v.hasData ? "Most constrained measured lab right now. " : ""}${bTooltip(v, now)} ${c.unknown.filter((u) => u !== v).map((u) => bTooltip(u, now)).join(" ")} Click for details.`;
       meters.setAttribute("aria-label", meters.title);
     },
   };
@@ -2583,6 +3031,15 @@
   // In a short window (switch on), one line per lab instead: name, a small glyph, "63% · 5h 70%".
   const SHORT_WINDOW = 800;
   const barsCompact = () => settings.usageSidebarShort && (W.innerHeight || 1000) < SHORT_WINDOW;
+  function makeMeasure(node) {
+    let probe = node.querySelector(":scope > .t3x-meas");
+    if (!probe) probe = h("span", { class: "t3x-meas", "aria-hidden": "true" });
+    if (!probe.isConnected) node.append(probe);
+    return (text) => {
+      probe.textContent = text ?? "";
+      return probe.getBoundingClientRect().width;
+    };
+  }
   features.bars = {
     on: () => settings.usageSidebar,
     node: null,
@@ -2613,19 +3070,52 @@
       // (about 20 px at 11 px), and the glyphs give up the same width.
       const wide = compact && labs.some((v) => v.name.length > 6);
       node.classList.toggle("t3x-bars-wide", wide);
+      let measure = makeMeasure(node);
+      const content = Math.max(80, Math.round((node.clientWidth || 226) - 16));
       if (sig(node, `${compact ? "c" : ""}${width}#${labs.map((v) => `${viewKey(v)}|${compactLabel(v, now)}`).join(";")}`)) {
+        const fs = parseFloat(getComputedStyle(node).fontSize) || 11;
+        const dotted = (parts) => parts.flatMap((p, i) => [i ? " · " : "", p.low ? h("span", { class: "t3x-low", text: p.t }) : p.t]);
+        // A line with a low per-model limit is never ellipsized, warning colour or not. In one-line
+        // mode, groups that do not fit on one line take a line each (two at most).
+        const lineVal = (v, room) => {
+          const layout = lineLayout(v, now, room, measure);
+          if (layout.wrap) return h("span", { class: "t3x-bar-val t3x-wrap" }, layout.lines.map((g) => h("span", { class: "t3x-ph" }, dotted(g))));
+          return h("span", { class: `t3x-bar-val${layout.keep ? " t3x-bar-low" : ""}` }, layout.parts ? dotted(layout.parts) : layout.text);
+        };
+        const sideVal = (v, room) => h("span", { class: `t3x-bar-val${lowScoped(v.barScoped) ? " t3x-bar-low" : ""}` }, dotted(fitParts(sidebarCands(v, now), room, measure)));
+        // Rows are fitted to an estimated width first, then again to the column's real width.
+        const refit = [];
         node.replaceChildren(...(labs.length
-          ? compact ? labs.map((v) => h("span", { class: `t3x-bar${v.stale ? " t3x-dim" : ""}`, title: bTooltip(v, now) },
-            h("span", { class: "t3x-bar-label" }, h("span", { class: "t3x-lab-name", text: v.name })),
-            h("span", { class: "t3x-bar-glyph" }, bSvg(v, Math.max(28, width - (wide ? 156 : 136)), 12, "sm")),
-            h("span", { class: "t3x-bar-val", text: shortBarText(v, now) })))
-          : labs.map((v) => h("span", { class: `t3x-bar${v.stale ? " t3x-dim" : ""}`, title: bTooltip(v, now) },
-            h("span", { class: "t3x-bar-label" }, h("span", { class: "t3x-lab-name", text: v.name })),
-            h("span", { class: "t3x-bar-val" }, compactParts(v, now).map((p) => (p.rw ? h("span", { class: "t3x-rw", text: p.t }) : p.t))),
-            h("span", { class: "t3x-bar-glyph" }, bSvg(v, width, 17, "md"))))
+          ? compact ? labs.map((v) => {
+            const gw = Math.max(28, width - (wide ? 156 : 136));
+            const room = Math.max(0, content - (wide ? 5.4 : 3.6) * fs - gw - 12);
+            const val = v.barScoped ? lineVal(v, room) : h("span", { class: "t3x-bar-val", text: shortBarText(v, now) });
+            if (v.barScoped) refit.push({ v, val, room, make: lineVal });
+            return h("span", { class: `t3x-bar${v.stale ? " t3x-dim" : ""}`, title: bTooltip(v, now) },
+              h("span", { class: "t3x-bar-label" }, h("span", { class: "t3x-lab-name", text: v.name })),
+              h("span", { class: "t3x-bar-glyph" }, bSvg(v, gw, 12, "sm")),
+              val);
+          })
+          : labs.map((v) => {
+            const room = Math.max(0, content - measure(v.name) - 8);
+            const val = v.barScoped ? sideVal(v, room) : h("span", { class: "t3x-bar-val" }, compactParts(v, now).map((p) => (p.rw ? h("span", { class: "t3x-rw", text: p.t }) : p.t)));
+            if (v.barScoped) refit.push({ v, val, room, make: sideVal });
+            return h("span", { class: `t3x-bar${v.stale ? " t3x-dim" : ""}`, title: bTooltip(v, now) },
+              h("span", { class: "t3x-bar-label" }, h("span", { class: "t3x-lab-name", text: v.name })),
+              val,
+              h("span", { class: "t3x-bar-glyph" }, bSvg(v, width, 17, "md")));
+          })
           : [h("span", { class: "t3x-bar" }, h("span", { class: "t3x-bar-label", text: "Usage" }), h("span", { class: "t3x-bar-val", text: "—" }))]));
+        if (refit.length) {
+          measure = makeMeasure(node); // replaceChildren took the probe out
+          for (const r of refit) {
+            const real = typeof r.val.getBoundingClientRect === "function" ? r.val.getBoundingClientRect().width : 0;
+            if (real > 0 && Math.abs(real - r.room) > 0.5) r.val.replaceWith(r.make(r.v, real));
+          }
+        }
       }
-      node.setAttribute("aria-label", labs.length ? `This Mac: ${labs.map((v) => `${v.name} ${compactLabel(v, now)}${v.stale ? " (stale)" : ""}`).join("; ")}. Click for details.` : "Usage: no readings yet. Click for details.");
+      const spoken = (v) => spokenUsage(v) ?? compactLabel(v, now);
+      node.setAttribute("aria-label", labs.length ? `This Mac: ${labs.map((v) => `${v.name} ${spoken(v)}${v.stale ? " (stale)" : ""}`).join("; ")}. Click for details.` : "Usage: no readings yet. Click for details.");
     },
   };
 

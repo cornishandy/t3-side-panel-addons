@@ -16,6 +16,7 @@
 
 - 6 Nov: keeper v14 supports Nightly .4247: runtimeLayer/server split, shared sidebar minimum, server indentation reclaim. Native title setting compared; Andy chose to keep rule/fit/titleGuide in the keeper and leave native threadTitleInstructions unset. Gemini version is already 2.24.0 upstream in this build.
 - 9–12 Nov: a showcase page of the sidebar title rules was built for T3 Code's maintainers (page, ten screenshots of invented threads, a README picture). Not published and not sent: on 12 Nov upstream said it takes only bug fixes from outside (see DECISIONS, 12 Nov). The page is parked on the local branch `sidebar-titles-page`, unpushed. Before any reuse: it shows an invented 101-character title and wrongly calls it a failed title (a design round settled on an invented 40-character one, labelled as invented; never built), and with thread burn tells on, the burn chip covers most of a compact-row title at 256 px (a bug, not fixed).
+- 12–13 Nov: Fable's own weekly limit added to Claude's usage item (thin twin bar in every glyph, label, chip, detail row, strip line, stop tick; see DECISIONS, 12–13 Nov, and the Usage section of t3-extras/README.md). Tests: `test/fable-usage.test.mjs` and `test/fable-browser.test.mjs` (the production renderers at the app's font). 324 add-on tests pass.
 
 ## Where things live
 

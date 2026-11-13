@@ -49,6 +49,13 @@
 .t3x-b-tank { fill: var(--t3x-surface, var(--background)); stroke: currentColor; stroke-opacity: .8; stroke-width: 1.1; }
 .t3x-b-level.t3x-amber { fill: var(--warning); }
 .t3x-b-blocked { stroke: var(--destructive); stroke-width: 1.2; }
+.t3x-b-zero { fill: var(--warning-foreground, var(--warning)); }
+.t3x-b-stop { stroke: currentColor; stroke-opacity: .75; stroke-width: 1.2; }
+.t3x-low { color: var(--warning-foreground, var(--warning)); }
+/* a low per-model limit is never ellipsized; several low limits in one-line mode take a line each */
+.t3x-bar-val.t3x-bar-low, .t3x-bar-val.t3x-wrap { overflow: visible; text-overflow: clip; white-space: nowrap; }
+.t3x-wrap .t3x-ph { display: block; }
+.t3x-meas { position: fixed; left: -9999px; top: 0; visibility: hidden; white-space: nowrap; pointer-events: none; }
 
 /* header: the chain pill, then one compact glyph per lab */
 .t3x-hdr {
@@ -132,6 +139,9 @@ header[data-chat-header]:has([data-t3x="hdr"]) > div:not([data-workspace-titleba
 .t3x-d-now { stroke: currentColor; stroke-opacity: .22; stroke-width: 1; }
 .t3x-d-est { fill: none; stroke-width: 1.2; stroke-opacity: .45; stroke-dasharray: 3 3; }
 .t3x-d-run { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.t3x-d-fable { fill: none; stroke-width: 1; stroke-linejoin: round; stroke-linecap: round; }
+.t3x-d-fable-cur { stroke-width: 1.2; }
+.t3x-d-name { fill: currentColor; fill-opacity: .72; font: 600 8px var(--font-sans); }
 .t3x-d-proj { fill: none; stroke-width: 1.6; stroke-dasharray: 1.5 2.5; stroke-linecap: round; }
 .t3x-d-cur { stroke: var(--t3x-surface); stroke-width: 1; }
 .t3x-d-cross { fill: none; stroke: var(--warning); stroke-width: 1.8; }

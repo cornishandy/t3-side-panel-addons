@@ -183,6 +183,16 @@ function logHistory(labs, at) {
         if (!w.live || typeof ts !== "number" || at - ts > SAMPLE_MAX_AGE_MS) continue;
         samples.push(historySample(lab.id, w.role, w, ts));
       }
+      // A per-model reading (Fable's own week) is logged as "<lab>:scoped:<model>", dated by the
+      // same lab-usage reading: its week's reset, length and time.
+      const week = lab.windows.find((w) => w.role === "long");
+      const ts = week?.fetchedAt;
+      if (!week?.live || typeof ts !== "number" || at - ts > SAMPLE_MAX_AGE_MS) continue;
+      for (const s of lab.verdict?.scoped ?? []) {
+        const model = String(s?.model ?? "").trim().toLowerCase();
+        if (!/^[a-z0-9]+$/.test(model)) continue;
+        samples.push(historySample(lab.id, `scoped:${model}`, { usedPct: s.usedPct, resetsAt: week.resetsAt, lengthSec: week.lengthSec }, ts));
+      }
     }
     history.append(samples.filter(Boolean));
   } catch (error) {

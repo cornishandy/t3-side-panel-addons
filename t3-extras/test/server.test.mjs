@@ -262,10 +262,11 @@ test("/state logs fresh readings to the history; /history is bounded and only fo
   assert.equal((await get("/history", { Origin: "https://evil.example" })).status, 403);
   const h = JSON.parse((await get("/history", { Origin: "t3code://app" })).body);
   assert.ok(Array.isArray(h.samples));
-  assert.deepEqual(h.samples.map((x) => x.s).sort(), ["claude:long", "claude:short", "codex:long"]);
+  assert.deepEqual(h.samples.map((x) => x.s).sort(), ["claude:long", "claude:scoped:fable", "claude:short", "codex:long"], "Fable's own reading from lab-usage is logged as its own series");
+  assert.equal(h.samples.find((x) => x.s === "claude:scoped:fable").used, 12);
   assert.ok(h.samples.every((x) => Date.now() - x.ts < 15 * 60_000));
   const file = fs.readFileSync(path.join(tmp, "install", "usage-history.jsonl"), "utf8").trim().split("\n");
-  assert.equal(file.length, 3, "one line per lab/window; repeated /state reads add nothing within 10 min");
+  assert.equal(file.length, 4, "one line per lab/window and per-model reading; repeated /state reads add nothing within 10 min");
   assert.equal((await get("/usage-history.jsonl", { Origin: "t3code://app" })).status, 404, "the file itself is never served");
 });
 

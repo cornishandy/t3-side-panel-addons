@@ -373,7 +373,8 @@ test("lab views: stale by source, the composer's lab counts short windows too", 
   assert.equal(C.mostConstrained(C.views(tight, NOW, {})).id, "gemini");
   assert.equal(g.stale, false);
   assert.equal(C.labView(C.mergeLabs(t3labs(), serverLabs)[0], NOW + 16 * MIN, {}).stale, true);
-  assert.match(C.compactLabel(view("claude"), NOW), /^63% left · 5h 68% · refills /, "12 points ahead of its clock: amber, so its refill shows");
+  // U3: the fixture's healthy Fable reading joins the fullest line. It gives way to today's wording next.
+  assert.match(C.compactLabel(view("claude"), NOW), /^63% left · Fable 85% · 5h 68% · refills /, "12 points ahead of its clock: amber, so its refill shows");
   assert.equal(C.compactLabel(view("codex"), NOW), "49% left");
 });
 
@@ -383,7 +384,8 @@ test("T3's blocking rule: Claude's week used up blocks its 5-hour window (empty 
   assert.equal(v.blocked, true);
   assert.equal(v.sp.left, 0);
   assert.equal(v.sp.pace, null);
-  assert.equal(C.compactLabel(v, NOW), `0% left · 5h blocked · week refills ${C.fmtClock(v.long.resetsAt, NOW)}`);
+  // U3: healthy Fable stays in the fullest line. The next candidate is today's blocked line.
+  assert.equal(C.compactLabel(v, NOW), `0% left · Fable 85% · 5h blocked · week refills ${C.fmtClock(v.long.resetsAt, NOW)}`);
   assert.match(C.bTooltip(v, NOW), /5-hour: blocked by the weekly limit until /);
   const g = C.bGeometry(v, 200, 17);
   assert.equal(g.tank.level, 0);
@@ -420,7 +422,8 @@ test("B: amber comes from unrounded values (5-hour window more than 5 points ahe
 
 test("B: the tooltip says both scales in Astra's words", () => {
   const t = C.bTooltip(C.labView(withWin("claude", "short", { usedPct: 20 }), NOW, {}), NOW); // on pace: no refill lead
-  assert.match(t, /^Claude · This Mac\. Week: 63% left; even pace 83% left; resets \S+ .+\. 5-hour: 80% left; even pace \d+% left; resets .+\. Amber tank means spending more than 5 percentage points ahead of the 5-hour clock\. Updated 2 min ago\.$/);
+  // U10 adds the Fable reading, with "left" and its own reset, before the updated time.
+  assert.match(t, /^Claude · This Mac\. Week: 63% left; even pace 83% left; resets \S+ .+\. 5-hour: 80% left; even pace \d+% left; resets .+\. Amber tank means spending more than 5 percentage points ahead of the 5-hour clock\. Fable: 85% left; resets .+\. Updated 2 min ago\.$/);
   const grok = C.bTooltip(view("grok"), NOW);
   assert.match(grok, /Pace assumed: Grok doesn't report its window length\./);
   assert.doesNotMatch(grok, /5-hour/);
@@ -1155,11 +1158,14 @@ test("refills: clock time beside the countdown; over a day, the weekday and time
 });
 
 test("refills in the sidebar label: only when running low; one line; narrow drops the word 'refills'", () => {
-  assert.equal(C.compactLabel(C.labView(withWin("claude", "short", { usedPct: 20 }), NOW, {}), NOW), "63% left · 5h 80%", "on pace, 80% left: not low");
+  // U3: this Claude fixture already has a healthy Fable reading, so it joins the fullest line.
+  assert.equal(C.compactLabel(C.labView(withWin("claude", "short", { usedPct: 20 }), NOW, {}), NOW), "63% left · Fable 85% · 5h 80%", "on pace, 80% left: not low");
   const low = C.labView(withWin("claude", "short", { usedPct: 88 }), NOW, {});
   const clock = C.fmtClock(low.short.resetsAt, NOW);
-  assert.equal(C.compactLabel(low, NOW), `63% left · 5h 12% · refills ${clock}`);
-  assert.equal(C.compactLabel(low, NOW, true), `63% left · 5h 12% · ${clock}`);
+  assert.equal(C.compactLabel(low, NOW), `63% left · Fable 85% · 5h 12% · refills ${clock}`);
+  // A boolean no longer fits a per-model row; the fullest line stays. Today's narrow line is the last candidate.
+  assert.equal(C.compactLabel(low, NOW, true), `63% left · Fable 85% · 5h 12% · refills ${clock}`);
+  assert.equal(C.sidebarCands(low, NOW).at(-1).map((p) => p.t).join(""), `63% left · 5h 12% · ${clock}`);
   assert.ok(!C.compactLabel(low, NOW).includes("\n"));
   // Ahead of its clock (amber) counts too, even with more than 25% left.
   const ahead = C.labView(withWin("claude", "short", { usedPct: 30 }), NOW, {}); // 20% of its 5 h gone, 30% used, 70% left
@@ -1167,7 +1173,7 @@ test("refills in the sidebar label: only when running low; one line; narrow drop
   assert.match(C.compactLabel(ahead, NOW), / · refills /);
   // Blocked: it refills when the week does.
   const blocked = C.labView(withWin("claude", "long", { usedPct: 100 }), NOW, {});
-  assert.equal(C.compactLabel(blocked, NOW), `0% left · 5h blocked · week refills ${C.fmtClock(blocked.long.resetsAt, NOW)}`);
+  assert.equal(C.compactLabel(blocked, NOW), `0% left · Fable 85% · 5h blocked · week refills ${C.fmtClock(blocked.long.resetsAt, NOW)}`);
   assert.match(C.bTooltip(blocked, NOW), /^Week: 0% left \(5-hour blocked too\), refills /);
   // The long window at 15% or less: "week refills Sat 8:07 PM".
   const week = C.labView(withWin("codex", "long", { usedPct: 86 }), NOW, {});

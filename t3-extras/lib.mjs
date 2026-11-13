@@ -73,6 +73,8 @@ export function usageView(raw, fetchedAt) {
         ? { share: num(conserve.today.share), spent: num(conserve.today.spent), usedUp: Boolean(conserve.today.used_up) }
         : null,
       stops: Array.isArray(conserve.stops) ? conserve.stops.map(String) : [],
+      // Percent used at which ordinary Fable work stops. Absent or not a number: no numeric stop.
+      fableStop: num(conserve.fable_stop),
       conserveError: typeof conserve.error === "string" ? conserve.error : null,
     };
   } else if (c && typeof c === "object") {
@@ -151,8 +153,10 @@ export function labsFromView(view) {
       projectionUsed: w.projectionUsed ?? null,
     }));
     const verdict = id === "claude"
-      ? { tier: lab.tier, tierName: lab.tierName, today: lab.today, stops: lab.stops, scoped: lab.scoped }
+      ? { tier: lab.tier, tierName: lab.tierName, today: lab.today, stops: lab.stops, scoped: lab.scoped, fableStop: lab.fableStop }
       : { gate: lab.gate, level: lab.level, challengeDay: lab.challengeDay, resetsAvailable: lab.resetsAvailable, resetsAtRisk: lab.resetsAtRisk, blocked: lab.blocked };
+    // Per-model readings stay on verdict.scoped; they are not windows. The service logs each one
+    // beside the long and short windows, as the series "<lab>:scoped:<model>" (server.mjs, logHistory).
     out.push({ ...LAB_BY_ID[id], source: "lab-usage", live, fetchedAt: lab.dataAt ?? null, windows, verdict });
   }
   return out;
@@ -170,9 +174,10 @@ export const HISTORY = Object.freeze({
 });
 const SERIES_LABS = new Set(LAB_INFO.map((l) => l.id));
 
-/** One history sample, or null if anything is off. series = "<lab>:<long|short>". */
+/** One history sample, or null if anything is off. series = "<lab>:<long|short>" or "<lab>:scoped:<model>". */
 export function historySample(lab, role, w, ts) {
-  if (!SERIES_LABS.has(lab) || (role !== "long" && role !== "short")) return null;
+  const scoped = typeof role === "string" && /^scoped:[a-z0-9]+$/.test(role);
+  if (!SERIES_LABS.has(lab) || (role !== "long" && role !== "short" && !scoped)) return null;
   const used = typeof w?.usedPct === "number" && Number.isFinite(w.usedPct) ? Math.round(w.usedPct * 100) / 100 : null;
   if (used === null || used < 0 || used > 1000 || !Number.isFinite(ts)) return null;
   const resetsAt = typeof w?.resetsAt === "number" && Number.isFinite(w.resetsAt) ? Math.round(w.resetsAt) : null;
@@ -190,7 +195,10 @@ export function parseSample(line) {
     return null;
   }
   if (!o || typeof o !== "object" || typeof o.s !== "string") return null;
-  const [lab, role] = o.s.split(":");
+  const cut = o.s.indexOf(":");
+  if (cut <= 0) return null;
+  const lab = o.s.slice(0, cut);
+  const role = o.s.slice(cut + 1);
   return historySample(lab, role, { usedPct: o.used, resetsAt: o.resetsAt, lengthSec: o.lengthSec }, o.ts);
 }
 
