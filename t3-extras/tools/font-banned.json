@@ -1,0 +1,8 @@
+{
+ "note": "One list for the \"About this font\" records, shared by the writer's self-check, tools/fonts.mjs about and the tests: words matched as whole words, case-insensitive (so \"write them\" is fine and \"em\" alone is not); phrases matched anywhere, case-insensitive; patterns are regular expressions for glyph counts, file sizes and fractions. addressHashes are SHA-256 hashes of lower-case address pieces of one or two words, so this public file never spells out a type designer's address; a text is checked by hashing each word and each pair of neighbouring words (letters and digits only).",
+ "words": ["never", "always", "perfect", "perfectly", "impossible", "em", "ems"],
+ "phrases": ["any size"],
+ "patterns": ["\\b\\d+\\s*glyphs?\\b", "\\bglyph count", "\\b\\d+(\\.\\d+)?\\s*(KB|kB|MB|bytes?)\\b", "\\b\\d+\\s*/\\s*\\d+\\b", "[¼-¾⅐-⅞]"],
+ "addresses": ["/Users/", "127.0.0.1"],
+ "addressHashes": ["0975b46314c30ee9b5ba22b4ec0692c3a8f8b1df88a1efd2c28a31721325b333", "7a8db92c48e25c4057995eb1a167b0bd267ac63f7e76da061d1c4a26fbb15dcb", "3d83d9ac9b538c0585498b91bc3667da2cdf116cd268d51e70254c6ddafb15a4", "94602a7eb5cf33b1489d6deef3b68b5434070433263ea7d692c44e707133dd66", "7e8eea5cc60980270c9ceb75ce8c087d48d726110fd3d17921f774eefd8e18d8"]
+}

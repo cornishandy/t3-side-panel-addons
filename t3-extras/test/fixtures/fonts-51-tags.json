@@ -1,0 +1,260 @@
+{
+ "note": "size, narrow and tall of the 51 families before the eight were added (fonts.json at 1e6cefb). Re-measuring must keep them.",
+ "families": {
+  "Amatic SC": [
+   80,
+   true,
+   true
+  ],
+  "Just Another Hand": [
+   125,
+   true,
+   true
+  ],
+  "Sue Ellen Francisco": [
+   135,
+   true,
+   true
+  ],
+  "Covered By Your Grace": [
+   105,
+   false,
+   true
+  ],
+  "Nanum Pen Script": [
+   100,
+   false,
+   false
+  ],
+  "Reenie Beanie": [
+   135,
+   true,
+   false
+  ],
+  "Shadows Into Light": [
+   95,
+   false,
+   false
+  ],
+  "Shadows Into Light Two": [
+   85,
+   false,
+   true
+  ],
+  "Loved by the King": [
+   90,
+   true,
+   true
+  ],
+  "Annie Use Your Telescope": [
+   105,
+   true,
+   true
+  ],
+  "Just Me Again Down Here": [
+   150,
+   true,
+   false
+  ],
+  "The Girl Next Door": [
+   100,
+   false,
+   false
+  ],
+  "Waiting for the Sunrise": [
+   105,
+   false,
+   false
+  ],
+  "Sedgwick Ave": [
+   80,
+   false,
+   true
+  ],
+  "Neucha": [
+   100,
+   false,
+   true
+  ],
+  "Dekko": [
+   115,
+   false,
+   false
+  ],
+  "Kalam": [
+   100,
+   false,
+   false
+  ],
+  "Gaegu": [
+   135,
+   false,
+   false
+  ],
+  "Gamja Flower": [
+   145,
+   false,
+   false
+  ],
+  "Hi Melody": [
+   150,
+   true,
+   false
+  ],
+  "Caveat": [
+   140,
+   true,
+   true
+  ],
+  "Caveat Brush": [
+   120,
+   true,
+   false
+  ],
+  "Patrick Hand": [
+   110,
+   false,
+   false
+  ],
+  "Patrick Hand SC": [
+   110,
+   false,
+   false
+  ],
+  "Handlee": [
+   100,
+   false,
+   false
+  ],
+  "Indie Flower": [
+   115,
+   false,
+   false
+  ],
+  "Architects Daughter": [
+   110,
+   false,
+   false
+  ],
+  "Gloria Hallelujah": [
+   95,
+   false,
+   false
+  ],
+  "Coming Soon": [
+   90,
+   false,
+   false
+  ],
+  "Schoolbell": [
+   115,
+   false,
+   false
+  ],
+  "Mynerve": [
+   115,
+   false,
+   false
+  ],
+  "Playpen Sans": [
+   95,
+   false,
+   false
+  ],
+  "Shantell Sans": [
+   100,
+   false,
+   false
+  ],
+  "Klee One": [
+   105,
+   false,
+   false
+  ],
+  "Zen Kurenaido": [
+   120,
+   false,
+   false
+  ],
+  "Permanent Marker": [
+   85,
+   false,
+   false
+  ],
+  "Rock Salt": [
+   80,
+   false,
+   false
+  ],
+  "Over the Rainbow": [
+   80,
+   false,
+   true
+  ],
+  "Give You Glory": [
+   90,
+   false,
+   false
+  ],
+  "Noteworthy": [
+   95,
+   false,
+   true
+  ],
+  "Marker Felt": [
+   90,
+   false,
+   true
+  ],
+  "Chalkboard SE": [
+   105,
+   false,
+   false
+  ],
+  "Bradley Hand": [
+   120,
+   false,
+   false
+  ],
+  "SignPainter": [
+   125,
+   true,
+   true
+  ],
+  "Yanone Kaffeesatz": [
+   100,
+   true,
+   true
+  ],
+  "Oswald": [
+   90,
+   false,
+   true
+  ],
+  "Pathway Gothic One": [
+   95,
+   true,
+   true
+  ],
+  "Sofia Sans Extra Condensed": [
+   105,
+   true,
+   true
+  ],
+  "Barlow Condensed": [
+   100,
+   true,
+   true
+  ],
+  "Roboto Condensed": [
+   95,
+   false,
+   false
+  ],
+  "Fira Sans Condensed": [
+   95,
+   false,
+   false
+  ]
+ }
+}

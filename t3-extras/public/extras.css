@@ -958,7 +958,7 @@ html[data-t3x-fsidebar] [data-t3x="grouping-root"] :is(.t3x-g-meta, .t3x-g-badge
 .t3x-font-workspace h2 { margin:0; font-size:20px; line-height:1.25; font-weight:600; }
 .t3x-font-workspace-head p { margin:4px 0 0; color:var(--muted-foreground); font-size:13px; }
 .t3x-font-workspace-body { display:grid; grid-template-columns:minmax(220px,32%) minmax(0,1fr); flex:1; min-height:0; }
-.t3x-font-navigation { min-width:0; min-height:0; display:flex; flex-direction:column; padding:16px 0 0; border-right:1px solid var(--border); }
+.t3x-font-navigation { position:relative; min-width:0; min-height:0; display:flex; flex-direction:column; padding:16px 0 0; border-right:1px solid var(--border); }
 .t3x-font-navigation > label { margin:0 16px 6px; font-weight:600; font-size:13px; }
 .t3x-font-search { flex:none; width:calc(100% - 32px); min-width:0; min-height:34px; margin:0 16px 12px; padding:6px 9px; border:1px solid var(--border); border-radius:8px; background:var(--background); color:var(--foreground); font:inherit; }
 .t3x-font-index { flex:1; min-height:0; overflow:auto; overflow-x:hidden; padding:0 8px 16px; overscroll-behavior:contain; scrollbar-gutter:stable; }
@@ -1013,7 +1013,7 @@ html[data-t3x-fsidebar] [data-t3x="grouping-root"] :is(.t3x-g-meta, .t3x-g-badge
 .t3x-font-dockbar { display:none; }
 .t3x-font-pick-entry { width:100%; margin-top:8px; }
 .t3x-font-workspace[data-mode="dock"] { position:fixed; inset:auto; margin:0; width:min(340px,calc(100vw - 24px)); max-width:calc(100vw - 24px); height:auto; max-height:min(600px,calc(100dvh - 24px)); z-index:2147483001; box-shadow:0 12px 40px #0006; }
-.t3x-font-workspace[data-mode="dock"] :is(.t3x-font-workspace-head, .t3x-font-navigation, .t3x-font-back, .t3x-font-preview-label, .t3x-workspace-sample, .t3x-font-own .t3x-chips, .t3x-font-own > .t3x-note, .t3x-font-editor > .t3x-note:nth-last-child(2)) { display:none!important; }
+.t3x-font-workspace[data-mode="dock"] :is(.t3x-font-workspace-head, .t3x-font-navigation, .t3x-font-back, .t3x-font-preview-label, .t3x-workspace-sample, .t3x-font-own .t3x-chips, .t3x-font-own > .t3x-note, .t3x-font-preview-note, .t3x-fabout:not(.t3x-fabout-docked)) { display:none!important; }
 .t3x-font-workspace[data-mode="dock"] .t3x-font-workspace-body { display:block; flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; }
 .t3x-font-workspace[data-mode="dock"] .t3x-font-editor { padding:14px 16px 12px; overflow:visible; }
 .t3x-font-workspace[data-mode="dock"] .t3x-font-editor h3 { margin:0 0 6px; font-size:16px; }
@@ -1143,6 +1143,63 @@ button.t3x-fs-def { cursor: pointer; }
   background: color-mix(in srgb, var(--foreground) 7%, transparent);
   & [data-slot="scroll-area-thumb"] { background: color-mix(in srgb, var(--muted-foreground) 70%, transparent); }
 }
+
+/* ---------- About this font (13 Nov 2026, design S′): hover card, panel, pane swap, docked card ---------- */
+/* The card: in the Fonts window's area list while the font menu is open (S1′), or beside the ✦ panel (S3′).
+   Never focused, never a target, no animation. Long names wrap; nothing shrinks. */
+.t3x-fcard { box-sizing:border-box; width:300px; padding:12px 14px; border:1px solid var(--border); border-radius:8px; background:var(--popover,var(--background)); color:var(--foreground); font:400 13px/1.45 var(--font-sans); text-align:left; box-shadow:0 8px 28px rgba(40,44,60,.18); pointer-events:none; transition:none; animation:none; overflow:visible; }
+.t3x-fcard-pane { position:absolute; z-index:3; margin:0; }
+.t3x-fcard-float { position:fixed; z-index:2147483000; margin:0; }
+:is(.t3x-fcard, .t3x-fswap) p { margin:0; }
+:is(.t3x-fcard, .t3x-fswap) .t3x-fcard-name { font-size:26px; line-height:1.1; overflow-wrap:anywhere; }
+.t3x-fswap .t3x-fcard-name { line-height:1.15; }
+/* The strip never splits across lines. letter-spacing turns ligatures off in Chromium even with
+   font-variant-ligatures; "liga" keeps a record's claimed ligature (fi, ffl…) drawn as one shape. */
+:is(.t3x-fcard, .t3x-fswap, .t3x-fabout) :is(.t3x-fcard-strip, .t3x-fabout-strip) { font-size:20px; letter-spacing:.06em; font-variant-ligatures:common-ligatures; font-feature-settings:"liga" 1; white-space:nowrap; color:var(--muted-foreground); }
+:is(.t3x-fcard, .t3x-fswap) .t3x-fcard-strip { margin:2px 0 6px; }
+:is(.t3x-fcard, .t3x-fswap, .t3x-fabout) :is(.t3x-fcard-desc, .t3x-fabout-desc) { margin-bottom:6px; }
+:is(.t3x-fcard, .t3x-fswap, .t3x-fabout) ul { margin:0 0 6px; padding-left:16px; list-style:disc outside; } /* T3's base styles remove list markers */
+:is(.t3x-fcard, .t3x-fswap, .t3x-fabout) li { margin:1px 0; }
+:is(.t3x-fcard, .t3x-fswap) .t3x-fcard-line { margin-top:6px; color:var(--foreground); }
+:is(.t3x-fcard, .t3x-fswap) .t3x-fcard-use { margin-top:6px; padding-top:6px; border-top:1px solid var(--border); color:var(--muted-foreground); }
+:is(.t3x-fcard, .t3x-fswap) .t3x-fcard-hidden { margin-top:6px; color:var(--muted-foreground); }
+/* The pane swap: when the card would not fit, the area list's viewport shows the highlighted font (never the search box). */
+/* Short windows (10G′, 14 Nov 2026): the card's own padding and one heading line; whole lines only (fitSwapLines). */
+.t3x-fswap { position:absolute; z-index:3; box-sizing:border-box; margin:0; padding:12px 14px; overflow:auto; overscroll-behavior:contain; background:var(--popover,var(--background)); color:var(--foreground); font:400 13px/1.45 var(--font-sans); text-align:left; transition:none; animation:none; }
+.t3x-fswap-area { margin-bottom:8px; font:600 13px/1.3 var(--font-sans); }
+/* 12B (14 Nov 2026): 6 px between the name and the sentence wherever the name would sit on it: T3's own fonts,
+   a Mac font not on this Mac, and a short window's swap whose letter strip has yielded (it stays, hidden). */
+:is(.t3x-fcard, .t3x-fswap) .t3x-fcard-name + .t3x-fcard-desc,
+:is(.t3x-fcard, .t3x-fswap) .t3x-fcard-name + .t3x-fcard-strip[hidden] + .t3x-fcard-desc { margin-top:6px; }
+/* The panel, after Preview's note in the full window (S2). */
+.t3x-fabout { margin-top:22px; padding:14px 16px; border:1px solid var(--border); border-radius:8px; font:400 13px/1.45 var(--font-sans); text-align:left; overflow-wrap:anywhere; }
+.t3x-fabout p { margin:0; }
+.t3x-fabout-title { margin-bottom:8px; font:600 13px/1.3 var(--font-sans); }
+.t3x-fabout-head { display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
+.t3x-fabout-name { font-size:30px; line-height:1.15; overflow-wrap:anywhere; }
+.t3x-fabout-strip { margin:0; }
+.t3x-fabout-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 22px; margin-top:4px; }
+.t3x-fabout-sec { min-width:0; border-top:1px solid var(--border); padding-top:7px; }
+.t3x-fabout-sec h4 { margin:0 0 3px; font:600 12px/1.3 var(--font-sans); color:var(--muted-foreground); }
+.t3x-fabout dl { display:grid; grid-template-columns:auto 1fr; gap:1px 10px; margin:0; }
+.t3x-fabout dt { color:var(--muted-foreground); }
+.t3x-fabout dd { margin:0; }
+.t3x-fabout-use { margin-top:6px; color:var(--muted-foreground); }
+/* Details that couldn't load: one muted line in the panel's place, no box. */
+.t3x-fabout.t3x-fabout-failedbox { padding:0; border:0; border-radius:0; }
+.t3x-fabout-failed, .t3x-font-docksentence.t3x-font-docksentence-failed { color:var(--muted-foreground); }
+@media(max-width:719px) { .t3x-fabout-grid { grid-template-columns:1fr; } }
+/* The docked card (S4′): the sentence in the body colour after the status line, then a closed "About this font"
+   that opens the panel's text in one column. Shown only when docked. */
+.t3x-font-dockabout { display:none; }
+.t3x-font-workspace[data-mode="dock"] .t3x-font-dockabout:not([hidden]) { display:block; }
+.t3x-font-docksentence { margin:6px 0 0; font:400 12.5px/1.45 var(--font-sans); color:var(--foreground); overflow-wrap:anywhere; }
+.t3x-font-dockdetails > summary { display:block; margin-top:10px; font:600 13px/1.3 var(--font-sans); color:var(--foreground); cursor:pointer; list-style:none; }
+.t3x-font-dockdetails > summary::-webkit-details-marker { display:none; }
+.t3x-font-dockdetails > summary::before { content:"▸ "; color:var(--muted-foreground); }
+.t3x-font-dockdetails[open] > summary::before { content:"▾ "; }
+.t3x-fabout.t3x-fabout-docked { margin:8px 0 0; padding:0; border:0; border-radius:0; }
+.t3x-fabout-docked .t3x-fabout-grid { grid-template-columns:1fr; }
 
 /* ---------- reply footer card ----------
  * Round 11 (approved by Andy 19 Oct 2026).

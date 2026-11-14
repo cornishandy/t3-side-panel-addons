@@ -10,6 +10,7 @@
  *   GET /version                    changes whenever those files change (reload on focus)
  *   GET /fonts/<file>               bundled fonts and their licences, allowlisted names only
  *   GET /font-catalog               the font pickers' list (fonts.json, public fields only)
+ *   GET /font-about                 "About this font" records (font-about.json, public fields only)
  *   GET /state?thread=<id>[&fresh=1] usage snapshot + the thread's handover chain
  *   GET /history[?since=<ms>]       bounded usage history samples (usage-history.jsonl)
  *   GET /burn                       per-thread burn tiers (no titles, text or paths)
@@ -27,7 +28,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { PORT, guard, usageView, labsFromView, historySample, chainView, diagEntry } from "./lib.mjs";
+import { PORT, guard, usageView, labsFromView, historySample, chainView, diagEntry, fontCatalogProjection, fontAboutProjection } from "./lib.mjs";
 import { createHistory } from "./history.mjs";
 import { createBurn } from "./burn.mjs";
 import { payloadVersion } from "./payload.mjs";
@@ -44,13 +45,14 @@ const DIAG_LOG = path.join(DIR, "diag.log");
 const FONTS = JSON.parse(fs.readFileSync(path.join(DIR, "fonts.json"), "utf8"));
 const FONT_FILES = new Set(FONTS.files.map((f) => f.file));
 // The pickers' list: names, verdicts and measurements; never URLs or hashes.
-const FONT_CATALOG = JSON.stringify({
-  families: (FONTS.families ?? []).map((f) => ({
-    name: f.name, source: f.source, group: f.group, style: f.style, star: Boolean(f.star), hard: Boolean(f.hard),
-    file: FONT_FILES.has(f.file) ? f.file : null, local: Array.isArray(f.local) ? f.local : null,
-    width: f.width ?? null, tallness: f.tallness ?? null, narrow: Boolean(f.narrow), tall: Boolean(f.tall), size: f.size ?? 100,
-  })),
-});
+const FONT_CATALOG = JSON.stringify(fontCatalogProjection(FONTS));
+// "About this font": the writer's records, public fields only (no sources), for the families in the list.
+// Missing or unreadable: no records, and the add-on shows no cards or panels.
+const FONT_ABOUT = (() => {
+  let about = null;
+  try { about = JSON.parse(fs.readFileSync(path.join(DIR, "font-about.json"), "utf8")); } catch {}
+  return JSON.stringify(fontAboutProjection(about, FONTS));
+})();
 const HISTORY_FILE = process.env.T3X_HISTORY || path.join(DIR, "usage-history.jsonl");
 const history = createHistory(HISTORY_FILE, { log });
 const SAMPLE_MAX_AGE_MS = 15 * 60_000; // only fresh readings go into the history
@@ -371,6 +373,7 @@ export function handler(req, res) {
     return first ? Promise.race([burnTick(), new Promise((r) => setTimeout(r, 3_000))]).then(answer, answer) : answer();
   }
   if (p === "/font-catalog") return send(res, 200, FONT_CATALOG, { ...cors, "Content-Type": "application/json" });
+  if (p === "/font-about") return send(res, 200, FONT_ABOUT, { ...cors, "Content-Type": "application/json" });
   if (p === "/history") {
     const since = Number(url.searchParams.get("since"));
     return send(res, 200, JSON.stringify({ now: Date.now(), samples: history.read(Number.isFinite(since) ? since : 0) }), { ...cors, "Content-Type": "application/json" });

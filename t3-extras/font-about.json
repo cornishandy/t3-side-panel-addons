@@ -1,0 +1,1009 @@
+{
+ "note": "The \"About this font\" records (tools/fonts.mjs about, from the writer's checked file; sources stay build-side). Shown as plain text.",
+ "listVersion": 2,
+ "records": {
+  "Amatic SC": {
+   "strip": "a g y R Q &",
+   "desc": "Hand-drawn small capitals with thin strokes, made for titles and short runs of text.",
+   "apart": [
+    "Lower-case letters are drawn as smaller capitals, so a and g look like A and G",
+    "Thin strokes of even width in tall, upright letters"
+   ],
+   "madeShort": "Made by Vernon Adams, Ben Nathan and Thomas Jockin; on Google Fonts since 2011.",
+   "background": "Vernon Adams drew the Latin letters; Ben Nathan drew the Hebrew and revised the Latin, and Thomas Jockin respaced the whole font. Google listed it in October 2011, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family also has Bold.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Hebrew, Cyrillic and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Hebrew",
+    "Cyrillic",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Just Another Hand": {
+   "strip": "a g y I fi &",
+   "desc": "Narrow, brush-drawn handwriting, inspired by the designer's own writing in high school.",
+   "apart": [
+    "Narrow letters with thick, brush-drawn strokes",
+    "The capital I has crossbars, which helps tell it from l",
+    "In fi and fl, the letters are drawn as one shape"
+   ],
+   "madeShort": "Made by Astigmatic; on Google Fonts since 2010.",
+   "background": "Astigmatic drew it from the designer's high-school handwriting, using a brush for a cleaner stroke. Google listed it in December 2010, under the Apache Licence 2.0.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Sue Ellen Francisco": {
+   "strip": "a g y k l I",
+   "desc": "Tall, skinny handwriting based on the designer's own, drawn on a tablet.",
+   "apart": [
+    "Tall, skinny letters with thin, even strokes",
+    "The capital I has crossbars, which helps tell it from l"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2011.",
+   "background": "Based on Kimberly Geswein's own handwriting, drawn in Adobe Illustrator with a Wacom tablet and named after a nickname for a friend. Google listed it in April 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Covered By Your Grace": {
+   "strip": "a g y l I &",
+   "desc": "Thick, uneven handwriting based on a teacher friend's writing, with whimsical curves and extensions.",
+   "apart": [
+    "The l and the capital I are both plain strokes, so they look alike",
+    "Thick, uneven strokes; the capital J has no top bar"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2010.",
+   "background": "By Kimberly Geswein, based on the handwriting of a teacher friend. Google listed it in December 2010, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Nanum Pen Script": {
+   "strip": "a g y J &",
+   "desc": "Contemporary pen handwriting with a warm touch, from the Nanum family of Korean fonts.",
+   "apart": [
+    "The l and the capital I are both plain strokes, so they look alike",
+    "Thick, rounded pen strokes; the capital J has no top bar"
+   ],
+   "madeShort": "Made by Sandoll Communication; on Google Fonts since 2012.",
+   "background": "One of the Nanum fonts, made especially for Korean: designed by Sandoll Communication and published by Naver. Google listed it in May 2012, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters and curly quotes; no accented letters and no dashes. This copy is Latin only; the full font also has Korean.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Korean"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Reenie Beanie": {
+   "strip": "a g k t &",
+   "desc": "Loose, playful ballpoint-pen handwriting for casual, informal messages.",
+   "apart": [
+    "Thin, loose lines, as from a ballpoint pen",
+    "The capital I has crossbars, which helps tell it from l"
+   ],
+   "madeShort": "Made by James Grieshaber; on Google Fonts since 2010.",
+   "background": "By James Grieshaber, based on basic ballpoint-pen handwriting. Google listed it in May 2010, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Shadows Into Light": {
+   "strip": "a g y l I &",
+   "desc": "Clean, neat handwriting with rounded edges and curves.",
+   "apart": [
+    "The & is drawn as a small loop with a cross stroke",
+    "The l and the capital I are both plain strokes, so they look alike",
+    "Thin strokes with rounded curves"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2011.",
+   "background": "By Kimberly Geswein. Google listed it in June 2011, under the SIL Open Font Licence. A revised version followed as Shadows Into Light Two.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Shadows Into Light Two": {
+   "strip": "a g y l I &",
+   "desc": "A revised, updated Shadows Into Light: clean, neat handwriting with rounded edges and curves.",
+   "apart": [
+    "The & is drawn as a small loop with a cross stroke",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2012.",
+   "background": "Kimberly Geswein's revised and updated version of Shadows Into Light. Google listed it in February 2012, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Loved by the King": {
+   "strip": "a g y l I &",
+   "desc": "Skinny handwriting that fits in little places, one of the designer's first fonts released online.",
+   "apart": [
+    "Skinny letters that lean and wobble a little",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2011.",
+   "background": "By Kimberly Geswein, one of the designer's first fonts released online. Google listed it in July 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Annie Use Your Telescope": {
+   "strip": "a g y l I z &",
+   "desc": "Handwriting based on a photography student's writing, named as a nod to the band Jack's Mannequin.",
+   "apart": [
+    "The z has a bar across its middle",
+    "The l and the capital I are both plain strokes, so they look alike",
+    "Thin, even strokes in upright letters"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2011.",
+   "background": "By Kimberly Geswein, from a photography student's handwriting; the student named it as a nod to the band Jack's Mannequin. Google listed it in April 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Just Me Again Down Here": {
+   "strip": "a g y r W &",
+   "desc": "The designer's own messy handwriting, with capitals mixed in and irregular letters.",
+   "apart": [
+    "The r is written as a small capital R",
+    "Thick strokes, with letters of uneven size and spacing"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2010.",
+   "background": "Kimberly Geswein made it with a Wacom tablet and Adobe Illustrator a few weeks after the designer's family moved to China. Google listed it in December 2010, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "The Girl Next Door": {
+   "strip": "a g y f z &",
+   "desc": "Readable, neat handwriting based on a middle-school geography teacher's writing.",
+   "apart": [
+    "The f drops below the line, and the z has a bar across it",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2011.",
+   "background": "By Kimberly Geswein, based on the handwriting of a middle-school geography teacher. Google listed it in April 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Waiting for the Sunrise": {
+   "strip": "a g y k &",
+   "desc": "Cheery, perky handwriting based on a high-school student's writing.",
+   "apart": [
+    "The y is drawn like a capital Y",
+    "Thin, light strokes, with letters that vary in size",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2011.",
+   "background": "By Kimberly Geswein, based on a high-school student's handwriting; the name comes from the song Lift Me Up by The Afters. Google listed it in April 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Sedgwick Ave": {
+   "strip": "a g y k fi &",
+   "desc": "Handwritten graffiti lettering: the text-size design of the Sedgwick Ave project.",
+   "apart": [
+    "Heavy, slanted strokes, in the style of graffiti",
+    "In fi and fl, the letters are drawn as one shape",
+    "The capital I has crossbars, which helps tell it from l"
+   ],
+   "madeShort": "Made by Pedro Vergani and Kevin Burke; on Google Fonts since 2017.",
+   "background": "By Pedro Vergani and Kevin Burke. It is the text-size design of the Sedgwick Ave project; Sedgwick Ave Display is its partner for larger sizes. Google listed it in August 2017, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Neucha": {
+   "strip": "a g y l I &",
+   "desc": "Upright, rounded hand-drawn letters, first made in eight hours in 2005 and later redone from scratch.",
+   "apart": [
+    "The capital I has crossbars, which helps tell it from l",
+    "The a has a hood, as in printed text; the g is one loop"
+   ],
+   "madeShort": "Made by Jovanny Lemonad; on Google Fonts since 2010.",
+   "background": "By Jovanny Lemonad, who says it was made for one phrase, “I love you”; the name is Russian for “not knowing how to create fonts right”. Google listed it in September 2010, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, curly quotes, dashes and accents such as é, ñ and ü; ã, ì, ð, ò, õ, ø, ý and þ are missing, with their capitals. This copy is Latin only; the full font also has Cyrillic.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Cyrillic"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Dekko": {
+   "strip": "a g y l I &",
+   "desc": "Warm, casual handwriting made for Devanagari, with matching Latin letters based on Short Stack.",
+   "apart": [
+    "Letters are widely spaced, which its record says helps at small sizes on screens",
+    "The capital I has crossbars, which helps tell it from l"
+   ],
+   "madeShort": "Made by Sorkin Type; on Google Fonts since 2015.",
+   "background": "From Sorkin Type, led by Eben Sorkin. The Devanagari grew from Modular InfoTech's 4948 and the Latin from Short Stack. Google listed it in January 2015, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Devanagari.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Devanagari"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Kalam": {
+   "strip": "a g y k fi &",
+   "desc": "Quick, slanted handwriting for Devanagari and Latin, optimised for text on screen.",
+   "apart": [
+    "Letters slant steeply to the right",
+    "Thin strokes, as from a felt-tip or ballpoint pen",
+    "In fi and fl, the letters are drawn as one shape"
+   ],
+   "madeShort": "Made by Indian Type Foundry; on Google Fonts since 2014.",
+   "background": "First published by the Indian Type Foundry in 2014. Lipi Raval designed the Devanagari, and Raval and Jonny Pinhorn the Latin. Google listed it in October 2014, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family also has Light and Bold.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Devanagari.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Devanagari"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Gaegu": {
+   "strip": "a g y I &",
+   "desc": "A Korean and Latin handwriting font with rounded, upright letters.",
+   "apart": [
+    "A curly apostrophe leaves a wide gap, as in it’s",
+    "The capital I has crossbars, which helps tell it from l"
+   ],
+   "madeShort": "Made by JIKJI SOFT; on Google Fonts since 2018.",
+   "background": "By JIKJI SOFT; Google's record calls it a Korean and Latin font. Google listed it in February 2018, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family also has Light and Bold.",
+   "letters": "Basic English letters and curly quotes; no accented letters and no dashes. This copy is Latin only; the full font also has Korean.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Korean"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Gamja Flower": {
+   "strip": "a g y ? ! &",
+   "desc": "A Korean and Latin font with round, thick handwriting.",
+   "apart": [
+    "The g is two closed loops, like a figure eight",
+    "Round, heavy dots on i, j, ! and ?",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by YoonDesign Inc; on Google Fonts since 2018.",
+   "background": "By YoonDesign Inc; Google's record calls it a Korean and Latin font. Google listed it in February 2018, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters and curly quotes; no accented letters and no dashes. This copy mainly has Latin letters and a few Korean syllables; the full font also has Korean.",
+   "copyLatinOnly": false,
+   "familyScripts": [
+    "Korean"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Hi Melody": {
+   "strip": "a g y i ! ?",
+   "desc": "A Korean and Latin font with light, rounded handwriting.",
+   "apart": [
+    "Round, heavy dots on i, j, ! and ?",
+    "The capital I has crossbars, which helps tell it from l"
+   ],
+   "madeShort": "Made by YoonDesign Inc; on Google Fonts since 2018.",
+   "background": "By YoonDesign Inc; Google's record calls it a Korean and Latin font. Google listed it in February 2018, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters and curly quotes; no accented letters and no dashes. This copy mainly has Latin letters and a few Korean syllables; the full font also has Korean.",
+   "copyLatinOnly": false,
+   "familyScripts": [
+    "Korean"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Caveat": {
+   "strip": "a g y I fi &",
+   "desc": "Slanted handwriting by Pablo Impallari, designed for both short notes and body text.",
+   "apart": [
+    "Letters lean to the right",
+    "Repeated letters, such as t, change shape slightly",
+    "The capital I has crossbars, which helps tell it from l"
+   ],
+   "madeShort": "Made by Impallari Type; on Google Fonts since 2015.",
+   "background": "Designed by Pablo Impallari and commissioned by Google from Impallari Type; Cyreal added extended Cyrillic in 2019. Caveat Brush is its sister family. Google listed it in September 2015, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the full family can be set to any weight from Regular to Bold.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Cyrillic.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Cyrillic"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Caveat Brush": {
+   "strip": "a g y ft fi &",
+   "desc": "Caveat's sister family, with thick strokes, designed for short annotations.",
+   "apart": [
+    "Thick, rounded strokes",
+    "In ft and fi, the letters are drawn as one shape",
+    "The capital I has crossbars, which helps tell it from l"
+   ],
+   "madeShort": "Made by Impallari Type; on Google Fonts since 2015.",
+   "background": "Designed by Pablo Impallari, from Impallari Type, as a sister family to Caveat. Google listed it in September 2015, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Patrick Hand": {
+   "strip": "a g y l I fi",
+   "desc": "Neat, upright handwriting based on the designer Patrick Wagesreiter's own.",
+   "apart": [
+    "The l ends in a little curl, which helps tell it from a capital I",
+    "Neat, upright letters with rounded ends"
+   ],
+   "madeShort": "Made by Patrick Wagesreiter; on Google Fonts since 2011.",
+   "background": "Based on Patrick Wagesreiter's own handwriting; a Small Caps sister family, Patrick Hand SC, followed in February 2013. Google listed it in July 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Patrick Hand SC": {
+   "strip": "a g y R fi &",
+   "desc": "The small-capitals sister of Patrick Hand: the designer's handwriting, with small capitals for lower case.",
+   "apart": [
+    "Lower-case letters are drawn as smaller capitals",
+    "In fi, the f and i keep lower-case shapes",
+    "Neat, upright letters with rounded ends"
+   ],
+   "madeShort": "Made by Patrick Wagesreiter; on Google Fonts since 2013.",
+   "background": "The Small Caps sister family of Patrick Hand, by Patrick Wagesreiter. Google listed it in February 2013, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Handlee": {
+   "strip": "a g y W &",
+   "desc": "Loosely based on Joe Prince's handwriting, with letters set at varying heights for a human feel.",
+   "apart": [
+    "The W is drawn with rounded bottoms",
+    "Letters sit at slightly different heights on the line, by design"
+   ],
+   "madeShort": "Made by Joe Prince; on Google Fonts since 2011.",
+   "background": "Loosely based on the handwriting of typographer Joe Prince; its accents were placed by hand to look uneven, as in handwriting. Google listed it in December 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, curly quotes, dashes and accents such as é, ñ and ü; ð, ý and þ are missing, with their capitals.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Indie Flower": {
+   "strip": "a g y w W &",
+   "desc": "Carefree, bubbly handwriting with rounded edges; the designer calls it easy to read.",
+   "apart": [
+    "The capital W is drawn as a round, lower-case w",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2011.",
+   "background": "By Kimberly Geswein. Google listed it in March 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Architects Daughter": {
+   "strip": "a g y k x &",
+   "desc": "Handwriting that mixes the squared look of architects' lettering with everyday writing.",
+   "apart": [
+    "Squared letters, as in architects' hand lettering",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2011.",
+   "background": "By Kimberly Geswein, inspired by the writing of an architect's daughter. Google listed it in March 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Gloria Hallelujah": {
+   "strip": "a g y I r &",
+   "desc": "Fun, comic-style handwriting based on a Korean high-school student's writing.",
+   "apart": [
+    "The capital I has crossbars, which helps tell it from l",
+    "Uneven, comic-style letters, as the designer describes them"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2011.",
+   "background": "By Kimberly Geswein, based on the handwriting of a Korean high-school student. Google listed it in July 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Coming Soon": {
+   "strip": "a g y l I &",
+   "desc": "Thin, rounded handwriting based on a mom's writing from sixth grade.",
+   "apart": [
+    "Thin, even strokes in round, upright letters",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Open Window; on Google Fonts since 2011.",
+   "background": "By Open Window, based on a mom's handwriting from sixth grade. Google listed it in January 2011, under the Apache Licence 2.0.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Schoolbell": {
+   "strip": "a g y I t &",
+   "desc": "Playful handwriting, presented as the work of a second-grade lettering artist.",
+   "apart": [
+    "The capital I has crossbars, which helps tell it from l",
+    "Thick, rounded strokes"
+   ],
+   "madeShort": "Made by Font Diner; on Google Fonts since 2011.",
+   "background": "By Font Diner, which presents it as the handwriting of a second-grade lettering artist. Google listed it in January 2011, under the Apache Licence 2.0.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Mynerve": {
+   "strip": "a g k th st &",
+   "desc": "Casual handwriting designed for annotating and commenting on documents.",
+   "apart": [
+    "Common pairs such as th, st and ch have their own combined shapes",
+    "Repeated letters change shape, as in real handwriting",
+    "The k is drawn with a loop"
+   ],
+   "madeShort": "Made by Carolina Short; on Google Fonts since 2023.",
+   "background": "By Carolina Short, for informal texts and notes; it has two sets of alternate letters and combined shapes for frequent pairs. Google listed it in January 2023, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Greek and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Greek",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Playpen Sans": {
+   "strip": "a g y l I &",
+   "desc": "Casual handwriting from TypeTogether, based on over two years of research into handwriting education.",
+   "apart": [
+    "The l and the capital I are both plain strokes, so they look alike",
+    "The a and g are each one loop",
+    "Thick, rounded strokes"
+   ],
+   "madeShort": "Made by TypeTogether; on Google Fonts since 2023.",
+   "background": "Designed by TypeTogether, with a team including Laura Meseguer and Veronika Burian, after over two years of research into handwriting education; the full family also has emoji. Google listed it in September 2023, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the full family can be set to any weight from Thin to Extra Bold.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Greek, Cyrillic and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Greek",
+    "Cyrillic",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Shantell Sans": {
+   "strip": "a g y l I &",
+   "desc": "Rounded handwriting made by artist Shantell Martin with Arrow Type, to inspire fun with words.",
+   "apart": [
+    "The l ends in a curl, which helps tell it from a capital I",
+    "Thick, rounded strokes with soft ends"
+   ],
+   "madeShort": "Made by Shantell Martin, Arrow Type and Anya Danilova; on Google Fonts since 2023.",
+   "background": "Made by British artist Shantell Martin with Stephen Nixon of Arrow Type and Anya Danilova. Google listed it in January 2023, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the full family can be set to any weight from Light to Extra Bold, and has italics.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Cyrillic and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Cyrillic",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Klee One": {
+   "strip": "a g y fi ffl &",
+   "desc": "A quiet hand, written with a pencil or pen, and meant for body text.",
+   "apart": [
+    "The a and g are each one loop",
+    "In ff, fi, fl, ffi and ffl, the letters are drawn as one shape",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Fontworks Inc.; on Google Fonts since 2021.",
+   "background": "By Fontworks Inc.; Google's record says it is handwritten by pencil or pen, with an elegant look. Iansui is based on its Semibold. Google listed it in June 2021, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family also has Semibold.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Japanese, extended Greek and Cyrillic.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Japanese",
+    "extended Greek",
+    "Cyrillic"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Zen Kurenaido": {
+   "strip": "a g y l I &",
+   "desc": "Ballpoint-style handwriting: the brush-like details are left out, leaving only the bones of each letter.",
+   "apart": [
+    "The l ends in a little hook, which helps tell it from a capital I",
+    "The a has a hood, as in printed text; the g is one loop"
+   ],
+   "madeShort": "Made by Yoshimichi Ohira; on Google Fonts since 2021.",
+   "background": "By Yoshimichi Ohira, one of the Zen Fonts, a collection of Japanese typefaces. Google listed it in October 2021, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Japanese, Greek and Cyrillic.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Japanese",
+    "Greek",
+    "Cyrillic"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Permanent Marker": {
+   "strip": "a g R Q ! &",
+   "desc": "Heavy, slanted capitals with the look and feel of a favourite writing instrument.",
+   "apart": [
+    "Lower-case letters are drawn as smaller capitals",
+    "The & is drawn like a plus sign",
+    "Heavy, slanted strokes"
+   ],
+   "madeShort": "Made by Font Diner; on Google Fonts since 2011.",
+   "background": "By Font Diner; Google's record says it represents the look and feel of a favourite writing instrument. Google listed it in January 2011, under the Apache Licence 2.0.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Rock Salt": {
+   "strip": "a g R K Q &",
+   "desc": "Rough capitals hand-crafted with felt-tip markers, for a personal look.",
+   "apart": [
+    "Lower-case letters are drawn as smaller capitals",
+    "Rough, sprawling strokes, as from a felt-tip marker"
+   ],
+   "madeShort": "Made by Sideshow; on Google Fonts since 2011.",
+   "background": "By Sideshow, hand-crafted with felt-tip markers. Google listed it in January 2011, under the Apache Licence 2.0.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Over the Rainbow": {
+   "strip": "a g x y I &",
+   "desc": "Upbeat, loose handwriting that the designer says makes them smile.",
+   "apart": [
+    "The x is drawn as a looped stroke that looks much like a p",
+    "The capital I has curly crossbars"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2011.",
+   "background": "By Kimberly Geswein. Google listed it in April 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Give You Glory": {
+   "strip": "a g r k n &",
+   "desc": "Quirky, mixed-case handwriting with the flow of real handwriting.",
+   "apart": [
+    "Some lower-case letters, such as r, k and n, are written as capitals",
+    "Thin, light strokes"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2011.",
+   "background": "By Kimberly Geswein, in the mixed-case style many people use in daily writing. Google listed it in July 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Yanone Kaffeesatz": {
+   "strip": "a g k fi &",
+   "desc": "Yanone's first finished typeface, from 2004: plain, upright letters whose Bold recalls 1920s coffee-house type.",
+   "apart": [
+    "The k's arm is a small rounded loop",
+    "The l and the capital I are both plain strokes, so they look alike",
+    "In ff, fi, fl, ffi and ffl, the letters are drawn as one shape"
+   ],
+   "madeShort": "Made by Yanone and Cyreal; on Google Fonts since 2010.",
+   "background": "Yanone's first finished typeface, published in 2004; Cyrillic by Sol Matas and Juan Pablo del Peral was added in December 2013. Google listed it in May 2010, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the full family can be set to any weight from Extra Light to Bold.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Cyrillic and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Cyrillic",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Oswald": {
+   "strip": "a g R Q fi &",
+   "desc": "A reworking of the classic Alternate Gothic style, redrawn to fit the pixels of digital screens.",
+   "apart": [
+    "Round letters such as o and e have straight sides",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Vernon Adams, Kalapi Gajjar and Cyreal; on Google Fonts since 2012.",
+   "background": "Vernon Adams drew it and kept refining it until 2014; in 2016 Kalapi Gajjar completed the Latin work Adams had started. Google listed it in February 2012, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the full family can be set to any weight from Extra Light to Bold.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Cyrillic and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Cyrillic",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Pathway Gothic One": {
+   "strip": "a g R Q fi &",
+   "desc": "Narrow, plain letters in the grotesque style, a very popular style in the history of type.",
+   "apart": [
+    "Round letters such as o and e have straight sides",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Eduardo Tunni; on Google Fonts since 2013.",
+   "background": "By Eduardo Tunni; this book weight was meant as the first of many, and a March 2023 update added more characters. Google listed it in June 2013, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Sofia Sans Extra Condensed": {
+   "strip": "a g R Q fi &",
+   "desc": "The Extra Condensed width of Sofia Sans, a type system first designed for Bulgaria's capital city.",
+   "apart": [
+    "The g has a small ear at its top right",
+    "Soft, rounded corners on straight strokes",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Lettersoup, Botio Nikoltchev and Ani Petrova; on Google Fonts since 2022.",
+   "background": "By Lettersoup with Botio Nikoltchev and Ani Petrova. Sofia Sans comes in four widths and was first designed for the capital city of Bulgaria. Google listed it in November 2022, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the full family can be set to any weight from very thin to very heavy, and has italics.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Greek and Cyrillic.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Greek",
+    "Cyrillic"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Barlow Condensed": {
+   "strip": "a g R Q fi &",
+   "desc": "Slightly rounded letters with even strokes, sharing qualities with car plates, highway signs, buses and trains.",
+   "apart": [
+    "Two hyphens in a row are drawn as one long dash",
+    "Slightly rounded corners and even strokes",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "apartWarn": [
+    0
+   ],
+   "madeShort": "Made by Jeremy Tribby; on Google Fonts since 2017.",
+   "background": "Led by Jeremy Tribby. This Condensed family is part of the Barlow superfamily with Normal and Semi Condensed, each in nine weights, upright and italic. Google listed it in October 2017, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family has nine weights, from Thin to Black, each with an italic.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Roboto Condensed": {
+   "strip": "a g R Q fi &",
+   "desc": "The condensed member of the Roboto family: a mechanical skeleton with friendly, open curves.",
+   "apart": [
+    "The l and the capital I are both plain strokes, so they look alike",
+    "Open, friendly curves on a mechanical frame"
+   ],
+   "madeShort": "Made by Christian Robertson; on Google Fonts since 2023.",
+   "background": "By Christian Robertson; it can be used alongside Roboto and Roboto Slab. Google listed it in July 2023, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the full family can be set to any weight from Thin to Black, and has italics.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Greek, Cyrillic and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Greek",
+    "Cyrillic",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Fira Sans Condensed": {
+   "strip": "a g l I fi &",
+   "desc": "The condensed width of Fira Sans, designed for Mozilla's Firefox OS phones.",
+   "apart": [
+    "The l has a curved foot, which helps tell it from a capital I",
+    "The a has a hood, as in printed text; the g is one loop"
+   ],
+   "madeShort": "Made by Carrois Apostrophe; on Google Fonts since 2016.",
+   "background": "From Carrois, for Mozilla's Firefox OS. Fira comes in three widths, all with italics, and has a monospaced version. Google listed it in December 2016, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family has nine weights, from Thin to Black, each with an italic.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Greek, Cyrillic and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Greek",
+    "Cyrillic",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Yomogi": {
+   "strip": "a g i m W &",
+   "desc": "Extra-thin handwriting with equal-width English letters, intended to combine cuteness and readability.",
+   "apart": [
+    "English letters take equal space, so i and l sit in wide gaps",
+    "Its long dash runs right up to the next word",
+    "Extra-thin, even strokes"
+   ],
+   "apartWarn": [
+    1
+   ],
+   "madeShort": "Made by Satsuyako; on Google Fonts since 2021.",
+   "background": "By Satsuyako, with Japanese kana and kanji as well as Latin; it can also be set in vertical writing. Google listed it in April 2021, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Japanese, Cyrillic and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Japanese",
+    "Cyrillic",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Iansui": {
+   "strip": "a g y I fi &",
+   "desc": "Fontworks' Klee Semibold, written with a pencil or pen, adapted for Taiwan's Ministry of Education requirements.",
+   "apart": [
+    "The a and g are each one loop",
+    "The capital I has crossbars, which helps tell it from l",
+    "In ff, fi, fl, ffi and ffl, the letters are drawn as one shape"
+   ],
+   "madeShort": "Made by But Ko; on Google Fonts since 2024.",
+   "background": "By But Ko, based on Fontworks' Klee Semibold and modified to meet the Ministry of Education's requirements for Taiwanese use. Google listed it in November 2024, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Traditional Chinese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Traditional Chinese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Yusei Magic": {
+   "strip": "a g e s &",
+   "desc": "Handwriting based on permanent-marker lettering, with thick upright strokes and thin crossing strokes.",
+   "apart": [
+    "Thick upright strokes with thinner crossing strokes",
+    "The capital I has crossbars, which helps tell it from l",
+    "The a is one loop"
+   ],
+   "madeShort": "Made by Tanukizamurai; on Google Fonts since 2020.",
+   "background": "By Tanukizamurai; its record recommends it for handwriting on blackboards and pop art designs. Google listed it in December 2020, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Japanese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Japanese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "LXGW Marker Gothic": {
+   "strip": "a g t y &",
+   "desc": "A Chinese adaptation of the Japanese font Tanugo, meant to be easy to read, with a fun, cute character.",
+   "apart": [
+    "The t is a simple cross, with no curl at its foot",
+    "The capital I has crossbars, which helps tell it from l",
+    "The a is one loop"
+   ],
+   "madeShort": "Made by LXGW; on Google Fonts since 2025.",
+   "background": "By LXGW, adapting the Japanese font Tanugo for traditional and simplified Chinese. Google listed it in May 2025, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Traditional Chinese, Greek, Cyrillic and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Traditional Chinese",
+    "Greek",
+    "Cyrillic",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Gowun Dodum": {
+   "strip": "a g l I fi &",
+   "desc": "Neat, delicate letters with a touch of hand movement and a warm, friendly feel.",
+   "apart": [
+    "The l ends in a curved foot, which helps tell it from a capital I",
+    "The a has a hood, as in printed text; the g is one loop"
+   ],
+   "madeShort": "Made by Yanghee Ryu; on Google Fonts since 2021.",
+   "background": "By Yanghee Ryu. Gowun means ‘neat and delicate’ in Korean, and Dodum is the style name for sans-serif Hangeul text. Google listed it in June 2021, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Korean and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Korean",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Kiwi Maru": {
+   "strip": "a g y fi &",
+   "desc": "A round font made mainly for digital devices, for everyday words and slang.",
+   "apart": [
+    "Strokes end in small, soft serifs",
+    "The a has a hood, as in printed text; the g is one loop"
+   ],
+   "madeShort": "Made by Hiroki-Chan; on Google Fonts since 2020.",
+   "background": "By Hiroki-Chan, made mainly for digital devices. Its three weights differ only slightly, to allow for differences between systems, browsers and devices. Google listed it in December 2020, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family also has Light and Medium, which differ from it only slightly.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Japanese and Cyrillic.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Japanese",
+    "Cyrillic"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Zen Maru Gothic": {
+   "strip": "a g y l I &",
+   "desc": "Rounded letters with deep rounding in the corners, for a soft, natural feel.",
+   "apart": [
+    "Rounded stroke ends and corners",
+    "The l and the capital I are both plain strokes, so they look alike",
+    "The a has a hood, as in printed text; the g is one loop"
+   ],
+   "madeShort": "Made by Yoshimichi Ohira; on Google Fonts since 2021.",
+   "background": "By Yoshimichi Ohira, one of the Zen Fonts, a collection of Japanese typefaces. Google listed it in October 2021, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family also has Light, Medium, Bold and Black.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Japanese, Greek and Cyrillic.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Japanese",
+    "Greek",
+    "Cyrillic"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Tsukimi Rounded": {
+   "strip": "a g r J fi &",
+   "desc": "Rounded letters based on traditional Japanese type in the Tsukiji Type Foundry's specimen books.",
+   "apart": [
+    "The capital J drops below the line",
+    "Rounded stroke ends"
+   ],
+   "madeShort": "Made by Takashi Funayama; on Google Fonts since 2020.",
+   "background": "By Takashi Funayama, based on a traditional size of type in the Tsukiji Type Foundry's specimen books, with rounded stroke ends. Google listed it in December 2020, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family also has Light, Medium, Semibold and Bold.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Japanese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Japanese"
+   ],
+   "weightLoaded": "Regular"
+  },
+  "Noteworthy": {
+   "strip": "a g s y &",
+   "desc": "Light, upright handwriting with thin strokes and rounded letters.",
+   "apart": [
+    "The s curls inward at the top",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Comes with macOS; the file credits Dan X. Solo, 2005.",
+   "background": "Comes with macOS. The font file credits Dan X. Solo, 2005; this Mac has it in Light and Bold.",
+   "weight": "Light loads here; this Mac also has Bold.",
+   "letters": "Basic English letters, accents such as é, ñ, ü, ą and č, curly quotes, dashes, Greek and Cyrillic.",
+   "copyLatinOnly": false,
+   "familyScripts": [],
+   "weightLoaded": "Light"
+  },
+  "Marker Felt": {
+   "strip": "a g k y &",
+   "desc": "Thick, rounded marker-style lettering.",
+   "apart": [
+    "Thick strokes with rounded ends",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Comes with macOS; the file credits Pat Snyder, 1992, 1993 and 2001.",
+   "background": "Comes with macOS. The font file credits Pat Snyder; this Mac has it in Thin and in a heavier style, Wide.",
+   "weight": "Thin loads here; this Mac also has a heavier style, Wide.",
+   "letters": "Basic English letters, accents such as é, ñ, ü, ą and č, curly quotes, dashes, Greek and Cyrillic.",
+   "copyLatinOnly": false,
+   "familyScripts": [],
+   "weightLoaded": "Thin"
+  },
+  "Chalkboard SE": {
+   "strip": "a g y I &",
+   "desc": "Rounded, upright lettering with thick, even strokes.",
+   "apart": [
+    "The capital I has crossbars, which helps tell it from l",
+    "Thick, rounded, upright letters"
+   ],
+   "madeShort": "Comes with macOS; the file credits Apple Computer, Inc., 2003–2010.",
+   "background": "Comes with macOS. The font file credits Apple Computer, Inc.; this Mac has it in Light, Regular and Bold.",
+   "weight": "Regular loads here; this Mac also has Light and Bold.",
+   "letters": "Basic English letters, accents such as é, ñ, ü, ą and č, curly quotes, dashes, Greek and Cyrillic.",
+   "copyLatinOnly": false,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  },
+  "Bradley Hand": {
+   "strip": "a g y I J &",
+   "desc": "Handwriting with thick and thin strokes and slightly rough edges.",
+   "apart": [
+    "The & is drawn like a curly E",
+    "Strokes swing between thick and thin"
+   ],
+   "madeShort": "Comes with macOS; the file credits International Typeface Corporation, 1997.",
+   "background": "Comes with macOS. The font file credits International Typeface Corporation, 1997; this Mac has only its Bold.",
+   "weight": "Bold loads here; it is the only weight on this Mac.",
+   "letters": "Basic English letters, accents such as é, ñ, ü, ą and č, curly quotes, dashes, Greek and Cyrillic.",
+   "copyLatinOnly": false,
+   "familyScripts": [],
+   "weightLoaded": "Bold"
+  },
+  "SignPainter": {
+   "strip": "a g y f &",
+   "desc": "Slanted sign-painter lettering with thick and thin strokes, from House Industries.",
+   "apart": [
+    "Letters slant to the right, with thick and thin strokes",
+    "The l is drawn with a loop"
+   ],
+   "madeShort": "Comes with macOS; the file credits House Industries/Brand Design Co., Inc., 1999.",
+   "background": "Comes with macOS. The font file credits House Industries/Brand Design Co., Inc. and calls it Sign Painter House Script; this Mac also has a Semibold.",
+   "weight": "Regular loads here; this Mac also has Semibold.",
+   "letters": "Basic English letters, accents such as é, ñ, ü, ą and č, curly quotes, dashes, Greek and Cyrillic.",
+   "copyLatinOnly": false,
+   "familyScripts": [],
+   "weightLoaded": "Regular"
+  }
+ }
+}

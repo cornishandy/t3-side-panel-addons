@@ -322,3 +322,58 @@ export function diagEntry(params) {
   }
   return out;
 }
+
+// ---------- font catalog and "About this font" records (public projections) ----------
+
+const intOrNull = (v) => (Number.isInteger(v) ? v : null);
+/** The pickers' list: names, verdicts and measurements; never URLs or hashes. `listVersion` counts changes to
+ *  the list; a family added in a change carries `newIn` = that version ("new" in the menus until the next). */
+export function fontCatalogProjection(fonts) {
+  const files = new Set((fonts?.files ?? []).map((f) => f.file));
+  return {
+    listVersion: intOrNull(fonts?.listVersion),
+    xRatioMedian: intOrNull(fonts?.xRatioMedian),
+    families: (fonts?.families ?? []).map((f) => ({
+      name: f.name, source: f.source, group: f.group, style: f.style, star: Boolean(f.star), hard: Boolean(f.hard),
+      file: files.has(f.file) ? f.file : null, local: Array.isArray(f.local) ? f.local : null,
+      width: f.width ?? null, tallness: f.tallness ?? null, narrow: Boolean(f.narrow), tall: Boolean(f.tall), size: f.size ?? 100,
+      newIn: intOrNull(f.newIn), note: typeof f.note === "string" ? f.note : null,
+      xRatio: intOrNull(f.xRatio), widthVsSystem: intOrNull(f.widthVsSystem), sizeClamped: Boolean(f.sizeClamped),
+      oneWeight: Boolean(f.oneWeight), smallCaps: Boolean(f.smallCaps),
+    })),
+  };
+}
+
+/** One record's public fields (the writer's `sources` and anything else stay build-side). */
+const ABOUT_FIELDS = Object.freeze({
+  strip: "text", desc: "text", madeShort: "text", background: "text", weight: "text", letters: "text", weightLoaded: "text",
+  apart: "list", familyScripts: "list", copyLatinOnly: "flag",
+  apartWarn: "indexes", // which traits (0-based, into apart) warn how the font draws in T3; the short-window pane swap keeps them
+});
+const aboutText = (v) => typeof v === "string" && v.length > 0 && v.length <= 600;
+/** The "About this font" records the service sends: only families in the catalog (exact name), only the public
+ *  fields, plain strings (the add-on renders them as text). `listVersion` is the records' own: the add-on uses
+ *  them only when it equals the catalog's. */
+export function fontAboutProjection(about, fonts) {
+  const names = new Set((fonts?.families ?? []).map((f) => f.name));
+  const raw = about && typeof about.records === "object" && !Array.isArray(about.records) ? about.records : {};
+  const records = {};
+  for (const [name, r] of Object.entries(raw)) {
+    if (!names.has(name) || !r || typeof r !== "object") continue;
+    const out = {};
+    for (const [k, kind] of Object.entries(ABOUT_FIELDS)) {
+      const v = r[k];
+      if (kind === "text" && aboutText(v)) out[k] = v;
+      else if (kind === "list" && Array.isArray(v)) out[k] = v.filter(aboutText).slice(0, 8);
+      else if (kind === "flag") out[k] = v === true;
+      else if (kind === "indexes" && Array.isArray(v)) out[k] = [...new Set(v.filter((i) => Number.isInteger(i) && i >= 0 && i < 8))];
+    }
+    // Warning indexes name the record's own traits: follow them past the list filter above (Sol, 14 Nov 2026).
+    if (out.apartWarn && Array.isArray(r.apart)) {
+      const kept = r.apart.flatMap((x, i) => (aboutText(x) ? [i] : [])).slice(0, 8);
+      out.apartWarn = out.apartWarn.map((i) => kept.indexOf(i)).filter((i) => i >= 0);
+    }
+    records[name] = out;
+  }
+  return { listVersion: intOrNull(about?.listVersion), records };
+}

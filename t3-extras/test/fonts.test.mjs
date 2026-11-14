@@ -7,12 +7,13 @@ import { latinWoff2, deriveTags, slug } from "../tools/fonts.mjs";
 const data = JSON.parse(fs.readFileSync(new URL("../fonts.json", import.meta.url), "utf8"));
 const F = data.families;
 
-test("51 families: 46 from Google Fonts, 5 built into macOS, names unique", () => {
-  assert.equal(F.length, 51);
-  assert.equal(F.filter((f) => f.source === "google").length, 46);
+test("59 families: 54 from Google Fonts, 5 built into macOS, names unique", () => {
+  assert.equal(F.length, 59);
+  assert.equal(F.filter((f) => f.source === "google").length, 54);
   assert.deepEqual(F.filter((f) => f.source === "mac").map((f) => f.name), ["Noteworthy", "Marker Felt", "Chalkboard SE", "Bradley Hand", "SignPainter"]);
-  assert.equal(new Set(F.map((f) => f.name)).size, 51);
+  assert.equal(new Set(F.map((f) => f.name)).size, 59);
   assert.equal(F.filter((f) => f.group === "cond").length, 7);
+  assert.deepEqual(F.filter((f) => f.group === "round").map((f) => f.name), ["Gowun Dodum", "Kiwi Maru", "Zen Maru Gothic", "Tsukimi Rounded"]);
 });
 
 test("Argon's style verdicts as data: 2 joined, 13 partly joined, the rest print; 8 stars, 8 hard to read", () => {
@@ -43,10 +44,10 @@ test("every Google family is pinned: a gstatic woff2 and its real licence, each 
   for (const x of data.files) assert.match(x.file, /^[A-Za-z0-9._-]+$/, "install.sh's file-name rule");
 });
 
-test("measured: width, tallness, tags and a default size within 80-150%", () => {
+test("measured: width, tallness, tags and a default size within 80-200%", () => {
   for (const f of F) {
     assert.ok(f.width > 100 && f.tallness > 0.5, f.name);
-    assert.ok(f.size >= 80 && f.size <= 150 && f.size % 5 === 0, `${f.name} ${f.size}`);
+    assert.ok(f.size >= 80 && f.size <= 200 && f.size % 5 === 0, `${f.name} ${f.size}`);
   }
   const jah = F.find((f) => f.name === "Just Another Hand");
   assert.ok(jah.narrow && jah.tall);
@@ -62,6 +63,6 @@ test("tool helpers: the latin block, tags and sizes", () => {
   assert.equal(latinWoff2(korean).url, "https://fonts.gstatic.com/s/k/v1/b.woff2");
   const fams = [{ group: "hand", m: { w: 100, tall: 1, xh: 0.5 } }, { group: "hand", m: { w: 200, tall: 2, xh: 0.25 } }, { group: "hand", m: { w: 300, tall: 3, xh: 1 } }];
   deriveTags(fams, 0.5);
-  assert.deepEqual(fams.map((f) => [f.narrow, f.tall, f.size]), [[true, false, 100], [false, false, 150], [false, true, 80]]);
+  assert.deepEqual(fams.map((f) => [f.narrow, f.tall, f.size]), [[true, false, 100], [false, false, 200], [false, true, 80]]);
   assert.equal(slug("Patrick Hand SC"), "patrick-hand-sc");
 });

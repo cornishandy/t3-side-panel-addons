@@ -2,15 +2,28 @@
 /**
  * Maintainer tool for fonts.json (not run by install.sh or the service).
  *
- *   node tools/fonts.mjs pin [--commit <google/fonts sha>]
+ *   node tools/fonts.mjs pin [--commit <google/fonts sha>] [--only "Name,Name"]
  *       For each Google family: ask the Google Fonts CSS API for its latin woff2 (one weight, 400),
  *       download it, record its URL + sha256, and find its real licence (OFL, Apache 2.0 or UFL) in
  *       github.com/google/fonts at one pinned commit. Downloads go to a fresh folder under
- *       ~/Library/Caches/t3-extras-build-r2/ for `measure`.
+ *       ~/Library/Caches/t3-extras-build-r2/ for `measure`. With --only, just those families are
+ *       (re)pinned, at the commit fonts.json already pins unless --commit says otherwise; every
+ *       other family keeps its file, URL and hash.
  *   node tools/fonts.mjs measure --dl <folder>
  *       Measures every family the way the specimen board does (40 px canvas: sentence width,
  *       x-height, cap height) in T3's headless Chrome, and stores the results, the "narrow" and
- *       "tall" tags and a default size (x-height matched to T3's UI font, 80-150%).
+ *       "tall" tags, a default size (x-height matched to T3's UI font, 80-200%; sizeClamped when
+ *       the match needed more or less than that), xRatio (lower case as a whole % of capital
+ *       height), widthVsSystem (the sentence at the default size against T3's built-in system font
+ *       at 100%, signed whole %) and the catalog's xRatioMedian. The folder must hold every
+ *       Google family's file.
+ *
+ *   node tools/fonts.mjs about --from <writer's font-about.json>
+ *       Writes font-about.json, the "About this font" records the service sends: the public fields
+ *       only (never the writer's `sources`), for families in fonts.json, at fonts.json's listVersion.
+ *       `apartWarn` marks the traits that warn how the font draws in T3 (Yomogi's dash, which
+ *       fonts.json's dashesTouch records, and Barlow Condensed's double hyphen).
+ *       Run it only on a file whose claims have been checked against their sources.
  *
  * The style verdicts (print / partly joined / joined, star, hard) are authored data in fonts.json.
  */
@@ -58,12 +71,21 @@ async function get(url, binary = false) {
 
 async function pin() {
   const data = JSON.parse(fs.readFileSync(FONTS_JSON, "utf8"));
-  const commit = arg("--commit") ?? execFileSync("git", ["ls-remote", "https://github.com/google/fonts", "HEAD"], { encoding: "utf8" }).split(/\s/)[0];
+  const only = arg("--only") ? new Set(arg("--only").split(",").map((n) => n.trim()).filter(Boolean)) : null;
+  if (only) for (const n of only) if (!data.families.some((f) => f.name === n && f.source === "google")) throw new Error(`--only: no Google family ${n} in fonts.json`);
+  const commit = arg("--commit") ?? (only ? data.googleFontsCommit : execFileSync("git", ["ls-remote", "https://github.com/google/fonts", "HEAD"], { encoding: "utf8" }).split(/\s/)[0]);
   if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error(`bad commit ${commit}`);
+  if (only && commit !== data.googleFontsCommit) throw new Error("--only keeps one pinned commit for every licence: drop --commit, or re-pin them all");
+  fs.mkdirSync(SCRATCH, { recursive: true });
   const dl = fs.mkdtempSync(path.join(SCRATCH, "fonts-dl-"));
+  const kept = new Map((data.files ?? []).map((x) => [x.file, x]));
   const files = [];
   for (const fam of data.families) {
     if (fam.source !== "google") continue;
+    if (only && !only.has(fam.name)) {
+      files.push(kept.get(fam.file), kept.get(fam.licence));
+      continue;
+    }
     const css = await get(`https://fonts.googleapis.com/css2?family=${encodeURIComponent(fam.name).replace(/%20/g, "+")}&display=swap`);
     const block = latinWoff2(css);
     if (!block) throw new Error(`no latin woff2 for ${fam.name}`);
@@ -92,13 +114,20 @@ async function pin() {
   data.googleFontsCommit = commit;
   data.files = files;
   fs.writeFileSync(FONTS_JSON, `${JSON.stringify(data, null, 1)}\n`);
-  console.log(`pinned ${files.length / 2} families; downloads in ${dl}`);
+  console.log(`pinned ${only ? only.size : files.length / 2} families; downloads in ${dl}`);
 }
 
-/** narrow / tall tags and a default size, from raw 40 px measurements (pure; tested). */
-export function deriveTags(families, uiXh) {
-  const hand = families.filter((f) => f.group === "hand" && f.m);
-  const median = (xs) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+const median = (xs) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+
+/** narrow / tall tags, a default size and the font-details numbers, from raw 40 px measurements
+ *  (pure; tested). `ui` is T3's built-in system font measured the same way: its x-height (a number,
+ *  as before) or { xh, w }; the width comparison needs w. */
+export function deriveTags(families, ui) {
+  const uiXh = typeof ui === "number" ? ui : ui.xh, uiW = typeof ui === "number" ? null : ui.w;
+  // narrow and tall compare with the Handwritten medians of the list as it was before families
+  // carried newIn, so adding fonts never re-tags the ones already there (13 Nov 2026: adding four
+  // Handwritten fonts would otherwise have made Nanum Pen Script and Patrick Hand "narrow").
+  const hand = families.filter((f) => f.group === "hand" && f.m && f.newIn == null);
   const wMed = median(hand.map((f) => f.m.w));
   const tMed = median(hand.map((f) => f.m.tall));
   for (const f of families) {
@@ -107,11 +136,23 @@ export function deriveTags(families, uiXh) {
     f.tallness = Math.round(f.m.tall * 100) / 100; // cap height / average advance
     f.narrow = f.m.w < wMed * 0.88;
     f.tall = f.m.tall > tMed * 1.12;
-    // x-height matched to T3's UI font, in 5% steps, kept to the stepper's 80-150%.
-    f.size = Math.max(80, Math.min(150, Math.round((uiXh / f.m.xh) * 20) * 5));
+    // x-height matched to T3's UI font, in 5% steps, kept to 80-200% (the size buttons' range; 80-150% until
+    // 13 Nov 2026, when Andy confirmed the 200% cap: only Hi Melody moved, 150% to 155%).
+    const match = Math.round((uiXh / f.m.xh) * 20) * 5;
+    f.size = Math.max(80, Math.min(200, match));
+    f.sizeClamped = f.size !== match; // the match needed more (or less) than the limits allow
+    // Lower case as a whole % of capital height (small capitals, for the SC families).
+    if (f.m.cap > 0) f.xRatio = Math.round((100 * f.m.xh) / f.m.cap);
+    // The board's sentence at the default size against T3's built-in system font at 100%, signed whole %.
+    if (uiW > 0) f.widthVsSystem = Math.round((100 * f.m.w * f.size) / 100 / uiW - 100) || 0;
     delete f.m;
   }
   return families;
+}
+/** The catalog's typical lower case: the median xRatio, whole %. */
+export function xRatioMedian(families) {
+  const xs = families.map((f) => f.xRatio).filter(Number.isFinite);
+  return xs.length ? Math.round(median(xs)) : null;
 }
 
 function measure() {
@@ -142,15 +183,42 @@ document.getElementById("out").textContent=JSON.stringify({ui:m("-apple-system, 
   const missing = data.families.filter((f, i) => res.rows[i].fallback).map((f) => f.name);
   if (missing.length) throw new Error(`not loaded: ${missing.join(", ")}`);
   data.families.forEach((f, i) => (f.m = res.rows[i]));
-  deriveTags(data.families, res.ui.xh);
-  data.measuredWith = { sample: SAMPLE, px: 40, uiXHeight: Math.round(res.ui.xh * 1000) / 1000, browser: "T3's chrome-headless-shell" };
+  deriveTags(data.families, { xh: res.ui.xh, w: res.ui.w });
+  data.xRatioMedian = xRatioMedian(data.families);
+  data.measuredWith = { sample: SAMPLE, px: 40, uiXHeight: Math.round(res.ui.xh * 1000) / 1000, uiWidth: Math.round(res.ui.w * 10) / 10, browser: `T3's chrome-headless-shell ${path.basename(path.dirname(chrome))}` };
   fs.writeFileSync(FONTS_JSON, `${JSON.stringify(data, null, 1)}\n`);
-  for (const f of data.families) console.log(`${f.name.padEnd(28)} w ${String(f.width).padStart(6)} tall ${f.tallness} ${f.narrow ? "narrow " : ""}${f.tall ? "tall " : ""}size ${f.size}%`);
+  for (const f of data.families) console.log(`${f.name.padEnd(28)} w ${String(f.width).padStart(6)} tall ${f.tallness} ${f.narrow ? "narrow " : ""}${f.tall ? "tall " : ""}size ${f.size}%${f.sizeClamped ? " (clamped)" : ""} x ${f.xRatio}% vs system ${f.widthVsSystem}%`);
+}
+
+/** The shipped records from the writer's file (pure; tested). */
+export function aboutRecords(writer, fonts) {
+  const by = new Map(fonts.families.map((f) => [f.name, f]));
+  const keep = ["strip", "desc", "apart", "apartWarn", "madeShort", "background", "weight", "letters", "copyLatinOnly", "familyScripts", "weightLoaded"];
+  const records = {};
+  const src = writer?.records ?? writer ?? {};
+  for (const [name, r] of Object.entries(src)) {
+    const f = by.get(name);
+    if (!f || f.source === "t3" || !r || typeof r !== "object") continue;
+    const out = {};
+    for (const k of keep) if (r[k] !== undefined) out[k] = r[k];
+    records[name] = out;
+  }
+  return { note: "The \"About this font\" records (tools/fonts.mjs about, from the writer's checked file; sources stay build-side). Shown as plain text.", listVersion: fonts.listVersion ?? null, records };
+}
+function about() {
+  const from = arg("--from");
+  if (!from || !fs.existsSync(from)) throw new Error("--from <writer's font-about.json> needed");
+  const fonts = JSON.parse(fs.readFileSync(FONTS_JSON, "utf8"));
+  const out = aboutRecords(JSON.parse(fs.readFileSync(from, "utf8")), fonts);
+  const missing = fonts.families.filter((f) => !out.records[f.name]).map((f) => f.name);
+  fs.writeFileSync(path.join(SRC, "font-about.json"), `${JSON.stringify(out, null, 1)}\n`);
+  console.log(`${Object.keys(out.records).length} records written${missing.length ? `; missing: ${missing.join(", ")}` : ""}`);
 }
 
 if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const cmd = process.argv[2];
   if (cmd === "pin") await pin();
   else if (cmd === "measure") measure();
-  else console.log("usage: tools/fonts.mjs pin [--commit sha] | measure --dl <folder>");
+  else if (cmd === "about") about();
+  else console.log("usage: tools/fonts.mjs pin [--commit sha] [--only names] | measure --dl <folder> | about --from <file>");
 }

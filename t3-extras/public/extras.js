@@ -388,6 +388,8 @@
   }
   function fontTags(f, native = true) {
     return [
+      f.isNew ? "new" : null, // added in the list's current version (catalog listVersion), first until the list next changes
+      f.source !== "t3" && f.note ? f.note : null, // a family's own menu note, e.g. Iansui's "a darker Klee One"
       f.narrow ? "narrow" : null,
       f.tall ? "tall" : null,
       f.style === "partly" ? "semi-cursive" : f.style === "joined" ? "cursive" : null,
@@ -408,11 +410,27 @@
   ].map(([name, css, note]) => Object.freeze({ name, css, note, source: "t3", group: "t3", style: "print", width: 0 })));
   const t3Font = (name) => T3_FONTS.find((f) => f.name === name) || null;
 
+  /** The menus' groups, in order (Rounded print added 13 Nov 2026, after Handwritten). */
+  const FONT_GROUPS = Object.freeze([["t3", "T3 Code settings"], ["hand", "Handwritten"], ["round", "Rounded print"], ["cond", "Condensed print"]]);
+  /** The service's catalog as the pickers use it: T3's own fonts first, then the families (names checked, at most
+   *  200), each marked isNew while its defined newIn equals the list's defined listVersion. A catalog from before
+   *  list versions (no listVersion) marks nothing new. */
+  function normalizeCatalog(c) {
+    const listVersion = Number.isInteger(c?.listVersion) ? c.listVersion : null;
+    const families = (Array.isArray(c?.families) ? c.families : [])
+      .filter((f) => f && typeof f.name === "string" && f.source !== "t3" && !t3Font(f.name)).slice(0, 200)
+      .map((f) => ({ ...f, isNew: listVersion !== null && Number.isInteger(f.newIn) && f.newIn === listVersion }));
+    const list = [...T3_FONTS, ...families];
+    list.listVersion = listVersion;
+    list.xRatioMedian = Number.isInteger(c?.xRatioMedian) ? c.xRatioMedian : null;
+    return list;
+  }
+
   /** Picker groups, narrowest first (the board's measured sentence width); near-ties put ★ first.
    *  The current choice always stays listed, marked when the filter would hide it.
    *  T3's own fonts come first when the catalog carries them, except for Visualizations. */
   function fontOptions(catalog, s, current, native = () => true, role = null) {
-    const groups = [["t3", "T3 Code settings"], ["hand", "Handwritten"], ["cond", "Condensed print"]].filter(([g]) => g !== "t3" || role !== "viz");
+    const groups = FONT_GROUPS.filter(([g]) => g !== "t3" || role !== "viz");
     return groups.map(([g, label]) => ({
       label,
       options: (Array.isArray(catalog) ? catalog : [])
@@ -436,6 +454,138 @@
       const i = start < 0 ? (delta > 0 ? n - 1 : entries.length - n) : (start + delta * n + entries.length) % entries.length;
       const name = entries[i].name;
       if (name !== current && available.has(name)) return name;
+    }
+    return null;
+  }
+
+  // ---------- "About this font" (13 Nov 2026, design S′): the words ----------
+  // Every user-visible template for the font details lives here, so a wording change is one edit. Wording
+  // confirmed by Andy on 13 Nov 2026, 9:51 PM ("Yes, use this wording"), the design team's W3.
+  // The records' own prose (desc, apart, background…) comes from the service's /font-about, never from this file.
+  const joinAnd = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+  const FONT_TEXT = Object.freeze({
+    panelTitle: "About this font",
+    paneSwapSub: "About the highlighted font",
+    paneSwapHead: (area) => `${area} · ${FONT_TEXT.paneSwapSub}`, // the short window's swap: one heading line (10G′, 14 Nov 2026)
+    apartHead: "What sets it apart",
+    usingHead: "Using it here",
+    backgroundHead: "Background",
+    technicalHead: "Technical",
+    lowerCaseLabel: "Lower case",
+    widthLabel: "Width",
+    weightLabel: "Weight",
+    lettersLabel: "Letters",
+    // Card, Technical line.
+    lowerCaseLine: (n, median) => `Lower case ${n}% as tall as capitals (typical here: about ${median}%).`,
+    smallCapsLine: (n) => `Lower-case letters appear as small capitals, ${n}% as tall as capitals.`,
+    weightLine: (w, latinOnly) => (latinOnly ? `${w} weight; Latin letters only in this copy.` : `${w} weight.`),
+    // Panel, Technical rows.
+    lowerCaseRow: (n, median) => `${n}% of capital height; typical here is about ${median}%`,
+    smallCapsRow: (n) => `Small capitals, ${n}% of capital height`,
+    widthRow: (n) => (n > 0 ? `A sample sentence at the default size is about ${n}% wider than in T3's built-in system font at 100%`
+      : n < 0 ? `A sample sentence at the default size is about ${-n}% narrower than in T3's built-in system font at 100%` : FONT_TEXT.widthSame),
+    widthSame: "A sample sentence at the default size is about as wide as in T3's built-in system font at 100%",
+    // Using it here: why the default size (the floor form only when the match fell below 80%), the style, bold, usage.
+    defaultSize: (size) => `Default size here ${size}%, to bring its lower case close to the height of T3's built-in system font at 100%.`,
+    defaultSizeFloor: (size) => `Default size here ${size}%, the smallest size; its lower case is still taller than the lower case of T3's built-in system font at 100%.`,
+    defaultSizeSmallCaps: (size) => `Default size here ${size}%, to bring its small capitals close to the lower-case height of T3's built-in system font at 100%.`,
+    defaultSizeSmallCapsFloor: (size) => `Default size here ${size}%, the smallest size; its small capitals are still taller than the lower case of T3's built-in system font at 100%.`,
+    style: Object.freeze({ print: "Print: letters mostly stand apart.", partly: "Semi-cursive: some letters join.", joined: "Cursive: most letters join up." }),
+    boldSame: "Bold text shows in the same weight.", // one-weight families, only where BOLD_SAME_CHECKED says T3 showed it
+    // Usage (card line and panel), in the ✦ panel's order.
+    usageNone: "Not used anywhere yet.",
+    usageSame: (list, size) => `You use it for ${list}, at ${size}%.`,
+    usageMixed: (list) => `You use it for ${list}.`,
+    usageMixedMore: (list) => `You use it for ${list}, sizes not listed.`,
+    usageNoSize: (list) => `You use it for ${list}.`, // T3's own fonts take T3's size
+    // Special kinds and states.
+    t3Follows: (which, now) => `Follows T3's Settings → Appearance ${which} font (now: ${now}). The size buttons don't apply.`,
+    nowSystem: "the system font",
+    t3System: "Uses T3's built-in system font. The size buttons don't apply.",
+    macMissing: "Not on this Mac; text would stay in T3's font.",
+    hiddenPrint: "Hidden by Print only; listed because it's your current choice.", // a semi-cursive choice
+    hiddenCursive: "Hidden until Print only and Show semi-cursive are both off; listed because it's your current choice.",
+    detailsFailed: "Font details couldn't load.",
+    detailsNone: "No details for this font.", // a font with no record: the panel and docked card only (7A, 14 Nov 2026)
+    // The ✦ row's size number, last sentence, on rows whose name is drawn capped (11C add-on, 14 Nov 2026).
+    sizeCapNote: (cap, size) => `The font name above is drawn at ${cap}%; the app uses ${size}%.`,
+  });
+  /** Where T3 showed bold text in a one-weight family in the same weight, by source (the build's live check,
+   *  13 Nov 2026, T3's web UI in Chromium 152 and 157): a Mac family's own file (Bradley Hand) drew bold text
+   *  pixel for pixel the same; a Google family's file (Zen Kurenaido) drew it slightly heavier (made-up bold),
+   *  so Google families never say so. */
+  const BOLD_SAME_CHECKED = Object.freeze({ google: false, mac: true });
+  const T3_FONT_KIND = Object.freeze({ "T3 interface font": "interface", "T3 composer font": "composer", "T3 code font": "code" });
+  const SYSTEM_ALIASES = new Set(["-apple-system", "system-ui", "blinkmacsystemfont", "ui-sans-serif", "ui-monospace", "ui-serif", "ui-rounded"]);
+  /** The first family a CSS font-family list names, unquoted, or "the system font" for a system alias. */
+  function firstFamily(stack) {
+    const first = String(stack ?? "").split(",")[0]?.trim().replace(/^["']|["']$/g, "") ?? "";
+    if (!first) return null;
+    return SYSTEM_ALIASES.has(first.toLowerCase()) ? FONT_TEXT.nowSystem : first;
+  }
+  /** "You use it for …": entries are { label, size } in the ✦ panel's order; T3's own fonts have no size. Three
+   *  areas, then "and N more"; the shared size only when every area has it; semicolons when a shown name has a comma,
+   *  and then "; and" before the last area, at any count (9B, 14 Nov 2026), "and N more" included ("A; B; C; and 2
+   *  more", 1B, 14 Nov 2026). */
+  function usageSentence(entries, { noSize = false } = {}) {
+    if (!entries.length) return FONT_TEXT.usageNone;
+    const shown = entries.slice(0, 3), more = entries.length - shown.length;
+    const sep = shown.some((e) => e.label.includes(",")) ? "; " : ", ", last = sep === "; " ? "; and " : " and ";
+    const list = (xs) => (more ? `${xs.join(sep)}${last}${more} more` : xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(sep)}${last}${xs.at(-1)}`);
+    if (noSize) return FONT_TEXT.usageNoSize(list(shown.map((e) => e.label)));
+    if (new Set(entries.map((e) => e.size)).size === 1) return FONT_TEXT.usageSame(list(shown.map((e) => e.label)), entries[0].size);
+    const mixed = list(shown.map((e) => `${e.label} at ${e.size}%`));
+    return more ? FONT_TEXT.usageMixedMore(mixed) : FONT_TEXT.usageMixed(mixed);
+  }
+  /** A record string with any "YEARS(1992, 1993, 2001)" token from the writer filled in as the file gives them. */
+  const creditText = (v) => String(v ?? "").replace(/YEARS\(([^)]*)\)/g, (_, ys) => joinAnd(ys.split(/\s*,\s*/).filter(Boolean)));
+  const recordOk = (r) => r && typeof r === "object" && ["desc", "strip", "madeShort", "weightLoaded"].every((k) => typeof r[k] === "string" && r[k]);
+  /** Everything the card, panel and docked card show for one family, as plain strings (pure; tested).
+   *  f: the catalog family; rec: its record or null; ctx: { median, usage: [{label,size}], hidden: listed though the
+   *  filter hides it, native: is a Mac font on this Mac, now: the T3 font's resolved first family }.
+   *  Null: nothing to show (a font without a usable record). */
+  function fontAbout(f, rec, ctx = {}) {
+    if (!f) return null;
+    const usage = ctx.usage ?? [];
+    const hiddenLine = !ctx.hidden ? null : f.style === "joined" ? FONT_TEXT.hiddenCursive : FONT_TEXT.hiddenPrint;
+    if (f.source === "t3") {
+      const which = T3_FONT_KIND[f.name];
+      const sentence = which ? FONT_TEXT.t3Follows(which, ctx.now || FONT_TEXT.nowSystem) : FONT_TEXT.t3System;
+      return { kind: "t3", name: f.name, nameCss: f.css, sentence, usage: usageSentence(usage, { noSize: true }), hiddenLine };
+    }
+    if (f.source === "mac" && ctx.native === false) return { kind: "missing", name: f.name, nameCss: null, sentence: FONT_TEXT.macMissing };
+    if (!recordOk(rec) || !Number.isInteger(f.xRatio) || !Number.isInteger(ctx.median)) return null;
+    const rawApart = Array.isArray(rec.apart) ? rec.apart : [], kept = rawApart.flatMap((x, i) => (typeof x === "string" && x ? [i] : []));
+    const apart = kept.map((i) => rawApart[i]); // warning indexes name the record's own traits: they follow them past this filter
+    const latinOnly = rec.copyLatinOnly === true && f.source !== "mac";
+    const technicalFirst = f.smallCaps ? FONT_TEXT.smallCapsLine(f.xRatio) : FONT_TEXT.lowerCaseLine(f.xRatio, ctx.median);
+    const technical = `${technicalFirst} ${FONT_TEXT.weightLine(rec.weightLoaded, latinOnly)}`;
+    const card = apart.slice(0, 2), warn = new Set((Array.isArray(rec.apartWarn) ? rec.apartWarn : []).map((i) => kept.indexOf(i)).filter((i) => i >= 0));
+    const size = Number.isInteger(f.size) ? f.size : 100, floor = f.sizeClamped && size <= 80;
+    const sizeWords = f.smallCaps ? (floor ? FONT_TEXT.defaultSizeSmallCapsFloor(size) : FONT_TEXT.defaultSizeSmallCaps(size)) : floor ? FONT_TEXT.defaultSizeFloor(size) : FONT_TEXT.defaultSize(size);
+    const using = [sizeWords, FONT_TEXT.style[f.style] ?? null, BOLD_SAME_CHECKED[f.source] === true && f.oneWeight ? FONT_TEXT.boldSame : null, usageSentence(usage)].filter(Boolean).join(" ");
+    const rows = [
+      [FONT_TEXT.lowerCaseLabel, f.smallCaps ? FONT_TEXT.smallCapsRow(f.xRatio) : FONT_TEXT.lowerCaseRow(f.xRatio, ctx.median)],
+      Number.isInteger(f.widthVsSystem) ? [FONT_TEXT.widthLabel, FONT_TEXT.widthRow(f.widthVsSystem)] : null,
+      typeof rec.weight === "string" && rec.weight ? [FONT_TEXT.weightLabel, rec.weight] : null,
+      typeof rec.letters === "string" && rec.letters ? [FONT_TEXT.lettersLabel, rec.letters] : null,
+    ].filter(Boolean);
+    return {
+      kind: "font", name: f.name, nameCss: null, strip: rec.strip, desc: rec.desc, apart, card,
+      cardWarn: card.map((_, i) => i).filter((i) => warn.has(i)), // the card's traits that warn how the font draws in T3
+      background: creditText(rec.madeShort), technical, technicalFirst, usage: usageSentence(usage), hiddenLine,
+      panel: { using, background: creditText(rec.background || rec.madeShort), rows },
+    };
+  }
+  /** S3′'s spot: 12 px beside the panel (right, else left), level with the row, or slid up just enough to fit
+   *  (12 px above the window's foot; 1B, 14 Nov 2026); only if the whole card is inside the window and covers
+   *  neither the panel nor any of `avoid` (the row's text). Null: no card (pure; tested). */
+  function besideSpot(size, panel, top, avoid, { vw, vh, gap = 12 } = {}) {
+    const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    top = Math.min(top, vh - gap - size.h);
+    for (const left of [panel.right + gap, panel.left - gap - size.w]) {
+      const b = { left, top, right: left + size.w, bottom: top + size.h };
+      if (b.left >= 0 && b.top >= 0 && b.right <= vw && b.bottom <= vh && !hit(b, panel) && !avoid.some((r) => hit(b, r))) return { left, top };
     }
     return null;
   }
@@ -1994,7 +2144,8 @@
 
   const core = {
     rowAgeHours, olderCutoff, olderRows, olderTitle, OLDER_AFTER, TITLE_LINES, titleSuffix, gapsBefore,
-    DEFAULTS, POP_KINDS, readSpots, spotFrom, clearSpot, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
+    DEFAULTS, POP_KINDS, readSpots, spotFrom, clearSpot, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute,
+    FONT_GROUPS, normalizeCatalog, FONT_TEXT, BOLD_SAME_CHECKED, firstFamily, usageSentence, fontAbout, creditText, besideSpot, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, FONT_SIMILAR_GROUPS, similarFontAreas, usagePageHash, usageContainerMatches,
     FOOTER_TEAM, FOOTER_MADE_MODES, FOOTER_CARD, FOOTER_MADE, FOOTER_DETAILS, footerPass, madePass, madeCount, newestAssistantId, timelineFromFiber, readHostTimeline, hostNewestId, laneIsWide, macAppOn, readMacPlatform, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
     forecast, seriesSegments, mergeSeries, dGeometry, fmtClock, lowRefills, compactParts, composerLabel, labUsageFailedSince, toolGates, labsForMerge, labFailure, handoverGate, HANDOVER_REQUEST, chainLabel, contrast, STALE_MS, T3_STALE_MS,
@@ -2667,6 +2818,7 @@
 
   let pop = null;
   function closePopover(restoreFocus = false) {
+    rowCardHide();
     if (!pop) return;
     const { el, trigger, onClose } = pop;
     closeFontPreviews();
@@ -2691,6 +2843,7 @@
   }
   function fillPopover() {
     if (!pop) return;
+    rowCardHide(); // its row is about to be replaced
     const keep = pop.el.scrollTop;
     const focusKey = D.activeElement?.closest?.(".t3x-pop") ? D.activeElement.getAttribute("data-focus") : null;
     pop.el.replaceChildren(...[pop.build()].flat(4).filter((n) => n !== null && n !== undefined && n !== false));
@@ -3723,12 +3876,15 @@
   };
   let catalog = null;
   let catalogP = null;
+  const rowCard = { timer: 0, el: null, pending: null, btn: null, tip: null }; // the ✦ "Your fonts" row's About card (S3′); btn's tooltip while held back (11C)
   function loadCatalog() {
     if (catalog) return Promise.resolve(catalog);
     catalogP ??= fetch(`${BASE}font-catalog`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((c) => {
-        catalog = [...T3_FONTS, ...(Array.isArray(c?.families) ? c.families : []).filter((f) => f && typeof f.name === "string" && f.source !== "t3" && !t3Font(f.name)).slice(0, 200)];
+        catalog = normalizeCatalog(c);
+        fontWorkspace?.hover?.end(); // a replaced catalog cancels the hover card's timers
+        rowCardHide();
         if (pop?.kind === "panel") fillPopover();
         syncFontWorkspace();
         return catalog;
@@ -3738,6 +3894,44 @@
         return null;
       });
     return catalogP;
+  }
+  // "About this font" records: fetched once the catalog is in, used only when their listVersion equals the
+  // catalog's. A records list newer than this page's catalog means the catalog is old: it reloads once.
+  // Missing, failed or mismatched: no records, so no cards and no panels (T3's own fonts need none).
+  let aboutRecords = null, aboutP = null, aboutUpgraded = false, aboutFailedAt = -Infinity, aboutStatus = "idle"; // idle, loading, ready, failed
+  function loadAbout() {
+    if (aboutRecords) return Promise.resolve(aboutRecords);
+    if (!aboutP && performance.now() - aboutFailedAt < 60_000) return Promise.resolve(null);
+    if (!aboutP) aboutStatus = "loading";
+    aboutP ??= loadCatalog()
+      .then((cat) => (cat ? fetch(`${BASE}font-about`, { cache: "no-store" }) : Promise.reject(new Error("no catalog"))))
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((a) => {
+        const v = Number.isInteger(a?.listVersion) ? a.listVersion : null;
+        if (v !== null && v !== catalog?.listVersion && !aboutUpgraded) {
+          aboutUpgraded = true;
+          catalog = null;
+          catalogP = null;
+          aboutP = null;
+          return loadAbout();
+        }
+        const ok = v !== null && v === catalog?.listVersion && a.records && typeof a.records === "object" && !Array.isArray(a.records);
+        aboutRecords = new Map(ok ? Object.entries(a.records).filter(([, r]) => r && typeof r === "object") : []);
+        aboutStatus = ok ? "ready" : "failed";
+        if (!disposed) {
+          syncFontWorkspace();
+          fontWorkspace?.hover?.render();
+        }
+        return aboutRecords;
+      })
+      .catch(() => {
+        aboutP = null;
+        aboutFailedAt = performance.now();
+        aboutStatus = "failed";
+        if (!disposed) syncFontWorkspace();
+        return null;
+      });
+    return aboutP;
   }
   const nativeCache = new Map();
   function nativeAvailable(name) {
@@ -3767,6 +3961,21 @@
     return null;
   }
   const nameFaces = new Map(); // one stable alias per catalog family, shared by every picker
+  /** A name face the panel, the menu card or a ✦ row card waited for has loaded or failed: redraw them once
+   *  (FontFace.load() on a face outside document.fonts fires no loadingdone). */
+  const nameFaceWaiters = new Set();
+  let nameFaceTimer = 0;
+  function nameFaceSettled(name) {
+    if (!nameFaceWaiters.delete(name) || nameFaceTimer) return;
+    nameFaceTimer = setTimeout(guarded("font-face-ready", () => {
+      nameFaceTimer = 0;
+      if (disposed) return;
+      syncFontWorkspace();
+      fontWorkspace?.hover?.render();
+      const p = rowCard.pending;
+      if (p && p.btn.matches(":hover")) showRowCard(p.id, p.btn);
+    }), 0);
+  }
   const nameAlias = (name) => `T3X Pick ${name}`;
   const nameStyle = (name) => `font-family:${t3Font(name)?.css ?? `"${nameAlias(name)}",var(--font-sans)`}`;
   let nameGeneration = 0, nameActive = 0;
@@ -3801,14 +4010,16 @@
       nameActive++;
       (async () => {
         const src = await fontSource(entry.f);
-        if (!src || disposed || entry.generation !== nameGeneration) return;
+        if (disposed || entry.generation !== nameGeneration) return;
+        if (!src) throw new Error("no font source");
         const face = new FontFace(nameAlias(entry.f.name), src, { weight: "1 1000" });
         await face.load();
         if (disposed || entry.generation !== nameGeneration) return;
         D.fonts.add(face);
         entry.face = face;
         entry.state = "loaded";
-      })().catch(() => { entry.state = "failed"; }).finally(() => {
+        nameFaceSettled(entry.f.name);
+      })().catch(() => { entry.state = "failed"; nameFaceSettled(entry.f.name); }).finally(() => {
         nameActive--;
         pumpFontNames();
       });
@@ -4094,6 +4305,7 @@
   }
   function closeFontWorkspace(restore=true) {
     const ui=fontWorkspace;if(!ui)return;
+    ui.hover?.end();
     rememberFontScroll();fontWorkspace=null;
     ui.el.close();ui.el.remove();closeFontPreviews();
     if(!restore||disposed)return;
@@ -4169,9 +4381,20 @@
       h("button",{type:"button",class:"t3x-btn",onclick:()=>startFontPick()},"Pick other text"),
       h("button",{type:"button",class:"t3x-btn",onclick:()=>undockFonts()},"All fonts…"),
       h("button",{type:"button",class:"t3x-btn t3x-font-done",onclick:()=>closeFontWorkspace(false)},"Done"));
-    editor.append(back,returnButton,editorTitle,pickNote,h("div",{class:"t3x-font-tools"},showBtn),h("strong",{class:"t3x-font-scope-label",text:"Applies to"}),scope,targets,h("label",{for:"t3x-font-source",text:"Font source"}),source,resolved,editSource,similar,own,fontNote,h("div",{class:"t3x-font-preview-label",text:"Preview"}),sample,h("p",{class:"t3x-note",text:"Changes apply immediately. A preview illustrates the face; native surfaces may have different text sizes and layout."}),dockbar);
+    // About this font: the panel after Preview's note (full window); the sentence and a closed About in the docked card.
+    const aboutPanel=h("section",{class:"t3x-fabout","aria-label":FONT_TEXT.panelTitle,hidden:true});
+    const dockSentence=h("p",{class:"t3x-font-docksentence"}),dockBody=h("div",{class:"t3x-fabout t3x-fabout-docked"});
+    const dockSummary=h("summary",{text:FONT_TEXT.panelTitle}),dockDetails=h("details",{class:"t3x-font-dockdetails"},dockSummary,dockBody);
+    const dockAbout=h("div",{class:"t3x-font-dockabout",hidden:true},dockSentence,dockDetails);
+    editor.append(back,returnButton,editorTitle,pickNote,h("div",{class:"t3x-font-tools"},showBtn),h("strong",{class:"t3x-font-scope-label",text:"Applies to"}),scope,targets,h("label",{for:"t3x-font-source",text:"Font source"}),source,resolved,editSource,similar,own,fontNote,dockAbout,h("div",{class:"t3x-font-preview-label",text:"Preview"}),sample,h("p",{class:"t3x-note t3x-font-preview-note",text:"Changes apply immediately. A preview illustrates the face; native surfaces may have different text sizes and layout."}),aboutPanel,dockbar);
     el.append(h("div",{class:"t3x-font-dockgrip"},grip("the Fonts card")),h("header",{class:"t3x-font-workspace-head"},grip("Fonts"),h("div",{},title,h("p",{text:"Choose an area, then its font"})),h("div",{class:"t3x-font-head-actions"},h("button",{type:"button",class:"t3x-btn t3x-font-small",title:"Shrink to a small card for this area, placed clear of its text",onclick:()=>shrinkFonts()},"Small card"),settings.fontPicker?h("button",{type:"button",class:"t3x-btn",onclick:()=>startFontPick()},"Pick from screen"):null,h("button",{type:"button",class:"t3x-btn","aria-label":"Close Fonts",onclick:()=>closeFontWorkspace()},"Close"))),h("div",{class:"t3x-font-workspace-body"},h("nav",{class:"t3x-font-navigation","aria-label":"Font areas"},h("label",{for:"t3x-font-search",text:"Find an area"}),search,index),editor));
-    fontWorkspace={el,trigger:anchor,search,index,editor,navigation:el.querySelector(".t3x-font-navigation"),lastFocus:null,switchingArea:true,rows,empty,guidance,title:editorTitle,scope,targets,source,resolved,editSource,similar,similarNote,similarApply,similarBack,own,family,prev,next,minus,plus,size,reset,sample,fontNote,returnButton,pickNote,showBtn,role:null,optionsKey:null};
+    fontWorkspace={el,trigger:anchor,search,index,editor,navigation:el.querySelector(".t3x-font-navigation"),lastFocus:null,switchingArea:true,rows,empty,guidance,title:editorTitle,scope,targets,source,resolved,editSource,similar,similarNote,similarApply,similarBack,own,family,prev,next,minus,plus,size,reset,sample,fontNote,returnButton,pickNote,showBtn,role:null,optionsKey:null,aboutPanel,dockAbout,dockSentence,dockDetails,dockBody,dockbar,aboutKey:null};
+    fontWorkspace.hover=fontMenuHover(fontWorkspace);
+    // Docked: opening About keeps the card's outer box as it was (its text scrolls inside), and the scroll keeps
+    // clear of the foot bar's actual height (Pick other text, All fonts…, Done), which stays put.
+    dockSummary.addEventListener("click",()=>{if(el.dataset.mode==="dock"&&!dockDetails.open)el.style.height=`${el.offsetHeight}px`;});
+    dockDetails.addEventListener("toggle",()=>{if(!dockDetails.open)el.style.removeProperty("height");padDockScroll(fontWorkspace);});
+    new ResizeObserver(guarded("dock-foot",()=>padDockScroll(fontWorkspace))).observe(dockbar);
     new ResizeObserver(guarded("card-size",()=>{if(el.open&&el.dataset.mode==="dock"&&settings.popMove)keepCardIn(el);})).observe(el); // content that grows stays inside the window
     movable(el,()=>el.dataset.mode==="dock"?{kind:"card",m:12,reset:()=>placeCard(el)}:{kind:"fonts",keep:BIG_KEEP,reset:()=>{el.removeAttribute("data-t3x-moved");el.style.removeProperty("left");el.style.removeProperty("top");}},".t3x-font-workspace-head, .t3x-font-dockgrip");
     el.addEventListener("focusin",e=>{if(fontWorkspace?.el===el){rememberFontScroll();fontWorkspace.lastFocus=e.target;}});
@@ -4187,7 +4410,7 @@
       else if(!e.shiftKey&&D.activeElement===last){e.preventDefault();first?.focus();}
     });
     if(dock){el.dataset.mode="dock";el.setAttribute("aria-labelledby","t3x-font-editor-title");}
-    D.body.append(el);syncFontWorkspace(true);
+    D.body.append(el);loadAbout();syncFontWorkspace(true);
     pickNote.textContent=note;pickNote.hidden=!note;
     if(dock){fontWorkspace.dockAnchor=dockAnchor;el.show();placeCard(el,dock);}
     else{el.showModal();placeBigSaved(el);}
@@ -4267,11 +4490,43 @@
     const native=id==="composer"?"var(--font-composer,var(--font-sans))":id==="paths"?"var(--font-mono,var(--font-sans))":"var(--font-sans)";
     ui.sample.style.fontFamily=t3?ef.css:effective.family!=="off"&&loaded?`"${r.alias}",${native}`:native;
     ui.returnButton.hidden=!fontNav.returns.length;ui.returnButton.textContent=fontNav.returns.length?`Back to ${fontArea(fontNav.returns.at(-1)).label}`:"";
+    syncFontAbout(ui,id==="viz"&&ef?.source==="t3"?"off":effective.family);
+    ui.hover?.render();
     // External settings can hide a focused Own control. Keep focus in a visible modal control.
     if(hadFocus&&(!ui.el.contains(D.activeElement)||!focusBefore.getClientRects().length)) {
       (ui.source.getClientRects().length?ui.source:ui.search).focus({preventScroll:true});
     }
     warmSelectedNames();
+  }
+  /** S2 and S4′ for the area's effective font: nothing on T3 default, while loading, or when its face failed;
+   *  one muted line when its details couldn't load, or when the font has no record (7A). The docked card's
+   *  "About this font" leaves out the sentence it already shows above (2B). */
+  function syncFontAbout(ui, family) {
+    const m = family && family !== "off" ? aboutModelFor(family) : null, failed = m?.kind === "failed" || m?.kind === "norecord";
+    const note = m?.kind === "norecord" ? FONT_TEXT.detailsNone : FONT_TEXT.detailsFailed;
+    const show = !!m && (failed || aboutFace(m) === "loaded");
+    const key = show ? JSON.stringify(m) : "";
+    if (ui.aboutKey !== key) {
+      ui.aboutKey = key;
+      ui.aboutPanel.replaceChildren(...(!show ? [] : failed ? [h("p", { class: "t3x-fabout-failed", text: note })] : aboutPanelBody(m)).filter(Boolean));
+      ui.dockSentence.textContent = !show ? "" : failed ? note : m.kind === "font" ? m.desc : m.sentence;
+      ui.dockBody.replaceChildren(...(show && m.kind === "font" ? aboutPanelBody(m, { title: false, desc: false }) : []).filter(Boolean));
+    }
+    ui.aboutPanel.hidden = !show;
+    ui.aboutPanel.classList.toggle("t3x-fabout-failedbox", show && failed);
+    ui.dockSentence.classList.toggle("t3x-font-docksentence-failed", show && failed);
+    ui.dockAbout.hidden = !show;
+    ui.dockDetails.hidden = !show || m.kind !== "font";
+    if (ui.el.dataset.mode !== "dock" || !ui.dockDetails.open || ui.dockDetails.hidden) ui.el.style.removeProperty("height");
+    padDockScroll(ui);
+  }
+  /** The docked card's scroll keeps the foot bar's height clear (scroll-padding), recomputed as it changes. */
+  function padDockScroll(ui) {
+    const body = ui?.el.querySelector(".t3x-font-workspace-body");
+    if (!body) return;
+    const sticky = ui.el.dataset.mode === "dock" && getComputedStyle(ui.dockbar).position === "sticky";
+    if (sticky) body.style.scrollPaddingBottom = `${Math.ceil(ui.dockbar.getBoundingClientRect().height)}px`;
+    else body.style.removeProperty("scroll-padding-bottom");
   }
   function panelBody() {
     if (!catalog) loadCatalog();
@@ -4844,6 +5099,302 @@
     return [...groups].map(([id, followers]) => ({ id, followers }));
   }
   const areaTitle = (id) => FONT_ROLE_BY_ID[id]?.title ?? fontArea(id)?.label ?? id;
+  // ---------- "About this font": the card, the panel, the docked card (13 Nov 2026, design S′) ----------
+  // Record strings are set as text, never HTML. Usage is worked out here, from each area's effective font.
+
+  /** Areas using a family, in the ✦ panel's order (each own font, then the areas that follow it), with sizes,
+   *  named as the place showing them names areas (6B): the ✦ panel's titles ("panel"), else the Fonts window's labels. */
+  function usageOf(name, names = "fonts") {
+    const f = catalog?.find((x) => x.name === name);
+    if (!f) return [];
+    const out = [];
+    for (const { id, followers } of fontStripGroups()) {
+      const pick = settings[ROLE[id].key];
+      if (pick.family !== name) continue;
+      for (const a of [id, ...followers]) {
+        if (f.source === "t3" && a === "viz") continue; // Visualizations can't use T3's own fonts
+        if (activePick(a).family === name) out.push({ label: names === "panel" ? areaTitle(a) : fontArea(a)?.label ?? a, size: f.source === "t3" ? null : sizeOf(f, pick) });
+      }
+    }
+    return out;
+  }
+  const T3_FONT_VARS = Object.freeze({ "T3 interface font": ["--font-sans"], "T3 composer font": ["--font-composer", "--font-sans"], "T3 code font": ["--font-mono"] });
+  function t3FontNow(name) {
+    const cs = getComputedStyle(D.documentElement);
+    for (const v of T3_FONT_VARS[name] ?? []) { const x = cs.getPropertyValue(v).trim(); if (x) return firstFamily(x); }
+    return null;
+  }
+  /** The words for one family (fontAbout); null while its details are loading; { kind: "failed" } when they
+   *  couldn't load (no records, records for another list, or an unusable record): the panel says so, cards don't
+   *  show; { kind: "norecord" } when the records loaded but this family has none (7A): the panel says that instead.
+   *  names: whose area names the usage line uses ("panel" for the ✦ card; else the Fonts window's). */
+  function aboutModelFor(name, { hidden = false, names = "fonts" } = {}) {
+    const f = catalog?.find((x) => x.name === name);
+    if (!f || !catalog) return null;
+    const native = f.source === "mac" ? nativeAvailable(f.name) : true;
+    if (f.source !== "t3" && native && !aboutRecords) { loadAbout(); return aboutStatus === "failed" ? { kind: "failed", name } : null; } // loadAbout retries at most once a minute
+    const rec = aboutRecords?.get(name) ?? null;
+    const m = fontAbout(f, rec, { median: catalog.xRatioMedian, usage: usageOf(name, names), hidden: hidden && !fontVisible(f, settings), native, now: f.source === "t3" ? t3FontNow(f.name) : null });
+    if (!m && !rec && aboutStatus === "ready") return { kind: "norecord", name }; // "ready": the records are this list's
+    return m ?? { kind: "failed", name };
+  }
+  /** "loaded", "loading" or "failed": a font kind shows once its name face has loaded; T3's own fonts and
+   *  missing Mac fonts load nothing. */
+  function aboutFace(m) {
+    if (m.kind !== "font") return m.kind === "failed" || m.kind === "norecord" ? "failed" : "loaded";
+    const st = nameFaces.get(m.name)?.state;
+    if (st === "loaded" || st === "failed") return st;
+    queueFontName(m.name, true);
+    const now = nameFaces.get(m.name)?.state;
+    if (now === "loaded" || now === "failed") return now;
+    nameFaceWaiters.add(m.name);
+    return "loading";
+  }
+  const aboutFaceCss = (m) => m.nameCss ?? (m.kind === "missing" ? "var(--font-sans)" : `"${nameAlias(m.name)}",var(--font-sans)`);
+  /** The card's lines (also the pane swap's): name, strip, sentence, two traits, Background, Technical, usage.
+   *  Only elements (a spread null would print "null" in the pane swap). */
+  function aboutCardBody(m) {
+    const name = h("div", { class: "t3x-fcard-name", text: m.name });
+    name.style.fontFamily = aboutFaceCss(m);
+    const hidden = m.hiddenLine ? h("p", { class: "t3x-fcard-hidden", text: m.hiddenLine }) : null;
+    if (m.kind !== "font") return [name, h("p", { class: "t3x-fcard-desc", text: m.sentence }), hidden].filter(Boolean); // T3's own and missing Mac fonts: the sentence only
+    const strip = h("div", { class: "t3x-fcard-strip", text: m.strip });
+    strip.style.fontFamily = aboutFaceCss(m);
+    return [name, strip, h("p", { class: "t3x-fcard-desc", text: m.desc }), m.card.length ? h("ul", {}, m.card.map((x) => h("li", { text: x }))) : null,
+      h("p", { class: "t3x-fcard-line t3x-fcard-bg", text: m.background }), h("p", { class: "t3x-fcard-line t3x-fcard-tech", text: m.technical }), h("p", { class: "t3x-fcard-use", text: m.usage }), hidden].filter(Boolean);
+  }
+  /** 10G′ (14 Nov 2026): fit the pane swap's lines to its box, whole lines only, by priority. Must show: the name,
+   *  letter strip, sentence, usage and any trait that warns how the font draws in T3 (in its place among the traits);
+   *  when those don't fit, the letter strip goes first (every font), then no swap. Then the traits; then Technical
+   *  whole, else its first sentence (also when the traits didn't fit); Background only when the traits and a
+   *  Technical form both show. The "Hidden by…" line comes last (2C, 14 Nov 2026): only when every line above shows
+   *  whole (strip, traits, Technical whole, Background) and it still fits; it never costs a line or the swap. On T3's
+   *  own fonts it goes before the swap does. False: nothing fits whole, so no swap. */
+  function fitSwapLines(swap, m) {
+    const fits = () => swap.scrollHeight <= swap.clientHeight + 0.5;
+    const hidden = swap.querySelector(".t3x-fcard-hidden");
+    if (m.kind !== "font") { if (hidden && !fits()) hidden.hidden = true; return fits(); } // T3's own and missing Mac fonts: the sentence only
+    if (hidden) hidden.hidden = true;
+    const strip = swap.querySelector(".t3x-fcard-strip"), ul = swap.querySelector("ul"), lis = ul ? [...ul.children] : [];
+    const bg = swap.querySelector(".t3x-fcard-bg"), tech = swap.querySelector(".t3x-fcard-tech");
+    const warn = lis.filter((_, i) => m.cardWarn?.includes(i));
+    const traits = (all) => { if (!ul) return; ul.hidden = !all && !warn.length; for (const li of lis) li.hidden = !all && !warn.includes(li); };
+    bg.hidden = true; tech.hidden = true; traits(false);
+    if (!fits()) { strip.hidden = true; if (!fits()) return false; }
+    let traitsAll = !ul;
+    if (ul) { traits(true); traitsAll = fits(); if (!traitsAll) traits(false); }
+    tech.hidden = false;
+    if (!fits()) { tech.textContent = m.technicalFirst; if (!fits()) tech.hidden = true; } // its ending goes only when that saves a line
+    if (traitsAll && !tech.hidden) { bg.hidden = false; if (!fits()) bg.hidden = true; }
+    if (hidden && !strip.hidden && traitsAll && tech.textContent === m.technical && !bg.hidden) { hidden.hidden = false; if (!fits()) hidden.hidden = true; }
+    return true;
+  }
+  const aboutCardEl = (m) => h("div", { [OWN]: "font-card", class: "t3x-fcard" }, aboutCardBody(m));
+  /** The panel's text: title (unless the docked card's summary stands in), name and strip, sentence, then
+   *  What sets it apart | Using it here; Background | Technical. T3's own fonts and missing Mac fonts: their sentence. */
+  function aboutPanelBody(m, { title = true, desc = true } = {}) {
+    const name = h("span", { class: "t3x-fabout-name", text: m.name });
+    name.style.fontFamily = aboutFaceCss(m);
+    const head = h("div", { class: "t3x-fabout-head" }, name);
+    const out = [title ? h("div", { class: "t3x-fabout-title", text: FONT_TEXT.panelTitle }) : null, head];
+    // T3's own fonts: their sentence and where you use them; a Mac font not on this Mac: its sentence.
+    if (m.kind !== "font") return [...out, h("p", { class: "t3x-fabout-desc", text: m.sentence }), m.kind === "t3" ? h("p", { class: "t3x-fabout-use", text: m.usage }) : null];
+    const strip = h("span", { class: "t3x-fabout-strip", text: m.strip });
+    strip.style.fontFamily = aboutFaceCss(m);
+    head.append(strip);
+    const sec = (t, ...kids) => h("div", { class: "t3x-fabout-sec" }, h("h4", { text: t }), ...kids);
+    return [...out, desc ? h("p", { class: "t3x-fabout-desc", text: m.desc }) : null, h("div", { class: "t3x-fabout-grid" },
+      sec(FONT_TEXT.apartHead, h("ul", {}, m.apart.map((x) => h("li", { text: x })))),
+      sec(FONT_TEXT.usingHead, h("p", { text: m.panel.using })),
+      sec(FONT_TEXT.backgroundHead, h("p", { text: m.panel.background })),
+      sec(FONT_TEXT.technicalHead, h("dl", {}, m.panel.rows.flatMap(([k, v]) => [h("dt", { text: k }), h("dd", { text: v })]))))];
+  }
+
+  /** S1′: while the font menu is open, the highlighted option's card sits in the area list's viewport (left and
+   *  top 6 px in, at most 300 px wide); first after 250 ms of rest, then swapped at once; when it would not fit,
+   *  that viewport shows the font instead until the menu closes. Pointer hover highlights an option; the
+   *  keyboard highlights the option it focuses. Nothing here commits a choice or takes focus. */
+  function fontMenuHover(ui) {
+    const st = { highlight: null, timer: 0, live: false, card: null, swap: null, swapped: false, watch: 0, keyed: false };
+    let menuBox = null; // the open menu's rectangle (5a C), found once per opening
+    let supported = null;
+    const canShow = () => {
+      if (supported === null) try { supported = CSS.supports("appearance", "base-select") && (D.createElement("select").matches(":open"), true); } catch { supported = false; }
+      return supported;
+    };
+    const hide = () => { clearTimeout(st.timer); st.timer = 0; st.card?.remove(); st.card = null; };
+    const end = () => {
+      hide();
+      menuBox = null;
+      st.swap?.remove();
+      st.swap = null;
+      st.swapped = false;
+      st.highlight = null;
+      st.live = false;
+      clearInterval(st.watch);
+      st.watch = 0;
+      if (ui.listening) { W.removeEventListener("resize", onMove); ui.index.removeEventListener("scroll", onMove); D.fonts.removeEventListener?.("loadingdone", onMove); ui.listening = false; }
+    };
+    const onMove = () => { if (st.card || st.swap || st.live) render(); };
+    const watch = () => {
+      if (!st.watch) st.watch = setInterval(guarded("font-card-watch", () => { if (!fontSelectOpen() || fontWorkspace !== ui) end(); }), 100);
+      if (!ui.listening) { W.addEventListener("resize", onMove); ui.index.addEventListener("scroll", onMove, { passive: true }); D.fonts.addEventListener?.("loadingdone", onMove); ui.listening = true; }
+    };
+    const box = (el, r, nav) => Object.assign(el.style, { left: `${r.left - nav.left}px`, top: `${r.top - nav.top}px` });
+    function render() {
+      if (disposed || fontWorkspace !== ui || ui.el.dataset.mode === "dock" || !canShow() || !fontSelectOpen()) return end();
+      const name = st.highlight;
+      if (!st.live || !name) return st.swapped ? null : hide();
+      const vp = ui.index.getClientRects().length ? ui.index.getBoundingClientRect() : null;
+      const m = vp ? aboutModelFor(name, { hidden: true }) : null;
+      const face = m ? aboutFace(m) : "failed";
+      if (!m || face !== "loaded") { // waits for its face; failed: nothing. A swapped pane drops the last font's lines.
+        if (!st.swapped) { st.card?.remove(); st.card = null; }
+        else st.swap?.replaceChildren(swapHead());
+        return;
+      }
+      const nav = ui.navigation.getBoundingClientRect(), width = Math.min(300, vp.width - 12);
+      if (!st.swapped) {
+        if (width < 120) return hide();
+        const card = aboutCardEl(m);
+        card.classList.add("t3x-fcard-pane");
+        card.style.width = `${width}px`;
+        box(card, { left: vp.left + 6, top: vp.top + 6 }, nav);
+        st.card?.remove();
+        ui.navigation.append(card);
+        st.card = card;
+        if (card.offsetHeight <= vp.bottom - 6 - (vp.top + 6)) return;
+        hide();
+        st.swapped = true; // for the rest of this menu opening
+      }
+      const swap = st.swap ?? h("div", { [OWN]: "font-swap", class: "t3x-fswap" });
+      swap.replaceChildren(swapHead(), ...aboutCardBody(m));
+      box(swap, vp, nav);
+      Object.assign(swap.style, { width: `${vp.width}px`, height: `${vp.height}px`, display: "" });
+      if (!st.swap) { ui.navigation.append(swap); st.swap = swap; }
+      if (!fitSwapLines(swap, m)) swap.style.display = "none"; // 10G′: not even the must-show lines fit whole: no swap
+    }
+    const swapHead = () => h("div", { class: "t3x-fswap-area", text: FONT_TEXT.paneSwapHead(fontArea(fontNav.role)?.label ?? "") });
+    function highlight(name) {
+      if (name === st.highlight) return;
+      st.highlight = name;
+      if (!name) { clearTimeout(st.timer); st.timer = 0; st.live = false; return st.swapped ? null : hide(); }
+      watch();
+      queueFontName(name, true);
+      if (st.live) return render(); // swapped at once
+      clearTimeout(st.timer);
+      st.timer = setTimeout(guarded("font-card", () => { st.timer = 0; st.live = true; render(); }), 250);
+    }
+    const optionOf = (t) => { const o = t?.closest?.("option"); return o && ui.family.contains(o) && !o.disabled ? o : null; };
+    // 5a C (14 Nov 2026): headings and gaps inside the open menu keep the card until the next option takes over;
+    // only leaving the menu hides it. The menu's padding and the closed button both report the select itself as
+    // the target, so there the menu's rectangle decides. The menu is a pseudo-element: its size comes from its
+    // computed style, its place from hit-testing a column through the highlighted option (once per opening, kept
+    // while the button and window stay put). Where the menu covers the button, the point is in the menu.
+    function menuRect() {
+      const btn = ui.family.getBoundingClientRect(), key = `${btn.left},${btn.top},${btn.width},${innerWidth},${innerHeight}`;
+      if (menuBox?.key === key) return menuBox.r;
+      menuBox = { key, r: null };
+      const cs = getComputedStyle(ui.family, "::picker(select)"), px = (v) => parseFloat(v) || 0;
+      const edge = (side) => px(cs[`padding${side}`]) + px(cs[`border${side}Width`]), outer = cs.boxSizing === "border-box" ? 0 : 1;
+      const W = px(cs.width) + outer * (edge("Left") + edge("Right")), H = px(cs.height) + outer * (edge("Top") + edge("Bottom"));
+      const inFamily = (x, y) => { const el = D.elementFromPoint(x, y); return !!el && (el === ui.family || ui.family.contains(el)); };
+      const opts = [...ui.family.querySelectorAll("option")], first = opts.find((o) => o.value === st.highlight);
+      for (const o of first ? [first, ...opts] : opts) {
+        const r = o.getBoundingClientRect(), x = r.left + Math.min(12, r.width / 2), y = r.top + r.height / 2;
+        if (!(W > 0 && H > 0 && r.width > 0) || D.elementFromPoint(x, y) !== o && !o.contains(D.elementFromPoint(x, y))) continue;
+        let top = y, bot = y; // the column's run of menu (or button) points, galloping out from the option
+        for (let step = 8; step >= 1; step >>= 1) { while (top - step >= 0 && inFamily(x, top - step)) top -= step; while (bot + step < innerHeight && inFamily(x, bot + step)) bot += step; }
+        const run = bot + 1 - top, buttonFirst = btn.top + btn.height / 2 < (top + bot) / 2;
+        const t = run <= H + 2 ? top : buttonFirst ? bot + 1 - H : top; // a longer run includes the button, next to the menu
+        const left = r.left - edge("Left");
+        menuBox.r = { left, right: left + W, top: t, bottom: Math.min(t + H, bot + 1) };
+        break;
+      }
+      return menuBox.r;
+    }
+    const inMenu = (e) => {
+      if (e.target !== ui.family) return ui.family.contains(e.target);
+      // The select reports itself only for its closed button and its open menu: off the button, the point is in
+      // the menu (its border and padding included; Sol, 14 Nov 2026). On the button, the menu's rectangle decides,
+      // widened by the 1 px its sampled edges can miss.
+      const r = ui.family.getBoundingClientRect();
+      if (!(e.clientX >= r.left && e.clientX < r.right && e.clientY >= r.top && e.clientY < r.bottom)) return true;
+      const m = menuRect();
+      return !!m && e.clientX >= m.left - 1 && e.clientX < m.right + 1 && e.clientY >= m.top - 1 && e.clientY < m.bottom + 1;
+    };
+    const onPointer = (e) => {
+      if (!fontSelectOpen()) return;
+      const o = optionOf(e.target);
+      if (o) highlight(o.value);
+      else if (!st.live) highlight(null); // no card yet: the first still needs 250 ms of rest on an option
+      else if (!inMenu(e)) highlight(null);
+    };
+    ui.family.addEventListener("pointerdown", () => { st.keyed = false; }, true);
+    ui.family.addEventListener("keydown", () => { st.keyed = true; if (fontSelectOpen()) watch(); }, true);
+    ui.family.addEventListener("pointerover", guarded("font-card-over", onPointer));
+    ui.family.addEventListener("pointermove", guarded("font-card-move", (e) => { if (st.highlight && !optionOf(e.target)) onPointer(e); }));
+    ui.family.addEventListener("pointerout", guarded("font-card-out", (e) => { if (!e.relatedTarget || !ui.family.contains(e.relatedTarget)) highlight(null); }));
+    ui.family.addEventListener("focusin", guarded("font-card-focus", (e) => {
+      const o = optionOf(e.target);
+      if (o && st.keyed && fontSelectOpen()) highlight(o.value);
+      else if (!o) end(); // focus back on the select: the menu closed
+    }));
+    ui.family.addEventListener("change", () => end());
+    return { render, end, state: () => ({ highlight: st.highlight, card: !!st.card, swapped: st.swapped }) };
+  }
+
+  /** S3′: resting the pointer 600 ms on a "Your fonts" name shows the card 12 px beside the ✦ panel, level with
+   *  the row (or slid up to fit, 1B), only where it fits whole inside the window and covers neither the panel nor
+   *  that row's text. 11C: the name's own tooltip is held back from pointer-enter, and comes back once the card
+   *  is ruled out or the pointer leaves, so it shows only where no card can. */
+  function rowTipBack() {
+    if (rowCard.btn && rowCard.tip !== null && !rowCard.btn.hasAttribute("title")) rowCard.btn.title = rowCard.tip;
+    rowCard.btn = null;
+    rowCard.tip = null;
+  }
+  function rowCardHide() {
+    clearTimeout(rowCard.timer);
+    rowCard.timer = 0;
+    rowCard.el?.remove();
+    rowCard.el = null;
+    rowCard.pending = null;
+    rowTipBack();
+  }
+  function rowCardStart(id, btn) {
+    rowCardHide();
+    if (btn.hasAttribute("title")) { rowCard.btn = btn; rowCard.tip = btn.title; btn.removeAttribute("title"); }
+    const ready = loadAbout(); // records arrive while the pointer rests
+    rowCard.timer = setTimeout(guarded("row-card", () => {
+      rowCard.timer = 0;
+      if (aboutRecords) return showRowCard(id, btn);
+      rowCard.pending = { id, btn };
+      ready.then(() => { const p = rowCard.pending; if (p?.btn === btn) { if (btn.matches(":hover")) showRowCard(id, btn); else rowTipBack(); } });
+    }), 600);
+  }
+  function showRowCard(id, btn) {
+    rowCard.pending = null;
+    const none = () => { rowTipBack(); return null; }; // ruled out: the name's tooltip comes back
+    if (disposed || !btn.isConnected || pop?.kind !== "panel" || !pop.el.contains(btn)) return none();
+    const name = settings[ROLE[id].key].family, m = aboutModelFor(name, { hidden: true, names: "panel" });
+    if (!m) return none();
+    const face = aboutFace(m);
+    if (face === "failed") return none();
+    if (face !== "loaded") { rowCard.pending = { id, btn }; return; } // shown when its face loads, if the pointer is still there
+    const card = aboutCardEl(m);
+    card.classList.add("t3x-fcard-float");
+    card.style.visibility = "hidden";
+    D.body.append(card);
+    const size = { w: card.offsetWidth, h: card.offsetHeight }, row = (btn.closest(".t3x-fs-row") ?? btn).getBoundingClientRect();
+    const followers = fontStripGroups().find((g) => g.id === id)?.followers ?? [];
+    const avoid = [id, ...followers].flatMap((a) => areaRects(a).map((c) => c.rect));
+    const at = besideSpot(size, pop.el.getBoundingClientRect(), row.top, avoid, { vw: innerWidth, vh: innerHeight });
+    if (!at) { card.remove(); return none(); }
+    Object.assign(card.style, { left: `${at.left}px`, top: `${at.top}px`, visibility: "" });
+    rowCard.el = card;
+  }
+  listen(D.fonts, "loadingdone", () => { const p = rowCard.pending; if (p && p.btn.matches(":hover")) showRowCard(p.id, p.btn); });
+
   /** The ✦ panel's "Your fonts": each picked font's name in its own face, with Previous/Next. */
   function fontPickList() {
     const groups = fontStripGroups();
@@ -4864,8 +5415,11 @@
       const name = h("button", {
         type: "button", class: "t3x-fs-name", "data-focus": `fs-name-${id}`,
         title: `${label}${also.length ? ` (also ${also.join(", ")})` : ""}: ${pick.family}${f && f.source !== "t3" ? ` · ${sizeOf(f, pick)}%` : ""}. Click to edit in Fonts; ← → try the previous or next font.`,
-        onclick: (e) => openFontsAt(id, e.currentTarget),
+        onclick: (e) => { rowCardHide(); openFontsAt(id, e.currentTarget); },
         onkeydown: (e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); stepAreaFont(id, e.key === "ArrowLeft" ? -1 : 1); } },
+        // "About this font" beside the panel after 600 ms of rest (pointer only; focus shows nothing).
+        onpointerenter: (e) => rowCardStart(id, e.currentTarget),
+        onpointerleave: () => rowCardHide(),
       }, pick.family);
       name.style.fontFamily = t3 ? f.css : loaded ? `"${ROLE[id].alias}",var(--font-sans)` : "var(--font-sans)";
       const offer = similarOffer(id);
@@ -4886,6 +5440,9 @@
         h("span", { class: "t3x-fs-defslot" }, defSizer()));
       if (f && f.source !== "t3") {
         const n = sizeOf(f, pick), def = defaultSizeOf(f), back = sizeBackFor(id);
+        // The size drawn is the loaded face's: a new size keeps the old face until its own has loaded, and a cold
+        // load draws T3's font uncapped, so "drawn at 150%" is said only while the loaded face is capped.
+        const shown = loaded ? Number(faceKey.slice(faceKey.lastIndexOf("|") + 1)) : 0, capped = shown > NAME_CAP && n > NAME_CAP;
         const step = (d) => {
           const cur = settings[ROLE[id].key], cf = catalog?.find((x) => x.name === cur.family);
           sizeBack.delete(id);
@@ -4898,7 +5455,7 @@
           disabled: (d < 0 ? n <= SIZE_MIN : n >= SIZE_MAX) ? true : null, onclick: () => step(d),
         }, d < 0 ? "−" : "+");
         const size = h("span", { class: "t3x-fs-size", role: "group", "aria-label": `Size for ${label}` }, sizeBtn(-5),
-          h("span", { class: "t3x-fs-size-val", text: `${n}%`, title: `Size ${n}%, default ${def}%. The Default control on this row sets it.` }),
+          h("span", { class: "t3x-fs-size-val", text: `${n}%`, title: `Size ${n}%, default ${def}%. The Default control on this row sets it.${capped ? ` ${FONT_TEXT.sizeCapNote(NAME_CAP, n)}` : ""}` }),
           sizeBtn(5));
         // Default, both ways. A ring: the size differs, click for the default. A dot: this is the default,
         // and when a size was left behind the same control goes back to it.
@@ -4911,10 +5468,8 @@
         // (or not) the same way in every row, and a click on Default never moves anything.
         sizeLine = h("span", { class: "t3x-fs-sizeline" }, size, h("span", { class: "t3x-fs-defslot" }, defSizer(), def2));
         // Past NAME_CAP the name stops growing: its line keeps its height, so − and + stay under the pointer.
-        // (The size drawn is the loaded face's: a new size keeps the old face until its own has loaded.)
-        const shown = loaded ? Number(faceKey.slice(faceKey.lastIndexOf("|") + 1)) : 0;
         if (shown > NAME_CAP) name.style.fontSize = `${Math.round(2000 * NAME_CAP / shown) / 100}px`;
-        if (n > NAME_CAP) name.title = `${pick.family}. Shown at ${NAME_CAP}% here; the app uses ${n}%. Click to edit in Fonts; ← → try the previous or next font.`;
+        if (capped) name.title = `${pick.family}. Shown at ${NAME_CAP}% here; the app uses ${n}%. Click to edit in Fonts; ← → try the previous or next font.`;
       }
       const pos = at >= 0 ? h("span", { class: "t3x-fs-pos", text: `${at + 1} of ${entries.length}` }) : null;
       if (pos) pos.style.minWidth = `${posCh}ch`;

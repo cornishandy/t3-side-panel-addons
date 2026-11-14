@@ -178,6 +178,7 @@ test("Your fonts rows: fixed places, size steps to 200%, Default both ways, T3 f
     assert.deepEqual(await saved("fontMain"), { family: "Arial", size: 150 });
     assert.equal(await until(face("T3X Main", 150), "Replies face not at 150%"), true); await frames();
     assert.equal(await ev(`document.querySelector('[data-focus="fs-name-main"]').style.fontSize`), "", "150%: the name isn't scaled down");
+    assert.match(await ev(`document.querySelector('[data-focus="fs-name-main"]').closest(".t3x-fs-row").querySelector(".t3x-fs-size-val").title`), /^Size 150%, default \d+%\. The Default control on this row sets it\.$/, "150%: no drawn-size sentence");
     // Up to 200: + turns off and focus moves to −, also after the face loads.
     for (let i = 0; i < 12; i++) { await ev(`(() => { const b = document.querySelector('[data-focus="plus-main"]'); if (!b.disabled) b.click(); })(), 1`); await frames(); }
     assert.deepEqual(await saved("fontMain"), { family: "Arial", size: 200 });
@@ -189,6 +190,9 @@ test("Your fonts rows: fixed places, size steps to 200%, Default both ways, T3 f
     const capped = await ev(`(() => { const n = document.querySelector('[data-focus="fs-name-main"]'); return { fs: n.style.fontSize, h: n.getBoundingClientRect().height, title: n.title }; })()`);
     assert.equal(capped.fs, "15px"); assert.equal(capped.h, 30);
     assert.match(capped.title, /^Arial\. Shown at 150% here; the app uses 200%\./);
+    // 11C add-on (14 Nov 2026): the size number's tooltip says the same, as its last sentence, on a capped row only.
+    assert.match(await ev(`document.querySelector('[data-focus="fs-name-main"]').closest(".t3x-fs-row").querySelector(".t3x-fs-size-val").title`),
+      /^Size 200%, default \d+%\. The Default control on this row sets it\. The font name above is drawn at 150%; the app uses 200%\.$/);
     // Down to 80: − turns off and focus moves to +.
     for (let i = 0; i < 26; i++) { await ev(`(() => { const b = document.querySelector('[data-focus="minus-main"]'); if (!b.disabled) b.click(); })(), 1`); await frames(); }
     assert.deepEqual(await saved("fontMain"), { family: "Arial", size: 80 });

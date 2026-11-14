@@ -68,6 +68,7 @@ Quit and reopen T3 after `--restore`. The keeper's uninstall only removes its ba
 - [x] Claude without a 5-hour window: no tank or `5h` number in its item, and the legend names the tank only while a lab has one (13 Nov 2026)
 - [x] Find fonts on screen: hover names the font area, Shift labels every area, a click opens Fonts beside the text, Show on screen — each with its own switch
 - [x] Move popups out of the way: every popup drags by its top bar and reopens there; Fonts stops dimming, and its Small card sits clear of the text
+- [x] About this font: a card while the font menu is open, a panel under Preview, a card beside "Your fonts" and a closed About in the docked card; eight more fonts with a new Rounded print group (13 Nov 2026, branch `font-details`, not yet installed)
 - [x] Committed add-on tests cover usage, fonts and sidebar behavior (browser tests use the newest installed headless Chrome)
 - [x] `geminiQuota` recognizes the corrected probe version in the November 6 nightly; the workaround remains for older builds
 - [x] `geminiQuota` follows the probe into the server bundle (November 13 nightly) and accepts any version from `2.24.0` up (keeper v15)

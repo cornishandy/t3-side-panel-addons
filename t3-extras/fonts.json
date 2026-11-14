@@ -1,6 +1,7 @@
 {
- "note": "Fonts for the Heading and Body pickers: one place for the list, each family's style verdict and its measurements. Google families are fetched once by install.sh from the pinned fonts.gstatic.com URLs below (latin subset, one weight) with their licence from github.com/google/fonts at a pinned commit; each file must match its sha256. macOS families need nothing. Rebuild with tools/fonts.mjs.",
- "styleSource": "Gemini 4 Argon by eye, 19 Oct 2026 (coordinator: Noteworthy is print). star = Argon's top 8 for Andy's taste; hard = hard to read at 14-16 px.",
+ "note": "Fonts for the Heading and Body pickers: one place for the list, each family's style verdict and its measurements. Google families are fetched once by install.sh from the pinned fonts.gstatic.com URLs below (latin subset, one weight) with their licence from github.com/google/fonts at a pinned commit; each file must match its sha256. macOS families need nothing. Rebuild with tools/fonts.mjs. listVersion counts changes to this list: families added in a change carry newIn = that version and show \"new\" in the menus until the next change, which bumps listVersion. xRatio (lower case as a whole % of capital height), widthVsSystem (the sample sentence at the default size against T3’s built-in system font at 100%, signed whole %), sizeClamped and xRatioMedian come from tools/fonts.mjs measure; narrow and tall compare with the Handwritten medians of the families without newIn.",
+ "listVersion": 2,
+ "styleSource": "Gemini 4 Argon by eye, 19 Oct 2026 (coordinator: Noteworthy is print). star = Argon's top 8 for Andy's taste; hard = hard to read at 14-16 px. The eight families with newIn 2 (13 Nov 2026): Claude Opus 5.5, the builder, by eye at 14, 15 and 16 px in T3’s chrome-headless-shell 157 (a sentence, a pangram, 1Il|O0, curly quotes and dashes): all print, none hard to read small, none starred. oneWeight: the family has one weight (Google’s METADATA at the pinned commit: one weight and no weight axis; the Mac families’ files). smallCaps: the lower case is drawn as small capitals. dashesTouch: in T3 (its web UI, Chromium 152 and 157, 13 Nov 2026) the em dash runs into the next word (its ink reaches about twice its advance), so the record says so.",
  "families": [
   {
    "name": "Amatic SC",
@@ -16,7 +17,11 @@
    "tallness": 2.57,
    "narrow": true,
    "tall": true,
-   "size": 80
+   "size": 80,
+   "sizeClamped": true,
+   "xRatio": 88,
+   "widthVsSystem": -46,
+   "smallCaps": true
   },
   {
    "name": "Just Another Hand",
@@ -32,7 +37,11 @@
    "tallness": 3.16,
    "narrow": true,
    "tall": true,
-   "size": 125
+   "size": 125,
+   "sizeClamped": false,
+   "xRatio": 57,
+   "widthVsSystem": -37,
+   "oneWeight": true
   },
   {
    "name": "Sue Ellen Francisco",
@@ -48,7 +57,11 @@
    "tallness": 3.21,
    "narrow": true,
    "tall": true,
-   "size": 135
+   "size": 135,
+   "sizeClamped": false,
+   "xRatio": 41,
+   "widthVsSystem": -12,
+   "oneWeight": true
   },
   {
    "name": "Covered By Your Grace",
@@ -64,7 +77,11 @@
    "tallness": 2.04,
    "narrow": false,
    "tall": true,
-   "size": 105
+   "size": 105,
+   "sizeClamped": false,
+   "xRatio": 62,
+   "widthVsSystem": -9,
+   "oneWeight": true
   },
   {
    "name": "Nanum Pen Script",
@@ -80,7 +97,11 @@
    "tallness": 1.51,
    "narrow": false,
    "tall": false,
-   "size": 100
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 90,
+   "widthVsSystem": -16,
+   "oneWeight": true
   },
   {
    "name": "Reenie Beanie",
@@ -96,7 +117,11 @@
    "tallness": 1.66,
    "narrow": true,
    "tall": false,
-   "size": 135
+   "size": 135,
+   "sizeClamped": false,
+   "xRatio": 65,
+   "widthVsSystem": 8,
+   "oneWeight": true
   },
   {
    "name": "Shadows Into Light",
@@ -112,7 +137,11 @@
    "tallness": 1.65,
    "narrow": false,
    "tall": false,
-   "size": 95
+   "size": 95,
+   "sizeClamped": false,
+   "xRatio": 81,
+   "widthVsSystem": -13,
+   "oneWeight": true
   },
   {
    "name": "Shadows Into Light Two",
@@ -128,7 +157,11 @@
    "tallness": 1.96,
    "narrow": false,
    "tall": true,
-   "size": 85
+   "size": 85,
+   "sizeClamped": false,
+   "xRatio": 73,
+   "widthVsSystem": -18,
+   "oneWeight": true
   },
   {
    "name": "Loved by the King",
@@ -144,7 +177,11 @@
    "tallness": 2.48,
    "narrow": true,
    "tall": true,
-   "size": 90
+   "size": 90,
+   "sizeClamped": false,
+   "xRatio": 69,
+   "widthVsSystem": -31,
+   "oneWeight": true
   },
   {
    "name": "Annie Use Your Telescope",
@@ -160,7 +197,11 @@
    "tallness": 2.09,
    "narrow": true,
    "tall": true,
-   "size": 105
+   "size": 105,
+   "sizeClamped": false,
+   "xRatio": 64,
+   "widthVsSystem": -14,
+   "oneWeight": true
   },
   {
    "name": "Just Me Again Down Here",
@@ -176,7 +217,11 @@
    "tallness": 1.69,
    "narrow": true,
    "tall": false,
-   "size": 150
+   "size": 150,
+   "sizeClamped": false,
+   "xRatio": 61,
+   "widthVsSystem": 13,
+   "oneWeight": true
   },
   {
    "name": "The Girl Next Door",
@@ -192,7 +237,11 @@
    "tallness": 1.32,
    "narrow": false,
    "tall": false,
-   "size": 100
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 77,
+   "widthVsSystem": 11,
+   "oneWeight": true
   },
   {
    "name": "Waiting for the Sunrise",
@@ -208,7 +257,11 @@
    "tallness": 1.6,
    "narrow": false,
    "tall": false,
-   "size": 105
+   "size": 105,
+   "sizeClamped": false,
+   "xRatio": 75,
+   "widthVsSystem": -3,
+   "oneWeight": true
   },
   {
    "name": "Sedgwick Ave",
@@ -224,7 +277,11 @@
    "tallness": 2.01,
    "narrow": false,
    "tall": true,
-   "size": 80
+   "size": 80,
+   "sizeClamped": true,
+   "xRatio": 78,
+   "widthVsSystem": -22,
+   "oneWeight": true
   },
   {
    "name": "Neucha",
@@ -240,7 +297,11 @@
    "tallness": 1.89,
    "narrow": false,
    "tall": true,
-   "size": 100
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 72,
+   "widthVsSystem": -14,
+   "oneWeight": true
   },
   {
    "name": "Dekko",
@@ -256,7 +317,11 @@
    "tallness": 1.44,
    "narrow": false,
    "tall": false,
-   "size": 115
+   "size": 115,
+   "sizeClamped": false,
+   "xRatio": 80,
+   "widthVsSystem": 2,
+   "oneWeight": true
   },
   {
    "name": "Kalam",
@@ -272,7 +337,10 @@
    "tallness": 1.62,
    "narrow": false,
    "tall": false,
-   "size": 100
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 71,
+   "widthVsSystem": 2
   },
   {
    "name": "Gaegu",
@@ -288,7 +356,10 @@
    "tallness": 1.24,
    "narrow": false,
    "tall": false,
-   "size": 135
+   "size": 135,
+   "sizeClamped": false,
+   "xRatio": 69,
+   "widthVsSystem": 36
   },
   {
    "name": "Gamja Flower",
@@ -304,7 +375,11 @@
    "tallness": 1.46,
    "narrow": false,
    "tall": false,
-   "size": 145
+   "size": 145,
+   "sizeClamped": false,
+   "xRatio": 63,
+   "widthVsSystem": 28,
+   "oneWeight": true
   },
   {
    "name": "Hi Melody",
@@ -320,7 +395,11 @@
    "tallness": 1.45,
    "narrow": true,
    "tall": false,
-   "size": 150
+   "size": 155,
+   "sizeClamped": false,
+   "xRatio": 65,
+   "widthVsSystem": 23,
+   "oneWeight": true
   },
   {
    "name": "Caveat",
@@ -336,7 +415,10 @@
    "tallness": 1.99,
    "narrow": true,
    "tall": true,
-   "size": 140
+   "size": 140,
+   "sizeClamped": false,
+   "xRatio": 52,
+   "widthVsSystem": 13
   },
   {
    "name": "Caveat Brush",
@@ -352,7 +434,11 @@
    "tallness": 1.82,
    "narrow": true,
    "tall": false,
-   "size": 120
+   "size": 120,
+   "sizeClamped": false,
+   "xRatio": 63,
+   "widthVsSystem": 0,
+   "oneWeight": true
   },
   {
    "name": "Patrick Hand",
@@ -368,7 +454,11 @@
    "tallness": 1.8,
    "narrow": false,
    "tall": false,
-   "size": 110
+   "size": 110,
+   "sizeClamped": false,
+   "xRatio": 71,
+   "widthVsSystem": -8,
+   "oneWeight": true
   },
   {
    "name": "Patrick Hand SC",
@@ -384,7 +474,12 @@
    "tallness": 1.74,
    "narrow": false,
    "tall": false,
-   "size": 110
+   "size": 110,
+   "sizeClamped": false,
+   "xRatio": 70,
+   "widthVsSystem": -5,
+   "oneWeight": true,
+   "smallCaps": true
   },
   {
    "name": "Handlee",
@@ -400,7 +495,11 @@
    "tallness": 1.7,
    "narrow": false,
    "tall": false,
-   "size": 100
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 71,
+   "widthVsSystem": -5,
+   "oneWeight": true
   },
   {
    "name": "Indie Flower",
@@ -416,7 +515,11 @@
    "tallness": 1.56,
    "narrow": false,
    "tall": false,
-   "size": 115
+   "size": 115,
+   "sizeClamped": false,
+   "xRatio": 65,
+   "widthVsSystem": 13,
+   "oneWeight": true
   },
   {
    "name": "Architects Daughter",
@@ -432,7 +535,11 @@
    "tallness": 1.42,
    "narrow": false,
    "tall": false,
-   "size": 110
+   "size": 110,
+   "sizeClamped": false,
+   "xRatio": 66,
+   "widthVsSystem": 26,
+   "oneWeight": true
   },
   {
    "name": "Gloria Hallelujah",
@@ -448,7 +555,11 @@
    "tallness": 1.42,
    "narrow": false,
    "tall": false,
-   "size": 95
+   "size": 95,
+   "sizeClamped": false,
+   "xRatio": 72,
+   "widthVsSystem": 12,
+   "oneWeight": true
   },
   {
    "name": "Coming Soon",
@@ -464,7 +575,11 @@
    "tallness": 1.58,
    "narrow": false,
    "tall": false,
-   "size": 90
+   "size": 90,
+   "sizeClamped": false,
+   "xRatio": 75,
+   "widthVsSystem": -3,
+   "oneWeight": true
   },
   {
    "name": "Schoolbell",
@@ -480,7 +595,11 @@
    "tallness": 1.76,
    "narrow": false,
    "tall": false,
-   "size": 115
+   "size": 115,
+   "sizeClamped": false,
+   "xRatio": 59,
+   "widthVsSystem": 10,
+   "oneWeight": true
   },
   {
    "name": "Mynerve",
@@ -496,7 +615,11 @@
    "tallness": 1.65,
    "narrow": false,
    "tall": false,
-   "size": 115
+   "size": 115,
+   "sizeClamped": false,
+   "xRatio": 63,
+   "widthVsSystem": 12,
+   "oneWeight": true
   },
   {
    "name": "Playpen Sans",
@@ -512,7 +635,10 @@
    "tallness": 1.55,
    "narrow": false,
    "tall": false,
-   "size": 95
+   "size": 95,
+   "sizeClamped": false,
+   "xRatio": 70,
+   "widthVsSystem": 9
   },
   {
    "name": "Shantell Sans",
@@ -528,7 +654,10 @@
    "tallness": 1.38,
    "narrow": false,
    "tall": false,
-   "size": 100
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 71,
+   "widthVsSystem": 17
   },
   {
    "name": "Klee One",
@@ -544,7 +673,10 @@
    "tallness": 1.42,
    "narrow": false,
    "tall": false,
-   "size": 105
+   "size": 105,
+   "sizeClamped": false,
+   "xRatio": 69,
+   "widthVsSystem": 19
   },
   {
    "name": "Zen Kurenaido",
@@ -560,7 +692,11 @@
    "tallness": 1.76,
    "narrow": false,
    "tall": false,
-   "size": 120
+   "size": 120,
+   "sizeClamped": false,
+   "xRatio": 59,
+   "widthVsSystem": 11,
+   "oneWeight": true
   },
   {
    "name": "Permanent Marker",
@@ -576,7 +712,11 @@
    "tallness": 1.42,
    "narrow": false,
    "tall": false,
-   "size": 85
+   "size": 85,
+   "sizeClamped": false,
+   "xRatio": 82,
+   "widthVsSystem": 1,
+   "oneWeight": true
   },
   {
    "name": "Rock Salt",
@@ -592,7 +732,11 @@
    "tallness": 1.63,
    "narrow": false,
    "tall": false,
-   "size": 80
+   "size": 80,
+   "sizeClamped": true,
+   "xRatio": 68,
+   "widthVsSystem": 17,
+   "oneWeight": true
   },
   {
    "name": "Over the Rainbow",
@@ -608,7 +752,11 @@
    "tallness": 1.9,
    "narrow": false,
    "tall": true,
-   "size": 80
+   "size": 80,
+   "sizeClamped": false,
+   "xRatio": 72,
+   "widthVsSystem": -16,
+   "oneWeight": true
   },
   {
    "name": "Give You Glory",
@@ -624,7 +772,97 @@
    "tallness": 1.64,
    "narrow": false,
    "tall": false,
-   "size": 90
+   "size": 90,
+   "sizeClamped": false,
+   "xRatio": 75,
+   "widthVsSystem": -3,
+   "oneWeight": true
+  },
+  {
+   "name": "Yomogi",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "yomogi-latin-400.woff2",
+   "licence": "LICENSE-yomogi.txt",
+   "licenceType": "OFL-1.1",
+   "newIn": 2,
+   "width": 960,
+   "tallness": 1.46,
+   "narrow": false,
+   "tall": false,
+   "size": 105,
+   "sizeClamped": false,
+   "xRatio": 68,
+   "widthVsSystem": 20,
+   "oneWeight": true,
+   "dashesTouch": true
+  },
+  {
+   "name": "Iansui",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "iansui-latin-400.woff2",
+   "licence": "LICENSE-iansui.txt",
+   "licenceType": "OFL-1.1",
+   "newIn": 2,
+   "note": "a darker Klee One",
+   "width": 953,
+   "tallness": 1.42,
+   "narrow": false,
+   "tall": false,
+   "size": 105,
+   "sizeClamped": false,
+   "xRatio": 69,
+   "widthVsSystem": 19,
+   "oneWeight": true
+  },
+  {
+   "name": "Yusei Magic",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "yusei-magic-latin-400.woff2",
+   "licence": "LICENSE-yusei-magic.txt",
+   "licenceType": "OFL-1.1",
+   "newIn": 2,
+   "width": 936.1,
+   "tallness": 1.56,
+   "narrow": false,
+   "tall": false,
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 67,
+   "widthVsSystem": 11,
+   "oneWeight": true
+  },
+  {
+   "name": "LXGW Marker Gothic",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "lxgw-marker-gothic-latin-400.woff2",
+   "licence": "LICENSE-lxgw-marker-gothic.txt",
+   "licenceType": "OFL-1.1",
+   "newIn": 2,
+   "width": 942.5,
+   "tallness": 1.55,
+   "narrow": false,
+   "tall": false,
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 68,
+   "widthVsSystem": 12,
+   "oneWeight": true
   },
   {
    "name": "Noteworthy",
@@ -641,7 +879,10 @@
    "tallness": 2.17,
    "narrow": false,
    "tall": true,
-   "size": 95
+   "size": 95,
+   "sizeClamped": false,
+   "xRatio": 62,
+   "widthVsSystem": -13
   },
   {
    "name": "Marker Felt",
@@ -658,7 +899,10 @@
    "tallness": 1.96,
    "narrow": false,
    "tall": true,
-   "size": 90
+   "size": 90,
+   "sizeClamped": false,
+   "xRatio": 69,
+   "widthVsSystem": -13
   },
   {
    "name": "Chalkboard SE",
@@ -675,7 +919,10 @@
    "tallness": 1.43,
    "narrow": false,
    "tall": false,
-   "size": 105
+   "size": 105,
+   "sizeClamped": false,
+   "xRatio": 73,
+   "widthVsSystem": 14
   },
   {
    "name": "Bradley Hand",
@@ -692,7 +939,11 @@
    "tallness": 1.2,
    "narrow": false,
    "tall": false,
-   "size": 120
+   "size": 120,
+   "sizeClamped": false,
+   "xRatio": 79,
+   "widthVsSystem": 24,
+   "oneWeight": true
   },
   {
    "name": "SignPainter",
@@ -709,7 +960,91 @@
    "tallness": 1.95,
    "narrow": true,
    "tall": true,
-   "size": 125
+   "size": 125,
+   "sizeClamped": false,
+   "xRatio": 64,
+   "widthVsSystem": -8
+  },
+  {
+   "name": "Gowun Dodum",
+   "source": "google",
+   "group": "round",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "gowun-dodum-latin-400.woff2",
+   "licence": "LICENSE-gowun-dodum.txt",
+   "licenceType": "OFL-1.1",
+   "newIn": 2,
+   "width": 851.2,
+   "tallness": 1.75,
+   "narrow": false,
+   "tall": false,
+   "size": 95,
+   "sizeClamped": false,
+   "xRatio": 70,
+   "widthVsSystem": -4,
+   "oneWeight": true
+  },
+  {
+   "name": "Kiwi Maru",
+   "source": "google",
+   "group": "round",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "kiwi-maru-latin-400.woff2",
+   "licence": "LICENSE-kiwi-maru.txt",
+   "licenceType": "OFL-1.1",
+   "newIn": 2,
+   "width": 1017.6,
+   "tallness": 1.41,
+   "narrow": false,
+   "tall": false,
+   "size": 95,
+   "sizeClamped": false,
+   "xRatio": 70,
+   "widthVsSystem": 15
+  },
+  {
+   "name": "Zen Maru Gothic",
+   "source": "google",
+   "group": "round",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "zen-maru-gothic-latin-400.woff2",
+   "licence": "LICENSE-zen-maru-gothic.txt",
+   "licenceType": "OFL-1.1",
+   "newIn": 2,
+   "width": 861.3,
+   "tallness": 1.56,
+   "narrow": false,
+   "tall": false,
+   "size": 105,
+   "sizeClamped": false,
+   "xRatio": 68,
+   "widthVsSystem": 8
+  },
+  {
+   "name": "Tsukimi Rounded",
+   "source": "google",
+   "group": "round",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "file": "tsukimi-rounded-latin-400.woff2",
+   "licence": "LICENSE-tsukimi-rounded.txt",
+   "licenceType": "OFL-1.1",
+   "newIn": 2,
+   "width": 987.8,
+   "tallness": 1.56,
+   "narrow": false,
+   "tall": false,
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 64,
+   "widthVsSystem": 17
   },
   {
    "name": "Yanone Kaffeesatz",
@@ -725,7 +1060,10 @@
    "tallness": 2.21,
    "narrow": true,
    "tall": true,
-   "size": 100
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 71,
+   "widthVsSystem": -28
   },
   {
    "name": "Oswald",
@@ -741,7 +1079,10 @@
    "tallness": 2.17,
    "narrow": false,
    "tall": true,
-   "size": 90
+   "size": 90,
+   "sizeClamped": false,
+   "xRatio": 71,
+   "widthVsSystem": -23
   },
   {
    "name": "Pathway Gothic One",
@@ -757,7 +1098,11 @@
    "tallness": 2.21,
    "narrow": true,
    "tall": true,
-   "size": 95
+   "size": 95,
+   "sizeClamped": false,
+   "xRatio": 77,
+   "widthVsSystem": -31,
+   "oneWeight": true
   },
   {
    "name": "Sofia Sans Extra Condensed",
@@ -773,7 +1118,10 @@
    "tallness": 2.35,
    "narrow": true,
    "tall": true,
-   "size": 105
+   "size": 105,
+   "sizeClamped": false,
+   "xRatio": 74,
+   "widthVsSystem": -33
   },
   {
    "name": "Barlow Condensed",
@@ -789,7 +1137,10 @@
    "tallness": 1.99,
    "narrow": true,
    "tall": true,
-   "size": 100
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 72,
+   "widthVsSystem": -20
   },
   {
    "name": "Roboto Condensed",
@@ -805,7 +1156,10 @@
    "tallness": 1.75,
    "narrow": false,
    "tall": false,
-   "size": 95
+   "size": 95,
+   "sizeClamped": false,
+   "xRatio": 74,
+   "widthVsSystem": -12
   },
   {
    "name": "Fira Sans Condensed",
@@ -821,7 +1175,10 @@
    "tallness": 1.63,
    "narrow": false,
    "tall": false,
-   "size": 95
+   "size": 95,
+   "sizeClamped": false,
+   "xRatio": 76,
+   "widthVsSystem": -9
   }
  ],
  "files": [
@@ -1216,6 +1573,86 @@
    "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
   },
   {
+   "file": "yomogi-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/yomogi/v27/VuJwdNrS2ZL7rpo_X4b4FotuYQ.woff2",
+   "sha256": "9bd393eff824e3a1cc3c400fb2e9e528885385a59ac324a28152cb1ffcbd7245"
+  },
+  {
+   "file": "LICENSE-yomogi.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/yomogi/OFL.txt",
+   "sha256": "bc0330d5973ab1f200553f51b4cb4ef11b81187fdcd0249f7f83992726c02a48"
+  },
+  {
+   "file": "iansui-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/iansui/v14/w8gbH2UoTuUp5bOqiiuC9lQHoA.woff2",
+   "sha256": "85fadc3836fd3c76aa3bc2960d7125d94d0484f59247712721074557ddf32654"
+  },
+  {
+   "file": "LICENSE-iansui.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/iansui/OFL.txt",
+   "sha256": "ba756a625db54032da8e4c8e58a19519964b93fac04267ec15e14ee8c5cc82a5"
+  },
+  {
+   "file": "yusei-magic-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/yuseimagic/v17/yYLt0hbAyuCmoo5wlhPkpgHW8NZ9c5T-.woff2",
+   "sha256": "af8daaaaaccf70b52485d7f5c507055765561b89808081d41ec6f5bea31b3d59"
+  },
+  {
+   "file": "LICENSE-yusei-magic.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/yuseimagic/OFL.txt",
+   "sha256": "c74e8c47951ddd9c902f07097761cfa0457993e28d8e1e946e273c0250be77c9"
+  },
+  {
+   "file": "lxgw-marker-gothic-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/lxgwmarkergothic/v4/Gg8oN4AaXyDVTi_NlS1-xCtMQxY3lToxieY-U5Sm6A.woff2",
+   "sha256": "14791ce144e47b878141e47677e9049b83981b7cbc4f5a4a5e47b35a4603872b"
+  },
+  {
+   "file": "LICENSE-lxgw-marker-gothic.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/lxgwmarkergothic/OFL.txt",
+   "sha256": "58e494ff4a5177d593a97ffc482f4069f59f54a0d4049fd29e531d3b1009e8b4"
+  },
+  {
+   "file": "gowun-dodum-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/gowundodum/v12/3Jn5SD_00GqwlBnWc1TUJG0CduVp0uNz.woff2",
+   "sha256": "7c677f41fbbb9be189e6f1081c1a8a236cb41a87fb7c48b16743d8e1d2e67562"
+  },
+  {
+   "file": "LICENSE-gowun-dodum.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/gowundodum/OFL.txt",
+   "sha256": "a7c73f9521cd646bbdfb6684c99a62311bbd7bce11898dc11ef0b3c69eda1aca"
+  },
+  {
+   "file": "kiwi-maru-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/kiwimaru/v21/R70YjykGkuuDep-hRg6onwqRfTHxTw.woff2",
+   "sha256": "7aea3381a9ccb7873900c496526b8bea20b0ee14fb18b87347934f9608e3bcff"
+  },
+  {
+   "file": "LICENSE-kiwi-maru.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/kiwimaru/OFL.txt",
+   "sha256": "07ceae7a6e3294cbbd0fdf6e35226550566a1cce9fd226d0f8a57f3d34c664fe"
+  },
+  {
+   "file": "zen-maru-gothic-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/zenmarugothic/v20/o-0SIpIxzW5b-RxT-6A8jWAtCp-U6khnFrKW9Q.woff2",
+   "sha256": "d652b5eddc2b877784592d1bb40e1713f97623ec7638801021519c1ea88b0b43"
+  },
+  {
+   "file": "LICENSE-zen-maru-gothic.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/zenmarugothic/OFL.txt",
+   "sha256": "2a20cf7ce1909d8ee1e949095d340f7d7656705f7c810a2d6faf56800ad0cb3d"
+  },
+  {
+   "file": "tsukimi-rounded-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/tsukimirounded/v14/sJoc3LJNksWZO0LvnZwkF3HtoB7dOnkPHZsf1Q.woff2",
+   "sha256": "54c4b465ef81d058a468ac21238789006f95d418a5108225a0e965ca0f2d127e"
+  },
+  {
+   "file": "LICENSE-tsukimi-rounded.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/tsukimirounded/OFL.txt",
+   "sha256": "0d268d55bd00b6518d3f136afb63e7f01f49c922b06c4e55dd4a2841d3bd66e6"
+  },
+  {
    "file": "yanone-kaffeesatz-latin-400.woff2",
    "url": "https://fonts.gstatic.com/s/yanonekaffeesatz/v34/3y9I6aknfjLm_3lMKjiMgmUUYBs04aUXNxt9gW2LIfto9tWZd2GKKHD0VTtI.woff2",
    "sha256": "c982159da7783eb7c0592977467846d7ac462e9a999168b197716120dba6d1b9"
@@ -1291,6 +1728,8 @@
   "sample": "The quick handover kept 42 notes in narrow rows.",
   "px": 40,
   "uiXHeight": 0.508,
-  "browser": "T3's chrome-headless-shell"
- }
+  "uiWidth": 841.1,
+  "browser": "T3's chrome-headless-shell 157.0.8103.78"
+ },
+ "xRatioMedian": 70
 }

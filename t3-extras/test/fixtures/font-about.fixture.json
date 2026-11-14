@@ -1,0 +1,45 @@
+{
+ "note": "Test fixture only: two records in the font-about.json schema, adapted from the round 2 mock (mock/data2.json, plain text, not HTML). The shipped font-about.json comes from the writer's checked file through tools/fonts.mjs about.",
+ "listVersion": 2,
+ "records": {
+  "Klee One": {
+   "strip": "a g y fi ffl &",
+   "desc": "A quiet hand, written with a pencil or pen, and meant for body text.",
+   "apart": [
+    "One-loop a and g, the way most people write them",
+    "In ff, fi, fl, ffi and ffl, the letters are drawn as one shape"
+   ],
+   "madeShort": "Made by Fontworks, a Japanese type foundry; on Google Fonts since 2021.",
+   "background": "By Fontworks. Added to Google Fonts in June 2021. Free, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family also has SemiBold.",
+   "weightLoaded": "Regular",
+   "letters": "English and Western European accents, curly quotes and dashes. This copy is Latin only; the full font also has Japanese, Greek and Cyrillic.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Japanese",
+    "Greek",
+    "Cyrillic"
+   ]
+  },
+  "Zen Kurenaido": {
+   "strip": "a g y l I &",
+   "desc": "Ballpoint handwriting: the brush details of Japanese calligraphy are left out, leaving the bones of each letter.",
+   "apart": [
+    "Small lower case, so its default size here is raised",
+    "The l ends in a little hook, which helps tell it from a capital I",
+    "The a has a hood, as in printed text; the g is one loop"
+   ],
+   "madeShort": "By Yoshimichi Ohira, one of the Zen Fonts; on Google Fonts since 2021.",
+   "background": "By Yoshimichi Ohira, one of the Zen Fonts, a family of Japanese typefaces added to Google Fonts in October 2021. Free, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "weightLoaded": "Regular",
+   "letters": "English and Western European accents, curly quotes and dashes. This copy is Latin only; the full font also has Japanese, Greek and Cyrillic.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Japanese",
+    "Greek",
+    "Cyrillic"
+   ]
+  }
+ }
+}

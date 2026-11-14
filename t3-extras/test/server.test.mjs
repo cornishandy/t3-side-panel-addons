@@ -153,6 +153,10 @@ before(async () => {
   fs.mkdirSync(path.join(dir, "public"), { recursive: true });
   fs.mkdirSync(path.join(dir, "fonts"));
   for (const f of ["server.mjs", "lib.mjs", "history.mjs", "burn.mjs", "burn-core.mjs", "burn-sql-worker.mjs", "fonts.json", "payload.mjs", "private-file.mjs"]) fs.copyFileSync(path.join(SRC, f), path.join(dir, f));
+  // "About this font" records, with a build-side field slipped in that must never be served.
+  const about = JSON.parse(fs.readFileSync(path.join(SRC, "font-about.json"), "utf8"));
+  about.records["Klee One"] = { ...about.records["Klee One"], sources: [{ claim: "x", source: "tech-mac.json:copyright" }] };
+  fs.writeFileSync(path.join(dir, "font-about.json"), JSON.stringify(about));
   fs.mkdirSync(path.join(tmp, "home"));
   fs.writeFileSync(path.join(dir, "public/extras.js"), "void 0;");
   fs.writeFileSync(path.join(dir, "public/extras.css"), "html{}");
@@ -288,9 +292,21 @@ test("/font-catalog lists the families without URLs or hashes", async () => {
   assert.equal((await get("/font-catalog")).status, 403);
   const r = await get("/font-catalog", { Origin: "t3code://app" });
   const cat = JSON.parse(r.body);
-  assert.equal(cat.families.length, 51);
+  assert.equal(cat.families.length, 59);
   assert.doesNotMatch(r.body, /gstatic|sha256|githubusercontent/);
   assert.ok(cat.families.find((f) => f.name === "Noteworthy").local.length);
+});
+
+test("/font-about sends the records' public fields at the list's version, never sources", async () => {
+  assert.equal((await get("/font-about")).status, 403);
+  const r = await get("/font-about", { Origin: "t3code://app" });
+  const about = JSON.parse(r.body);
+  assert.equal(about.listVersion, 2);
+  assert.equal(Object.keys(about.records).length, 59);
+  assert.doesNotMatch(r.body, /"sources"|tech-mac\.json|\/Users\//);
+  assert.equal(typeof about.records["Klee One"].desc, "string");
+  const cat = JSON.parse((await get("/font-catalog", { Origin: "t3code://app" })).body);
+  assert.equal(cat.listVersion, about.listVersion, "the records match the catalog's list");
 });
 
 test("diag is refused unless it comes from T3, and stores no free text", async () => {

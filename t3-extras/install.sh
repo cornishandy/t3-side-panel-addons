@@ -144,6 +144,8 @@ install -m 600 "$SRC/public/extras.js" "$SRC/public/extras.css" "$HOME_DIR/publi
 # The sidebar view chooser (Group / Sort / Native) is not installed (25 Oct 2026: native list only).
 # Its source stays in public/grouping.*; the service serves it only when those files are installed.
 rm -f "$HOME_DIR/public/grouping.js" "$HOME_DIR/public/grouping.css"
+# "About this font" records: installed when the repo has them (checked prose); without them, no cards.
+if [[ -f "$SRC/font-about.json" ]]; then install -m 600 "$SRC/font-about.json" "$HOME_DIR/"; else rm -f "$HOME_DIR/font-about.json"; fi
 "$NODE" "$SRC/sign.mjs" "$HOME_DIR"
 
 cat > "$PLIST" <<PLIST
