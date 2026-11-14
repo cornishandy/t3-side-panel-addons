@@ -1175,8 +1175,10 @@ button.t3x-fs-def { cursor: pointer; }
    * resizing", "Still off"). Status labels share one width per card, wide enough for the longest label it uses. */
   --t3x-lw: calc(5.1em + 1rem);
   &:has(tbody [itemprop~="saved"]) { --t3x-lw: calc(6.3em + 1rem); }
-  /* "Decided for you" is the last row and has no who-and-when (:has() can't nest, so this is how it is found) */
-  &:has(tbody tr:last-child > td:last-child:empty) { --t3x-lw: calc(7.9em + 1rem); }
+  /* "Decided for you" has no who-and-when: it is the last row with an empty third cell, or the row just before a
+   * Threads row, which comes last and has an empty third cell too (:has() can't nest, so the card takes two tests) */
+  &:has(tbody tr:last-child > td:last-child:empty):not(:has(tbody tr:last-child [itemprop~="threads"])) { --t3x-lw: calc(7.9em + 1rem); }
+  &:has(tbody tr:last-child [itemprop~="threads"]):has(tbody tr:nth-last-child(2) > td:last-child:empty) { --t3x-lw: calc(7.9em + 1rem); }
   & table { display: block; width: 100%; min-width: 0; font-size: .8125rem; line-height: 1.5; font-variant-numeric: tabular-nums; }
   & tbody { display: block; }
   & tbody tr { display: flex; flex-wrap: wrap; align-items: flex-start; }
@@ -1230,11 +1232,12 @@ button.t3x-fs-def { cursor: pointer; }
     animation: t3x-footer-pulse 1.6s ease-in-out infinite;
   }
 
-  /* needs you: a neutral bar and a faint tint, the label in full strength.
+  /* needs you (Andy, 13 Nov 2026: "Needs You text should be in red"; the team's pick, his yes the same night): a red
+   * bar, a 9% red tint and the label in the verdict's red; the item's own words, links and action words keep their colours.
    * The action word is the one underlined layer: a direct <ins> in that row's step.
    * The same word in the body, a finished step, or the team list stays plain. */
-  & tbody tr:has(> td:nth-child(2) > strong:first-child) { background: color-mix(in srgb, var(--foreground) 5%, transparent); box-shadow: inset 2px 0 0 var(--foreground); padding-block: .36rem; }
-  & tbody tr:has(> td:nth-child(2) > strong:first-child) td:first-child { color: var(--foreground); }
+  & tbody tr:has(> td:nth-child(2) > strong:first-child) { background: color-mix(in srgb, var(--t3x-bad) 9%, transparent); box-shadow: inset 2px 0 0 var(--t3x-bad); padding-block: .36rem; }
+  & tbody tr:has(> td:nth-child(2) > strong:first-child) td:first-child { color: color-mix(in srgb, var(--t3x-bad) 75%, var(--foreground)); }
   & tbody tr:has(> td:nth-child(2) > strong:first-child) > td:nth-child(2) > ins { text-decoration-line: underline; text-decoration-thickness: 1.5px; text-underline-offset: .18em; text-decoration-color: currentColor; text-decoration-skip-ink: auto; }
   /* a folded Needs you item (the Thread health watch writes each item as a <details> in the step cell, its advice as a
    * second <details> inside): one tight line each, without T3's fold border, padding or larger type; an open item's
@@ -1245,8 +1248,8 @@ button.t3x-fs-def { cursor: pointer; }
   & td:nth-child(2) [data-markdown-details-summary] > svg { width: .8rem; height: .8rem; }
   & td:nth-child(2) [data-markdown-details-content] { padding: .15rem 0 .3rem 1rem; }
   & td:nth-child(2) [data-markdown-details-content] div:has(> [data-markdown-details]) { margin-top: .25rem; }
-  & tbody tr:has(> td:nth-child(2) > div:first-child > [data-markdown-details] > [data-markdown-details-summary] strong:first-child) { background: color-mix(in srgb, var(--foreground) 5%, transparent); box-shadow: inset 2px 0 0 var(--foreground); padding-block: .1rem; }
-  & tbody tr:has(> td:nth-child(2) > div:first-child > [data-markdown-details] > [data-markdown-details-summary] strong:first-child) td:first-child { color: var(--foreground); }
+  & tbody tr:has(> td:nth-child(2) > div:first-child > [data-markdown-details] > [data-markdown-details-summary] strong:first-child) { background: color-mix(in srgb, var(--t3x-bad) 9%, transparent); box-shadow: inset 2px 0 0 var(--t3x-bad); padding-block: .1rem; }
+  & tbody tr:has(> td:nth-child(2) > div:first-child > [data-markdown-details] > [data-markdown-details-summary] strong:first-child) td:first-child { color: color-mix(in srgb, var(--t3x-bad) 75%, var(--foreground)); }
   & tbody tr:has(> td:nth-child(2) > div:first-child > [data-markdown-details]) > td { padding-block: .06rem; }
   & tbody tr:has(> td:nth-child(2) > div:first-child > [data-markdown-details]) [data-markdown-details-content] ins { text-decoration-line: underline; text-decoration-thickness: 1.5px; text-underline-offset: .18em; text-decoration-color: currentColor; text-decoration-skip-ink: auto; }
   /* decided for you: quiet, still readable */
@@ -1256,8 +1259,9 @@ button.t3x-fs-def { cursor: pointer; }
   & tbody tr:has([itemprop~="saved"]) { background: color-mix(in srgb, var(--warning, #f59e0b) 9%, transparent); box-shadow: inset 2px 0 0 var(--warning, #f59e0b); }
   & tbody tr:has([itemprop~="saved"]) td:first-child { color: var(--foreground); }
   & tbody tr:has([itemprop~="saved"]) td:last-child { color: color-mix(in srgb, var(--muted-foreground) 55%, var(--foreground)); }
-  /* time over its plan (rule "Honest time"): the theme's warning text colour */
-  & [itemprop~="over"] { color: var(--warning-foreground, #b45309); }
+  /* time over its plan (rule "Honest time"): the theme's warning text colour with 15% of the text colour, so it reads
+   * at 4.5:1 or better on every band, the red Needs you and blue Running rows included (Andy, 13 Nov 2026, the team's pick) */
+  & [itemprop~="over"] { color: color-mix(in srgb, var(--warning-foreground, #b45309) 85%, var(--foreground)); }
 
   /* header as a caption: verdict, reason, then progress and ETA on the right */
   & thead {
