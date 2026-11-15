@@ -193,7 +193,7 @@ document.getElementById("out").textContent=JSON.stringify({ui:m("-apple-system, 
 /** The shipped records from the writer's file (pure; tested). */
 export function aboutRecords(writer, fonts) {
   const by = new Map(fonts.families.map((f) => [f.name, f]));
-  const keep = ["strip", "desc", "apart", "apartWarn", "madeShort", "background", "weight", "letters", "copyLatinOnly", "familyScripts", "weightLoaded"];
+  const keep = ["strip", "desc", "apart", "apartWarn", "madeShort", "background", "weight", "letters", "copyLatinOnly", "familyScripts", "weightLoaded", "story", "storySources"];
   const records = {};
   const src = writer?.records ?? writer ?? {};
   for (const [name, r] of Object.entries(src)) {

@@ -26,9 +26,11 @@ const fontFile = (f) => FONT_DIRS.map((d) => path.join(d, f)).find((p) => fs.exi
 const FONTS = JSON.parse(fs.readFileSync(path.join(SRC, "fonts.json"), "utf8"));
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(SRC, "test/fixtures/font-about.fixture.json"), "utf8"));
 const HAVE_FONTS = !!fontFile("klee-one-latin-400.woff2") && !!fontFile("zen-kurenaido-latin-400.woff2");
-// The shipped records (all 59 families), for the tests that need Yomogi's and Barlow Condensed's warnings or a filtered font.
+// The shipped records (all 71 families), for the tests that need Yomogi's and Barlow Condensed's warnings or a filtered font.
 const SHIPPED = fs.existsSync(path.join(SRC, "font-about.json")) ? JSON.parse(fs.readFileSync(path.join(SRC, "font-about.json"), "utf8")) : null;
 const HAVE_SHIPPED = HAVE_FONTS && !!SHIPPED && ["yomogi", "barlow-condensed", "kalam"].every((f) => fontFile(`${f}-latin-400.woff2`));
+// Families whose files this harness can serve. List 3's files are not in the installed folder, so a hover on one never draws a card.
+const DRAWABLE = FONTS.families.filter((f) => f.file && fontFile(f.file)).map((f) => f.name);
 
 const THEME = `:root{--foreground:#2d2f3e;--background:#e9ebf0;--border:#c3c6d0;--popover:#f2f3f7;--popover-foreground:#2d2f3e;--muted-foreground:#6f7280;--accent:rgba(100,105,130,.14);--primary:#8a3ffc;--font-sans:Arial,sans-serif;--font-mono:Menlo,monospace}
 body{margin:0;background:#e9ebf0;color:#2d2f3e;font:15px/1.5 var(--font-sans)}
@@ -184,6 +186,7 @@ test("S1′: the card's lines and computed style match the approved card (§5)",
   const r = FIXTURE.records["Klee One"], f = FONTS.families.find((x) => x.name === "Klee One");
   assert.deepEqual(s.text, ["Klee One", r.strip, r.desc, r.apart.slice(0, 2), r.madeShort,
     `Lower case ${f.xRatio}% as tall as capitals (typical here: about ${FONTS.xRatioMedian}%). Regular weight; Latin letters only in this copy.`,
+    `Screen readability test (experimental, at its Default): ${Math.round(f.screen.score)}, in the same range as T3's font (100).`,
     "You use it for Message composer and Your sent prompts, at 120%."]);
   // Klee One's record says the letters of fi are drawn as one shape: in the strip, with its letter-spacing, "fi" is one ligature.
   const lig = await ev(`(async () => { const c = document.querySelector(".t3x-fcard-pane .t3x-fcard-strip"); const a = document.createElement("span"), b = document.createElement("span"); a.textContent = "fi"; b.textContent = "f\\u200ci"; c.append(a, b); await document.fonts.ready; const w = [a.getBoundingClientRect().width, b.getBoundingClientRect().width]; a.remove(); b.remove(); return w; })()`);
@@ -348,14 +351,14 @@ test("S2: the panel for the area's effective font, hidden on T3 default or witho
       heads: [...p.querySelectorAll("h4")].map((h) => h.textContent), name: p.querySelector(".t3x-fabout-name").textContent, rows: [...p.querySelectorAll("dt")].map((d) => d.textContent) }; })()`);
   assert.deepEqual(s, { hidden: false, after: true, box: ["22px", "14px", "16px", "1px", "8px", "13px", "18.85px"], title: ["About this font", "600", "13px", "8px"],
     head: ["flex", "baseline", "16px", "wrap", "30px", "34.5px"], grid: [2, "4px", "22px", "4px"], sec: ["1px", "7px", "12px", "600", "3px"], dl: [2, "1px", "10px"],
-    heads: ["What sets it apart", "Using it here", "Background", "Technical"], name: "Zen Kurenaido", rows: ["Lower case", "Width", "Weight", "Letters"] });
+    heads: ["What sets it apart", "Using it here", "Background", "Screen readability test · experimental", "Technical"], name: "Zen Kurenaido", rows: ["Lower case", "Width", "Weight", "Letters"] });
   const pick = async (area) => { await ev(`[...document.querySelectorAll(".t3x-font-area")].find((e) => e.querySelector(".t3x-font-area-name").textContent === ${JSON.stringify(area)}).click(), 1`); await sleep(500); };
   await pick("Your sent prompts");
   assert.deepEqual(await ev(`[${panel}.hidden, ${panel}.querySelector(".t3x-fabout-name")?.textContent, ${panel}.textContent.includes("You use it for Message composer and Your sent prompts, at 120%.")]`), [false, "Klee One", true], "a follower shows the font it follows");
   await pick("Links in replies");
   assert.equal(await ev(`${panel}.hidden`), true, "T3 default: no panel");
   await pick("Questions & saved answers");
-  assert.deepEqual(await ev(`[${panel}.hidden, ${panel}.textContent, getComputedStyle(${panel}.firstElementChild).color, getComputedStyle(${panel}).borderTopWidth]`), [false, "No details for this font.", "rgb(111, 114, 128)", "0px"], "7A: no record for Dekko: one muted line saying so");
+  assert.deepEqual(await ev(`[${panel}.hidden, ${panel}.textContent, getComputedStyle(${panel}.firstElementChild).color, getComputedStyle(${panel}).borderTopWidth]`), [false, "No details for this font.Hide this fontHides it from every font list; Show hidden brings it back.", "rgb(111, 114, 128)", "0px"], "7A: no record for Dekko: one muted line, then Hide");
   await load({ settings: { ...SETTINGS, fontPlans: { family: "T3 interface font", size: null }, fontSources: { ...SETTINGS.fontSources, plans: "own" } } });
   await openFonts("Proposed plans");
   assert.deepEqual(await ev(`[...${panel}.children].map((e) => e.textContent)`), ["About this font", "T3 interface font", "Follows T3's Settings → Appearance interface font (now: Arial). The size buttons don't apply.", "You use it for Proposed plans."], "T3's own font: its sentence and where you use it");
@@ -481,14 +484,15 @@ for (const popMove of [true, false]) {
   });
 }
 
-test("the menu: \"new\" on the eight, Iansui's note, Rounded print between Handwritten and Condensed print", { timeout: 60_000 }, async () => {
+test("the menu: \"new\" on list 3, Iansui's note, Rounded print between Handwritten and Condensed print", { timeout: 60_000 }, async () => {
   await load();
   await openFonts();
-  const m = await ev(`(() => { const s = document.getElementById("t3x-font-family"); return { groups: [...s.querySelectorAll("optgroup")].map((g) => g.label), round: [...s.querySelectorAll("optgroup")].find((g) => g.label === "Rounded print") ? [...[...s.querySelectorAll("optgroup")].find((g) => g.label === "Rounded print").querySelectorAll("option")].map((o) => o.value).sort() : null, labels: Object.fromEntries([...s.querySelectorAll("option")].map((o) => [o.value, o.textContent])) }; })()`);
+  const m = await ev(`(() => { const s = document.getElementById("t3x-font-family"); const labelOf = (o) => [...o.childNodes].filter((n) => !(n.classList && (n.classList.contains("mk") || n.classList.contains("mkt")))).map((n) => n.textContent).join(""); return { groups: [...s.querySelectorAll("optgroup")].map((g) => g.label), round: [...s.querySelectorAll("optgroup")].find((g) => g.label === "Rounded print") ? [...[...s.querySelectorAll("optgroup")].find((g) => g.label === "Rounded print").querySelectorAll("option")].map((o) => o.value).sort() : null, labels: Object.fromEntries([...s.querySelectorAll("option")].map((o) => [o.value, labelOf(o)])) }; })()`);
   assert.deepEqual(m.groups, ["T3 Code settings", "Handwritten", "Rounded print", "Condensed print"]);
-  assert.deepEqual(m.round, ["Gowun Dodum", "Kiwi Maru", "Tsukimi Rounded", "Zen Maru Gothic"]);
-  assert.equal(m.labels.Iansui, "Iansui · new, a darker Klee One");
-  for (const n of ["Yomogi", "Yusei Magic", "LXGW Marker Gothic", "Gowun Dodum", "Kiwi Maru", "Zen Maru Gothic", "Tsukimi Rounded"]) assert.equal(m.labels[n], `${n} · new`);
+  assert.deepEqual(m.round, ["Chiron GoRound TC", "Darumadrop One", "Gowun Dodum", "Kiwi Maru", "Mochiy Pop One", "Stick", "Tsukimi Rounded", "Zen Maru Gothic"]);
+  assert.equal(m.labels.Iansui, "Iansui · a darker Klee One");
+  for (const n of ["Yomogi", "Yusei Magic", "LXGW Marker Gothic", "Gowun Dodum", "Kiwi Maru", "Zen Maru Gothic", "Tsukimi Rounded"]) assert.equal(m.labels[n], n);
+  for (const n of ["Chiron GoRound TC", "Mochiy Pop One", "Stick", "Darumadrop One", "Short Stack", "Itim", "Mali", "Comic Relief", "Crafty Girls", "Swanky and Moo Moo", "Fuzzy Bubbles", "Delius"]) assert.equal(m.labels[n], `${n} · new`);
   assert.equal(m.labels["Klee One"], "Klee One");
 });
 
@@ -496,7 +500,7 @@ test("records failed, late, mismatched or hostile: no errors; nothing shown unti
   const panelShown = () => ev(`!document.querySelector(".t3x-fabout:not(.t3x-fabout-docked)").hidden`);
   await load({ aboutMode: "fail" });
   await openFonts();
-  assert.deepEqual([await panelShown(), await ev(`document.querySelector(".t3x-fabout:not(.t3x-fabout-docked)").textContent`)], [true, "Font details couldn't load."], "failed: one muted line");
+  assert.deepEqual([await panelShown(), await ev(`document.querySelector(".t3x-fabout:not(.t3x-fabout-docked)").textContent`)], [true, "Font details couldn't load.Hide this fontHides it from every font list; Show hidden brings it back."], "failed: one muted line, then Hide");
   await openMenu();
   const o = await optionAt("Klee One");
   await mouse("mouseMoved", o.x, o.y); await sleep(500);
@@ -511,7 +515,7 @@ test("records failed, late, mismatched or hostile: no errors; nothing shown unti
   await load({ aboutMode: "mismatch" });
   await openFonts();
   await sleep(500);
-  assert.equal(await ev(`document.querySelector(".t3x-fabout:not(.t3x-fabout-docked)").textContent`), "Font details couldn't load.", "records for another list version: not used");
+  assert.equal(await ev(`document.querySelector(".t3x-fabout:not(.t3x-fabout-docked)").textContent`), "Font details couldn't load.Hide this fontHides it from every font list; Show hidden brings it back.", "records for another list version: not used");
   assert.equal(server.catalogHits, 2, "the page's catalog reloads once to catch up, then stops");
   await load({ aboutMode: "html", settings: { ...SETTINGS, fontMain: { family: "Klee One", size: null } } });
   await openFonts();
@@ -559,13 +563,20 @@ test("5a C: a heading inside the menu keeps the card until the next option takes
   };
   await openHigh();
   await watchCard();
-  // The last option above the "Rounded print" heading, the heading itself and the first option under it.
-  const at = () => ev(`(() => { const gs = [...document.querySelectorAll("#t3x-font-family optgroup")], i = gs.findIndex((g) => g.label === "Rounded print");
-    const prev = [...gs[i - 1].querySelectorAll("option")].filter((o) => !o.disabled).at(-1), first = gs[i].querySelector("option");
-    first.scrollIntoView({ block: "center" });
-    const g = gs[i].getBoundingClientRect(), f = first.getBoundingClientRect(), p = prev.getBoundingClientRect(), head = { x: f.x + 40, y: (g.top + f.top) / 2 };
+  // The last option above the "Rounded print" heading whose file this harness can serve (list 3's files are not installed),
+  // the heading itself, and the first option under it that can draw a card.
+  const at = () => ev(`(() => { const drawable = new Set(${JSON.stringify(DRAWABLE)});
+    const gs = [...document.querySelectorAll("#t3x-font-family optgroup")], i = gs.findIndex((g) => g.label === "Rounded print");
+    const prevAll = [...gs[i - 1].querySelectorAll("option")].filter((o) => !o.disabled);
+    const prev = [...prevAll].reverse().find((o) => drawable.has(o.value));
+    const opts = [...gs[i].querySelectorAll("option")].filter((o) => !o.disabled);
+    const first = opts[0], withRec = opts.find((o) => drawable.has(o.value)) ?? first;
+    prev.scrollIntoView({ block: "center" });
+    first.scrollIntoView({ block: "nearest" });
+    const g = gs[i].getBoundingClientRect(), f = first.getBoundingClientRect(), p = prev.getBoundingClientRect(), c = withRec.getBoundingClientRect();
+    const head = { x: f.x + 40, y: (g.top + f.top) / 2 }, pt = (r) => ({ x: r.x + 40, y: r.y + r.height / 2 });
     const under = document.elementFromPoint(head.x, head.y);
-    return { prev: prev.value, first: first.value, p: { x: p.x + 40, y: p.y + p.height / 2 }, head, f: { x: f.x + 40, y: f.y + f.height / 2 }, underHead: under?.closest?.("option") ? "option" : under?.tagName ?? null }; })()`);
+    return { prev: prev.value, first: first.value, cardName: withRec.value, p: pt(p), head, f: pt(f), card: pt(c), underHead: under?.closest?.("option") ? "option" : under?.tagName ?? null }; })()`);
   const m = await at();
   assert.notEqual(m.underHead, "option", "the point between them is the heading, not an option");
   assert.ok(m.underHead === "OPTGROUP" || m.underHead === "SELECT", `inside the menu: ${m.underHead}`);
@@ -578,9 +589,14 @@ test("5a C: a heading inside the menu keeps the card until the next option takes
   assert.equal(await ev(`document.elementFromPoint(${edgeX}, ${m.head.y})?.id`), "t3x-font-family", "the menu's edge reports the select");
   await mouse("mouseMoved", edgeX, m.head.y); await sleep(300); await frames();
   assert.equal(await cardName(), m.prev, "on the menu's edge: the card stays");
-  await ev(`__w.over = 0, 1`);
-  await mouse("mouseMoved", m.f.x, m.f.y); await frames();
-  const swap = await ev(`(() => { const s = __w.shown.find((x) => x.name === ${JSON.stringify(m.first)}); return s && __w.over ? s.at - __w.over : null; })()`);
+  // Warm the first rounded font this harness can draw, then measure the swap from the option above the heading.
+  await mouse("mouseMoved", m.card.x, m.card.y);
+  assert.equal(await ev(`(async () => { const name = ${JSON.stringify(m.cardName)}; for (let i = 0; i < 40; i++) { if (document.querySelector(".t3x-fcard-pane .t3x-fcard-name")?.textContent === name) return 1; await new Promise((r) => setTimeout(r, 50)); } return 0; })()`), 1, "a rounded font with a record can show a card");
+  await mouse("mouseMoved", m.p.x, m.p.y); await frames();
+  assert.equal(await cardName(), m.prev, "back on the option above the heading");
+  await ev(`__w.over = 0; __w.shown = __w.shown.filter((s) => s.name !== ${JSON.stringify(m.cardName)}); 1`);
+  await mouse("mouseMoved", m.card.x, m.card.y); await frames();
+  const swap = await ev(`(() => { const s = __w.shown.find((x) => x.name === ${JSON.stringify(m.cardName)}); return s && __w.over ? s.at - __w.over : null; })()`);
   assert.ok(swap !== null && swap < 60, `the next option takes over at once (${swap} ms)`);
   // The closed button reports the select itself as the target, as the menu's padding does: outside the menu.
   const btn = await rect("#t3x-font-family");
@@ -589,10 +605,10 @@ test("5a C: a heading inside the menu keeps the card until the next option takes
   assert.equal(await cardName(), null, "on the closed button, outside the menu: gone");
   assert.equal(await ev(`document.getElementById("t3x-font-family").matches(":open")`), true);
   const m2 = await at();
-  await mouse("mouseMoved", m2.f.x, m2.f.y); await sleep(120);
+  await mouse("mouseMoved", m2.card.x, m2.card.y); await sleep(120);
   assert.equal(await cardName(), null, "back in the menu: 250 ms again");
   await sleep(350);
-  assert.equal(await cardName(), m2.first);
+  assert.equal(await cardName(), m2.cardName);
   // A select mid-window: the menu, taller than the room on either side, covers the closed button. There the
   // menu's edge is still the menu.
   await key("Escape"); await sleep(200);
@@ -648,7 +664,7 @@ test("7A: a font with no record: one muted line in the panel and docked card; ho
   await ev(`document.querySelector('[data-focus="open-fonts"]').click(), 1`); await sleep(500);
   await ev(`[...document.querySelectorAll(".t3x-font-area")].find((e) => e.querySelector(".t3x-font-area-name").textContent === "Replies").click(), 1`); await sleep(600);
   const panel = `document.querySelector(".t3x-fabout:not(.t3x-fabout-docked)")`;
-  assert.deepEqual(await ev(`[${panel}.hidden, ${panel}.textContent, getComputedStyle(${panel}.firstElementChild).color]`), [false, "No details for this font.", "rgb(111, 114, 128)"], "the panel: one muted line");
+  assert.deepEqual(await ev(`[${panel}.hidden, ${panel}.textContent, getComputedStyle(${panel}.firstElementChild).color]`), [false, "No details for this font.Hide this fontHides it from every font list; Show hidden brings it back.", "rgb(111, 114, 128)"], "the panel: one muted line, then Hide");
   await openMenu();
   const o = await optionAt("Dekko");
   await mouse("mouseMoved", o.x, o.y); await sleep(500);
@@ -658,7 +674,7 @@ test("7A: a font with no record: one muted line in the panel and docked card; ho
   assert.deepEqual(await ev(`(() => { const p = document.querySelector(".t3x-font-docksentence"); return [document.querySelector(".t3x-font-workspace").dataset.mode, p.textContent, getComputedStyle(p).color, document.querySelector(".t3x-font-dockdetails").hidden]; })()`), ["dock", "No details for this font.", "rgb(111, 114, 128)", true], "the docked card: one muted line, no About");
   await load({ aboutMode: "fail", settings: dekko });
   await openFonts();
-  assert.equal(await ev(`${panel}.textContent`), "Font details couldn't load.", "a real failure keeps its line");
+  assert.equal(await ev(`${panel}.textContent`), "Font details couldn't load.Hide this fontHides it from every font list; Show hidden brings it back.", "a real failure keeps its line, then Hide");
   assert.deepEqual(await ev("window.__errors"), []);
 });
 
@@ -763,7 +779,8 @@ test("2C: in a short window's swap the \"Hidden by…\" line comes last, only wh
   assert.ok(Object.entries(seen).some(([k, s]) => k.endsWith("hidden") && s.swap && !s.hidden && s.strip && s.traits === s.all && s.tech === "whole" && s.bg), "a swap one line short shows everything but the Hidden line: it is the first line left out");
   // With room: Dekko's taller card swaps the pane for this menu opening, so Kalam then shows in the swap where its own card would fit.
   const roomy = {};
-  for (const height of [565, 570, 575, 580, 585, 590]) {
+  // 565–590: Dekko's card forces the swap and the Hidden line does not fit. 640–652: it fits, last, with the score.
+  for (const height of [565, 570, 575, 580, 585, 590, 640, 646, 652]) {
     await load({ height, records: "shipped", settings: { ...SETTINGS, fontMain: { family: "Kalam", size: null } } });
     await openFonts();
     await openMenu();

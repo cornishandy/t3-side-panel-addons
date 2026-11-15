@@ -41,22 +41,29 @@ const shipped = fs.existsSync(shippedPath) ? JSON.parse(fs.readFileSync(shippedP
 const T = C.FONT_TEXT;
 const fam = (name) => C.normalizeCatalog(fontCatalogProjection(fonts)).find((f) => f.name === name);
 const NEW8 = ["Yomogi", "Iansui", "Yusei Magic", "LXGW Marker Gothic", "Gowun Dodum", "Kiwi Maru", "Zen Maru Gothic", "Tsukimi Rounded"];
+const NEW12 = ["Chiron GoRound TC", "Mochiy Pop One", "Stick", "Darumadrop One", "Short Stack", "Itim", "Mali", "Comic Relief", "Crafty Girls", "Swanky and Moo Moo", "Fuzzy Bubbles", "Delius"];
+const ROUND = ["Gowun Dodum", "Kiwi Maru", "Zen Maru Gothic", "Tsukimi Rounded", "Chiron GoRound TC", "Mochiy Pop One", "Stick", "Darumadrop One"];
 
 // ---------------------------------------------------------------- the eight new fonts and the measurements
 
 test("eight new fonts: four Handwritten, four in Rounded print, all print and new in list 2; the left-out fonts stay out", () => {
-  assert.equal(fonts.listVersion, 2);
+  assert.equal(fonts.listVersion, 3);
   assert.deepEqual(F.filter((f) => f.newIn === 2).map((f) => f.name), NEW8);
   assert.deepEqual(F.filter((f) => f.newIn === 2 && f.group === "hand").map((f) => f.name), ["Yomogi", "Iansui", "Yusei Magic", "LXGW Marker Gothic"]);
-  assert.deepEqual(F.filter((f) => f.group === "round").map((f) => f.name), ["Gowun Dodum", "Kiwi Maru", "Zen Maru Gothic", "Tsukimi Rounded"]);
+  assert.deepEqual(F.filter((f) => f.group === "round").map((f) => f.name), ROUND);
   for (const f of F.filter((x) => x.newIn)) assert.ok(f.style === "print" && !f.hard && !f.star && f.source === "google", f.name);
   assert.equal(F.find((f) => f.name === "Iansui").note, "a darker Klee One");
   for (const out of ["Poor Story", "Single Day", "Cute Font", "Stylish", "Zen Loop", "Hachi Maru Pop", "Huninn", "LXGW WenKai TC", "LXGW WenKai Mono TC"]) assert.ok(!F.some((f) => f.name === out), out);
   assert.match(fonts.styleSource, /newIn 2/);
+  assert.match(fonts.styleSource, /hard re-judged 14 Nov 2026 by the consensus team at true size/);
   const files = new Map(fonts.files.map((x) => [x.file, x]));
-  for (const f of F.filter((x) => x.newIn)) {
+  for (const f of F.filter((x) => x.newIn === 2)) {
     assert.ok(files.get(f.file) && files.get(f.licence), f.name);
     assert.ok(files.get(f.licence).url.includes(`/google/fonts/${fonts.googleFontsCommit}/ofl/`), f.name);
+  }
+  for (const f of F.filter((x) => x.newIn === 3)) {
+    const url = files.get(f.licence).url;
+    assert.ok(url.includes(`/ofl/`) || url.includes(`/apache/`), f.name);
   }
 });
 
@@ -110,9 +117,11 @@ test("deriveTags (pure): clamping, the lower-case ratio, the width against the s
 
 test("the catalog carries listVersion, newIn, notes and the measured fields, never files' URLs", () => {
   const cat = fontCatalogProjection(fonts);
-  assert.equal(cat.listVersion, 2);
+  assert.equal(cat.listVersion, 3);
   assert.equal(cat.xRatioMedian, 70);
-  assert.equal(cat.families.length, 59);
+  assert.equal(cat.uiWidth, fonts.measuredWith.uiWidth);
+  assert.equal(cat.families.length, 71);
+  assert.deepEqual(cat.families.find((f) => f.name === "Gowun Dodum").screen, { score: 97.6, letters: 0.943, reading: 1.01 });
   const ian = cat.families.find((f) => f.name === "Iansui");
   assert.deepEqual([ian.newIn, ian.note, ian.group], [2, "a darker Klee One", "hand"]);
   const zen = cat.families.find((f) => f.name === "Zen Kurenaido");
@@ -123,9 +132,9 @@ test("the catalog carries listVersion, newIn, notes and the measured fields, nev
 test("\"new\" shows only while a defined newIn equals a defined listVersion; an old catalog upgrades to none", () => {
   const cat = fontCatalogProjection(fonts);
   const now = C.normalizeCatalog(cat);
-  assert.equal(now.listVersion, 2);
-  assert.deepEqual(plain(now.filter((f) => f.isNew).map((f) => f.name)), NEW8);
-  const next = C.normalizeCatalog({ ...cat, listVersion: 3 });
+  assert.equal(now.listVersion, 3);
+  assert.deepEqual(plain(now.filter((f) => f.isNew).map((f) => f.name)), NEW12);
+  const next = C.normalizeCatalog({ ...cat, listVersion: 4 });
   assert.deepEqual(plain(next.filter((f) => f.isNew).map((f) => f.name)), [], "the next list change ends \"new\"");
   const old = C.normalizeCatalog({ families: cat.families });
   assert.equal(old.listVersion, null);
@@ -141,8 +150,9 @@ test("menus: Rounded print after Handwritten; new first among the tags; Iansui's
   assert.deepEqual(groups.map((g) => g.label), ["T3 Code settings", "Handwritten", "Rounded print", "Condensed print"]);
   assert.deepEqual(plain(C.FONT_GROUPS).map(([g]) => g), ["t3", "hand", "round", "cond"]);
   const label = (n) => groups.flatMap((g) => g.options).find((o) => o.name === n).label;
-  assert.equal(label("Iansui"), "Iansui · new, a darker Klee One");
-  for (const n of ["Yomogi", "Yusei Magic", "LXGW Marker Gothic", "Gowun Dodum", "Kiwi Maru", "Zen Maru Gothic", "Tsukimi Rounded"]) assert.equal(label(n), `${n} · new`);
+  assert.equal(label("Iansui"), "Iansui · a darker Klee One");
+  for (const n of ["Yomogi", "Yusei Magic", "LXGW Marker Gothic", "Gowun Dodum", "Kiwi Maru", "Zen Maru Gothic", "Tsukimi Rounded"]) assert.equal(label(n), n);
+  for (const n of NEW12) assert.equal(label(n), `${n} · new`);
   assert.equal(label("Klee One"), "Klee One");
   assert.equal(label("T3 interface font"), "T3 interface font · follows T3's interface font", "T3's own notes unchanged");
   assert.ok(groups[2].options.every((o) => cat.find((f) => f.name === o.name).group === "round"));
@@ -207,11 +217,12 @@ for (const [label, records] of recordSets) {
   });
 }
 
-test("every family has a record (the writer's checked file, through tools/fonts.mjs about)", (t) => {
+test("every family has a record", (t) => {
   if (!shipped) return t.todo("font-about.json is not in the repo yet: the writer's checked records arrive later");
   assert.equal(shipped.listVersion, fonts.listVersion);
   const missing = F.filter((f) => !shipped.records[f.name]).map((f) => f.name);
-  assert.deepEqual(missing, []);
+  assert.deepEqual(missing, [], "all 71 families have a record");
+  assert.equal(Object.keys(shipped.records).length, F.length);
   assert.ok(shipped.records.Yomogi.letters, "Yomogi's record");
 });
 
@@ -267,7 +278,7 @@ test("tools/fonts.mjs about: drops sources, keeps the catalog's names and the wa
   const writer = { "Yomogi": { strip: "a g", desc: "d", apart: ["x", "Its long dash runs right up to the next word", "y"], apartWarn: [1], madeShort: "m", background: "b", weight: "w", letters: "English letters. This copy is Latin only; the full font also has Japanese.", copyLatinOnly: true, familyScripts: ["Japanese"], weightLoaded: "Regular", dashNote: "An old dash note.", sources: [{ claim: "c", source: "s" }] },
     "Klee One": { strip: "a", desc: "d", dashNote: "unused", sources: [] }, "Unknown": { desc: "x" } };
   const out = aboutRecords(writer, fonts);
-  assert.equal(out.listVersion, 2);
+  assert.equal(out.listVersion, 3);
   assert.deepEqual(Object.keys(out.records).sort(), ["Klee One", "Yomogi"]);
   assert.equal(out.records.Yomogi.letters, "English letters. This copy is Latin only; the full font also has Japanese.", "no dash note in Letters");
   assert.deepEqual(out.records.Yomogi.apartWarn, [1]);
@@ -294,7 +305,7 @@ test("8D and the flag in the shipped records: Yomogi's dash is trait 2 (on the c
 // ---------------------------------------------------------------- the words: card, panel, special kinds, usage
 
 const zenRec = fixture.records["Zen Kurenaido"], kleeRec = fixture.records["Klee One"];
-const about = (name, rec, ctx = {}) => plain(C.fontAbout(fam(name), rec, { median: fonts.xRatioMedian, usage: [], ...ctx }));
+const about = (name, rec, ctx = {}) => plain(C.fontAbout(fam(name), rec, { median: fonts.xRatioMedian, usage: [], uiWidth: fonts.measuredWith.uiWidth, ...ctx }));
 
 test("the card's lines: Technical numbers are fonts.json's, Background is madeShort, two traits", () => {
   const m = about("Zen Kurenaido", zenRec, { usage: [{ label: "Replies", size: 130 }] });
@@ -306,7 +317,7 @@ test("the card's lines: Technical numbers are fonts.json's, Background is madeSh
   assert.equal(m.usage, "You use it for Replies, at 130%.");
   assert.deepEqual(m.panel.rows, [
     ["Lower case", `${f.xRatio}% of capital height; typical here is about ${fonts.xRatioMedian}%`],
-    ["Width", `A sample sentence at the default size is about ${f.widthVsSystem}% wider than in T3's built-in system font at 100%`],
+    ["Width", plain(C.widthLines(fam("Zen Kurenaido"), { uiWidth: fonts.measuredWith.uiWidth }))],
     ["Weight", zenRec.weight], ["Letters", zenRec.letters],
   ]);
   assert.equal(m.panel.using, `Default size here ${f.size}%, to bring its lower case close to the height of T3's built-in system font at 100%. Print: letters mostly stand apart. You use it for Replies, at 130%.`);
@@ -315,13 +326,13 @@ test("the card's lines: Technical numbers are fonts.json's, Background is madeSh
   assert.match(noLatin.technical, /\. Regular weight\.$/);
 });
 
-test("width row: wider, narrower, about as wide as", () => {
+test("width row: the old one-line helpers stay; the panel stacks the unrounded ratio", () => {
   assert.match(T.widthRow(12), /about 12% wider than in T3's built-in system font at 100%$/);
   assert.match(T.widthRow(-9), /about 9% narrower than in T3's built-in system font at 100%$/);
   assert.equal(T.widthRow(0), "A sample sentence at the default size is about as wide as in T3's built-in system font at 100%");
   const cav = about("Caveat Brush", { ...zenRec });
   assert.equal(F.find((f) => f.name === "Caveat Brush").widthVsSystem, 0);
-  assert.equal(cav.panel.rows[1][1], T.widthSame);
+  assert.deepEqual(cav.panel.rows[1][1].lines, ["1% narrower at its Default 120%", "17% narrower at 100%"]);
 });
 
 test("special kinds: T3's own fonts, missing and present Mac fonts, small capitals, clamped sizes, hidden by the filter", () => {
@@ -337,7 +348,7 @@ test("special kinds: T3's own fonts, missing and present Mac fonts, small capita
   assert.equal(t3("T3 system font").usage, "You use it for Replies.", "T3's own fonts: no size");
   assert.equal(t3("T3 code font", "Menlo").kind, "t3");
   const missing = plain(C.fontAbout(fam("Noteworthy"), null, { median: 70, native: false }));
-  assert.deepEqual(missing, { kind: "missing", name: "Noteworthy", nameCss: null, sentence: "Not on this Mac; text would stay in T3's font." });
+  assert.deepEqual(missing, { kind: "missing", name: "Noteworthy", nameCss: null, sentence: "Not on this Mac; text would stay in T3's font.", userHidden: false });
   const macRec = { ...zenRec, madeShort: "Comes with macOS; the file credits Someone, YEARS(1992, 1993, 2001).", copyLatinOnly: true };
   const mac = about("Bradley Hand", macRec, { native: true });
   assert.match(mac.technical, /\. Bold weight\.$|\. Regular weight\.$/, "a Mac font's Technical line has no Latin-only clause");

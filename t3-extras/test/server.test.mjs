@@ -292,7 +292,7 @@ test("/font-catalog lists the families without URLs or hashes", async () => {
   assert.equal((await get("/font-catalog")).status, 403);
   const r = await get("/font-catalog", { Origin: "t3code://app" });
   const cat = JSON.parse(r.body);
-  assert.equal(cat.families.length, 59);
+  assert.equal(cat.families.length, 71);
   assert.doesNotMatch(r.body, /gstatic|sha256|githubusercontent/);
   assert.ok(cat.families.find((f) => f.name === "Noteworthy").local.length);
 });
@@ -301,8 +301,8 @@ test("/font-about sends the records' public fields at the list's version, never 
   assert.equal((await get("/font-about")).status, 403);
   const r = await get("/font-about", { Origin: "t3code://app" });
   const about = JSON.parse(r.body);
-  assert.equal(about.listVersion, 2);
-  assert.equal(Object.keys(about.records).length, 59);
+  assert.equal(about.listVersion, 3);
+  assert.equal(Object.keys(about.records).length, 71);
   assert.doesNotMatch(r.body, /"sources"|tech-mac\.json|\/Users\//);
   assert.equal(typeof about.records["Klee One"].desc, "string");
   const cat = JSON.parse((await get("/font-catalog", { Origin: "t3code://app" })).body);

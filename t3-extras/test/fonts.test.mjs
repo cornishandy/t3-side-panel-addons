@@ -7,23 +7,25 @@ import { latinWoff2, deriveTags, slug } from "../tools/fonts.mjs";
 const data = JSON.parse(fs.readFileSync(new URL("../fonts.json", import.meta.url), "utf8"));
 const F = data.families;
 
-test("59 families: 54 from Google Fonts, 5 built into macOS, names unique", () => {
-  assert.equal(F.length, 59);
-  assert.equal(F.filter((f) => f.source === "google").length, 54);
+const ROUND = ["Gowun Dodum", "Kiwi Maru", "Zen Maru Gothic", "Tsukimi Rounded", "Chiron GoRound TC", "Mochiy Pop One", "Stick", "Darumadrop One"];
+
+test("71 families: 66 from Google Fonts, 5 built into macOS, names unique", () => {
+  assert.equal(F.length, 71);
+  assert.equal(F.filter((f) => f.source === "google").length, 66);
   assert.deepEqual(F.filter((f) => f.source === "mac").map((f) => f.name), ["Noteworthy", "Marker Felt", "Chalkboard SE", "Bradley Hand", "SignPainter"]);
-  assert.equal(new Set(F.map((f) => f.name)).size, 59);
+  assert.equal(new Set(F.map((f) => f.name)).size, 71);
   assert.equal(F.filter((f) => f.group === "cond").length, 7);
-  assert.deepEqual(F.filter((f) => f.group === "round").map((f) => f.name), ["Gowun Dodum", "Kiwi Maru", "Zen Maru Gothic", "Tsukimi Rounded"]);
+  assert.deepEqual(F.filter((f) => f.group === "round").map((f) => f.name), ROUND);
 });
 
-test("Argon's style verdicts as data: 2 joined, 13 partly joined, the rest print; 8 stars, 8 hard to read", () => {
+test("Argon's style verdicts as data: 2 joined, 13 partly joined, the rest print; 8 stars, 7 hard to read", () => {
   const by = (style) => F.filter((f) => f.style === style).map((f) => f.name).sort();
   assert.deepEqual(by("joined"), ["Over the Rainbow", "SignPainter"]);
   assert.equal(by("partly").length, 13);
   assert.ok(by("partly").includes("Caveat") && by("partly").includes("Bradley Hand") && by("partly").includes("Kalam"));
   assert.equal(F.find((f) => f.name === "Noteworthy").style, "print", "coordinator override");
   assert.equal(F.filter((f) => f.star).length, 8);
-  assert.equal(F.filter((f) => f.hard).length, 8);
+  assert.deepEqual(F.filter((f) => f.hard).map((f) => f.name).sort(), ["Amatic SC", "Give You Glory", "Just Another Hand", "Loved by the King", "Over the Rainbow", "Permanent Marker", "Rock Salt"]);
   assert.ok(F.filter((f) => f.group === "cond").every((f) => f.style === "print"));
 });
 

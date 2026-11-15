@@ -333,14 +333,22 @@ export function fontCatalogProjection(fonts) {
   return {
     listVersion: intOrNull(fonts?.listVersion),
     xRatioMedian: intOrNull(fonts?.xRatioMedian),
-    families: (fonts?.families ?? []).map((f) => ({
+    uiWidth: Number.isFinite(fonts?.measuredWith?.uiWidth) ? fonts.measuredWith.uiWidth : (Number.isFinite(fonts?.uiWidth) ? fonts.uiWidth : null),
+    families: (fonts?.families ?? []).map((f) => {
+      const letters = Number.isFinite(f.screen?.letters) ? f.screen.letters : f.screen?.letter;
+      const reading = Number.isFinite(f.screen?.reading) ? f.screen.reading : f.screen?.familiar;
+      const screen = f.screen && Number.isFinite(f.screen.score) && Number.isFinite(letters) && Number.isFinite(reading)
+        ? { score: f.screen.score, letters, reading } : undefined;
+      return {
       name: f.name, source: f.source, group: f.group, style: f.style, star: Boolean(f.star), hard: Boolean(f.hard),
       file: files.has(f.file) ? f.file : null, local: Array.isArray(f.local) ? f.local : null,
       width: f.width ?? null, tallness: f.tallness ?? null, narrow: Boolean(f.narrow), tall: Boolean(f.tall), size: f.size ?? 100,
       newIn: intOrNull(f.newIn), note: typeof f.note === "string" ? f.note : null,
       xRatio: intOrNull(f.xRatio), widthVsSystem: intOrNull(f.widthVsSystem), sizeClamped: Boolean(f.sizeClamped),
       oneWeight: Boolean(f.oneWeight), smallCaps: Boolean(f.smallCaps),
-    })),
+      ...(screen ? { screen } : {}),
+      };
+    }),
   };
 }
 
@@ -349,6 +357,7 @@ const ABOUT_FIELDS = Object.freeze({
   strip: "text", desc: "text", madeShort: "text", background: "text", weight: "text", letters: "text", weightLoaded: "text",
   apart: "list", familyScripts: "list", copyLatinOnly: "flag",
   apartWarn: "indexes", // which traits (0-based, into apart) warn how the font draws in T3; the short-window pane swap keeps them
+  story: "story", storySources: "sources",
 });
 const aboutText = (v) => typeof v === "string" && v.length > 0 && v.length <= 600;
 /** The "About this font" records the service sends: only families in the catalog (exact name), only the public
@@ -367,6 +376,14 @@ export function fontAboutProjection(about, fonts) {
       else if (kind === "list" && Array.isArray(v)) out[k] = v.filter(aboutText).slice(0, 8);
       else if (kind === "flag") out[k] = v === true;
       else if (kind === "indexes" && Array.isArray(v)) out[k] = [...new Set(v.filter((i) => Number.isInteger(i) && i >= 0 && i < 8))];
+      else if (kind === "story" && Array.isArray(v)) {
+        const rows = v.filter((row) => row && aboutText(row.row) && aboutText(row.text)).slice(0, 8).map((row) => ({ row: row.row, text: row.text }));
+        if (rows.length) out[k] = rows;
+      } else if (kind === "sources" && v && aboutText(v.text)) {
+        const links = (Array.isArray(v.links) ? v.links : []).filter((l) => l && aboutText(l.text) && typeof l.url === "string" && l.url.startsWith("https://") && l.url.length < 500).slice(0, 8)
+          .map((l) => ({ text: l.text, url: l.url }));
+        out[k] = { text: v.text, links };
+      }
     }
     // Warning indexes name the record's own traits: follow them past the list filter above (Sol, 14 Nov 2026).
     if (out.apartWarn && Array.isArray(r.apart)) {

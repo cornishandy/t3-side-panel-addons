@@ -1,6 +1,6 @@
 {
  "note": "The \"About this font\" records (tools/fonts.mjs about, from the writer's checked file; sources stay build-side). Shown as plain text.",
- "listVersion": 2,
+ "listVersion": 3,
  "records": {
   "Amatic SC": {
    "strip": "a g y R Q &",
@@ -19,7 +19,46 @@
     "Cyrillic",
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "Ben Nathan widened the letter-spacing to fit the Hebrew, and the calligrapher Eugene Spizhovy drew the Cyrillic letters."
+    },
+    {
+     "row": "Where it's used",
+     "text": "Vandal wines, chosen as a simple but noticeable hand-drawn typeface that was easy to use for small runs of text."
+    },
+    {
+     "row": "Made for",
+     "text": "Free use across the internet, in web browsers on desktop computers, laptops and mobile devices."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the font's GitHub page, Fonts In Use, Sessions College's Free Font Friday and an LWN article. Not found in them: what it's based on, its design ideas.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/amaticsc/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/googlefonts/AmaticSC/blob/main/README.md"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/uses/45415/vandal-wines"
+     },
+     {
+      "text": "Sessions College's Free Font Friday",
+      "url": "https://sessions.edu/notes-on-design/free-font-friday-amatic-sc"
+     },
+     {
+      "text": "an LWN article",
+      "url": "https://lwn.net/Articles/697980/"
+     }
+    ]
+   }
   },
   "Just Another Hand": {
    "strip": "a g y I fi &",
@@ -35,7 +74,22 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "The designer describes it as a little personality and a little restraint, in a style that works for all sorts of projects."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description. Not found in them: why it was made, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/apache/justanotherhand/DESCRIPTION.en_us.html"
+     }
+    ]
+   }
   },
   "Sue Ellen Francisco": {
    "strip": "a g y k l I",
@@ -50,7 +104,38 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Geswein's page calls it a slightly messy sans with faint imperfections and a natural look. She calls it one of her earlier, imperfect fonts, but still enjoys its tall, slender lines."
+    },
+    {
+     "row": "Where it's used",
+     "text": "PicMonkey's blog names it among Geswein's fonts that are stand-out favourites of PicMonkey users."
+    },
+    {
+     "row": "Made for",
+     "text": "Giving a project a bit of character without being distracting, Geswein's page says."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, PicMonkey's blog and the designer's site. Not found in them: why it was made.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/sueellenfrancisco/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "PicMonkey's blog",
+      "url": "https://mobile-assets.fastly.picmonkey.com/blog/raising-characters-a-typographer-plies-her-trade-at-home"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/downloads/kg-sue-ellen-francisco/"
+     }
+    ]
+   }
   },
   "Covered By Your Grace": {
    "strip": "a g y l I &",
@@ -65,7 +150,30 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Geswein's page calls it sleek and carefully drawn, both unique and uniform."
+    },
+    {
+     "row": "Made for",
+     "text": "Geswein suggests pairing it with a thin sans for documents and presentations, or using it on products that need a polished, slightly feminine feel."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the designer's site. Not found in them: why it was made, how it was made, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/coveredbyyourgrace/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/?p=1720"
+     }
+    ]
+   }
   },
   "Nanum Pen Script": {
    "strip": "a g y J &",
@@ -82,7 +190,38 @@
    "familyScripts": [
     "Korean"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "It came with version 3.0 of the Nanum fonts, which added two kinds of handwriting, brush and pen. Fonts In Use credits Doo-Yul Kwak, Hyunghwan Choi and Nicolas Noh."
+    },
+    {
+     "row": "Where it's used",
+     "text": "The Nanum fonts are Ubuntu Linux's default Korean font, since version 12.04."
+    },
+    {
+     "row": "Made for",
+     "text": "Screen use: Google says it is expertly hinted for it."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, Fonts In Use and Wikipedia's Nanum fonts article. Not found in them: what it's based on, its design ideas.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/nanumpenscript/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/typefaces/48001/nanum-pen-script"
+     },
+     {
+      "text": "Wikipedia's Nanum fonts article",
+      "url": "https://en.wikipedia.org/wiki/Nanum_fonts"
+     }
+    ]
+   }
   },
   "Reenie Beanie": {
    "strip": "a g k t &",
@@ -97,7 +236,30 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Where it's used",
+     "text": "The handwritten asides on Atelier WOO's website, next to hand-drawn emblems and illustrations."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, Fonts In Use and P22's designer page. Not found in them: why it was made, how it was made, its design ideas.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/reeniebeanie/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/uses/80858/atelier-woo-website"
+     },
+     {
+      "text": "P22's designer page",
+      "url": "https://www.p22.com/ihof/grieshaber.html"
+     }
+    ]
+   }
   },
   "Shadows Into Light": {
    "strip": "a g y l I &",
@@ -113,7 +275,34 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Google's description says it has a feminine feel."
+    },
+    {
+     "row": "Where it's used",
+     "text": "Typewolf lists Justin Jackson (October 2018), alongside Roboto Mono."
+    },
+    {
+     "row": "Made for",
+     "text": "Adding a personalised touch to a project, Google says."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and Typewolf. Not found in them: why it was made, how it was made, what it's based on.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/shadowsintolight/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Typewolf",
+      "url": "https://www.typewolf.com/shadows-into-light"
+     }
+    ]
+   }
   },
   "Shadows Into Light Two": {
    "strip": "a g y l I &",
@@ -128,7 +317,38 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Google's description says it has a feminine feel. Typewolf calls it neater and less scraggly than the original."
+    },
+    {
+     "row": "Where it's used",
+     "text": "PicMonkey's blog names it among Geswein's fonts that are stand-out favourites of PicMonkey users."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, Typewolf, PicMonkey's blog and the designer's site. Not found in them: why it was made, how it was made, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/shadowsintolighttwo/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Typewolf",
+      "url": "https://www.typewolf.com/shadows-into-light"
+     },
+     {
+      "text": "PicMonkey's blog",
+      "url": "https://mobile-assets.fastly.picmonkey.com/blog/raising-characters-a-typographer-plies-her-trade-at-home"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/?p=4197"
+     }
+    ]
+   }
   },
   "Loved by the King": {
    "strip": "a g y l I &",
@@ -143,7 +363,26 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Geswein's page says its irregular stroke weight makes text look written passionately and quickly, with an authentic handwritten feeling."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the designer's site. Not found in them: why it was made, how it was made, what it's based on, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/lovedbytheking/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/downloads/kg-loved-by-the-king/"
+     }
+    ]
+   }
   },
   "Annie Use Your Telescope": {
    "strip": "a g y l I z &",
@@ -159,7 +398,30 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "Kimberly Geswein saw the student writing, begged her for a sample, and felt her style would make a cute font."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Geswein's page says it has the detail of letters written with an ink pen or marker, in a clean, easy-to-read style."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the designer's site. Not found in them: how it was made, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/annieuseyourtelescope/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/?p=988"
+     }
+    ]
+   }
   },
   "Just Me Again Down Here": {
    "strip": "a g y r W &",
@@ -174,7 +436,30 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "After moving to China without the local language, Geswein found that making a font reminded her she did know how to do something."
+    },
+    {
+     "row": "Made for",
+     "text": "Geswein's page says it looks like cute sticky notes or shopping lists, and suggests it for letters, kids' clothes and decor."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the designer's site. Not found in them: its design ideas, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/justmeagaindownhere/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/downloads/kg-just-me-again-down-here/"
+     }
+    ]
+   }
   },
   "The Girl Next Door": {
    "strip": "a g y f z &",
@@ -189,7 +474,30 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Geswein calls the handwriting comfortable and welcoming. Her page describes cursive-like fluidity, a medium stroke weight and lots of minute details."
+    },
+    {
+     "row": "Made for",
+     "text": "Single lines of text and headlines, which Geswein's page says its several low-hanging descenders suit."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the designer's site. Not found in them: why it was made, how it was made, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/thegirlnextdoor/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/downloads/kg-the-girl-next-door/"
+     }
+    ]
+   }
   },
   "Waiting for the Sunrise": {
    "strip": "a g y k &",
@@ -205,7 +513,38 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "Geswein made it during a time of darkness in her life; it reminds her of the joy that comes after mourning. The name speaks to her of hope that good things are ahead while still waiting in a darker place."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Geswein's page calls it a light sans that gives off an optimistic feeling."
+    },
+    {
+     "row": "Where it's used",
+     "text": "The Efteling website."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the designer's site and Fonts In Use. Not found in them: how it was made, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/waitingforthesunrise/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/downloads/kg-waiting-for-the-sunrise/"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/uses/6188/efteling-website"
+     }
+    ]
+   }
   },
   "Sedgwick Ave": {
    "strip": "a g y k fi &",
@@ -223,7 +562,34 @@
    "familyScripts": [
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "To celebrate the letterforms of hip hop culture."
+    },
+    {
+     "row": "Based on",
+     "text": "Its name comes from Sedgwick Ave in the South Bronx of New York City, the birthplace of hip hop."
+    },
+    {
+     "row": "Where it's used",
+     "text": "The Google Doodle celebrating the 44th anniversary of the birth of hip hop, which it was designed for."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the font's GitHub page. Not found in them: how it was made, its design ideas.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/sedgwickave/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/googlefonts/sedgwickave"
+     }
+    ]
+   }
   },
   "Neucha": {
    "strip": "a g y l I &",
@@ -240,7 +606,34 @@
    "familyScripts": [
     "Cyrillic"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "The designer says he was in love."
+    },
+    {
+     "row": "How it was made",
+     "text": "In the redo, some letters changed greatly, but most were only polished."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, Fontsource and Luc Devroye's type pages. Not found in them: what it's based on, its design ideas, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/neucha/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Fontsource",
+      "url": "https://fontsource.org/fonts/neucha/about"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-49883.html"
+     }
+    ]
+   }
   },
   "Dekko": {
    "strip": "a g y l I &",
@@ -257,7 +650,26 @@
    "familyScripts": [
     "Devanagari"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "The Devanagari from 4948 was changed to feel more written and more regular in appearance and weight. A May 2015 update improved its OpenType shaping and vertical metrics."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Both the Devanagari and the Latin are based on written forms, with thick horizontal strokes."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description. Not found in them: why it was made, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/dekko/DESCRIPTION.en_us.html"
+     }
+    ]
+   }
   },
   "Kalam": {
    "strip": "a g y k fi &",
@@ -275,7 +687,30 @@
    "familyScripts": [
     "Devanagari"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "Updated in July 2015 to version 2.001, with improved OpenType features."
+    },
+    {
+     "row": "Design ideas",
+     "text": "In the Devanagari, knotted ends are left open while some other enclosed shapes are closed, which the foundry says makes text look written very quickly."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the font's GitHub page. Not found in them: why it was made, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/kalam/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/itfoundry/kalam/blob/master/README.md"
+     }
+    ]
+   }
   },
   "Gaegu": {
    "strip": "a g y I &",
@@ -292,7 +727,26 @@
    "familyScripts": [
     "Korean"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "A Sessions College article says its letters lean forward and back, and their place on the baseline varies from letter to letter. It says each of the three weights feels like a different writing tool, from a fineliner at the lightest to a Sharpie at the heaviest."
+    }
+   ],
+   "storySources": {
+    "text": "From Luc Devroye's type pages and Sessions College's Free Font Friday. Not found in them: why it was made, how it was made, what it's based on, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-94227.html"
+     },
+     {
+      "text": "Sessions College's Free Font Friday",
+      "url": "https://www.sessions.edu/notes-on-design/free-font-friday-gaegu/"
+     }
+    ]
+   }
   },
   "Gamja Flower": {
    "strip": "a g y ? ! &",
@@ -310,7 +764,26 @@
    "familyScripts": [
     "Korean"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Gamja means potato, and the font takes the handwriting style and feminine shape of the potato flower. The designers say yellow potato flowers add soft beauty and are likely to bring good luck."
+    }
+   ],
+   "storySources": {
+    "text": "From the font's GitHub page and Sandoll Cloud. Not found in them: how it was made, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/yoondesign/yoonfont-Gamjaflower/blob/master/README.md"
+     },
+     {
+      "text": "Sandoll Cloud",
+      "url": "https://www.sandollcloud.com/free-font/18110/Gamja-Flower"
+     }
+    ]
+   }
   },
   "Hi Melody": {
    "strip": "a g y i ! ?",
@@ -327,7 +800,26 @@
    "familyScripts": [
     "Korean"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "YoonDesign says it resembles a delightful girl saying hi, with small consonants and soft, charming handwriting."
+    }
+   ],
+   "storySources": {
+    "text": "From the font's GitHub page and Sandoll Cloud. Not found in them: why it was made, how it was made, what it's based on, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/yoondesign/Yoonfont-HiMelody/blob/master/README.md"
+     },
+     {
+      "text": "Sandoll Cloud",
+      "url": "https://www.sandollcloud.com/free-font/18111/Hi-Melody"
+     }
+    ]
+   }
   },
   "Caveat": {
    "strip": "a g y I fi &",
@@ -345,7 +837,38 @@
    "familyScripts": [
     "Cyrillic"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "The Cyrillic letters were made from calligraphic sketches by Eugene Spizhovy."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Google says OpenType features vary each letter slightly by its place in a word, for a natural handwritten feel."
+    },
+    {
+     "row": "Where it's used",
+     "text": "LÔCÔ Art Market (summer 2026), for selected headlines and moments of emphasis, suggesting a note left on a package."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the font's GitHub page and Fonts In Use. Not found in them: what it's based on.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/caveat/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://raw.githubusercontent.com/googlefonts/caveat/main/README.md"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/uses/80117/loco-art-market-summer-2026"
+     }
+    ]
+   }
   },
   "Caveat Brush": {
    "strip": "a g y ft fi &",
@@ -361,7 +884,30 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Google says OpenType features vary each letter slightly by its place in a word, for a natural handwritten feel."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, Google Fonts' description of Caveat and Caveat's GitHub page. Not found in them: why it was made, how it was made, what it's based on, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/caveatbrush/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Google Fonts' description of Caveat",
+      "url": "https://github.com/google/fonts/blob/main/ofl/caveat/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Caveat's GitHub page",
+      "url": "https://github.com/googlefonts/caveat"
+     }
+    ]
+   }
   },
   "Patrick Hand": {
    "strip": "a g y l I fi",
@@ -378,7 +924,34 @@
    "familyScripts": [
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "A January 2013 update added support for more European languages and Vietnamese. No source files were ever published: the fonts Google Fonts ships were its only form."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Google says it was developed to bring an impressive and useful handwriting effect to texts."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, Luc Devroye's type pages and the font's GitHub page. Not found in them: why it was made, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/patrickhand/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-55829.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/googlefonts/patrickhand"
+     }
+    ]
+   }
   },
   "Patrick Hand SC": {
    "strip": "a g y R fi &",
@@ -396,7 +969,26 @@
    "familyScripts": [
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "A March 2019 update brought it to the latest upstream release and fixed its fi ligature."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and Luc Devroye's type pages. Not found in them: why it was made, its design ideas, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/patrickhandsc/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-55829.html"
+     }
+    ]
+   }
   },
   "Handlee": {
    "strip": "a g y W &",
@@ -411,7 +1003,30 @@
    "letters": "Basic English letters, curly quotes, dashes and accents such as é, ñ and ü; ð, ý and þ are missing, with their capitals.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Google says unnecessary overlap between letters was removed, so it stays legible when scaled down to very small sizes."
+    },
+    {
+     "row": "Made for",
+     "text": "Google calls it a great font for any web page looking to add some personality and charisma."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and Luc Devroye's type pages. Not found in them: why it was made, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/handlee/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-57393.html"
+     }
+    ]
+   }
   },
   "Indie Flower": {
    "strip": "a g y w W &",
@@ -428,7 +1043,30 @@
    "familyScripts": [
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Geswein's page says subtle weight differences make it look written with a pen or marker, and its arching lines meet an irregular outline. She calls it a bit bolder than some of her other fonts."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the designer's site and PicMonkey's blog. Not found in them: why it was made, how it was made, what it's based on, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/indieflower/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/?p=2531"
+     },
+     {
+      "text": "PicMonkey's blog",
+      "url": "https://mobile-assets.fastly.picmonkey.com/blog/raising-characters-a-typographer-plies-her-trade-at-home"
+     }
+    ]
+   }
   },
   "Architects Daughter": {
    "strip": "a g y k x &",
@@ -443,7 +1081,26 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Geswein's page says small imperfections give it the real look of writing with a Sharpie, while it still reads as a clean, easy-to-read sans."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the designer's site. Not found in them: why it was made, how it was made, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/architectsdaughter/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/?p=1051"
+     }
+    ]
+   }
   },
   "Gloria Hallelujah": {
    "strip": "a g y I r &",
@@ -458,7 +1115,30 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Geswein says it looks great in all capitals and is easy to read. Her page describes it as medium weight and slightly left-slanting, with rounded corners and a little variance in stroke thickness."
+    },
+    {
+     "row": "Made for",
+     "text": "Headlines: Geswein's page says its playful attitude helps keep any headline from looking too stiff or formal."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the designer's site. Not found in them: why it was made, how it was made, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/gloriahallelujah/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/?p=2251"
+     }
+    ]
+   }
   },
   "Coming Soon": {
    "strip": "a g y l I &",
@@ -473,7 +1153,21 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [],
+   "storySources": {
+    "text": "From Google Fonts' description and Luc Devroye's type pages. Not found in them: why it was made, how it was made, its design ideas, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/apache/comingsoon/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-54621.html"
+     }
+    ]
+   }
   },
   "Schoolbell": {
    "strip": "a g y I t &",
@@ -488,7 +1182,38 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "Fonts In Use says Stuart Sandler designed it together with his ten-year-old son, Jackson."
+    },
+    {
+     "row": "Where it's used",
+     "text": "The website of Anure, with Schoolbell for headlines and Roboto Mono for text."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, Fonts In Use, Luc Devroye's type pages and Adobe Fonts' foundry page. Not found in them: why it was made, what it's based on, its design ideas, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/apache/schoolbell/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/uses/46613/anure-website-and-logo"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-62522.html"
+     },
+     {
+      "text": "Adobe Fonts' foundry page",
+      "url": "https://fonts.adobe.com/foundries/font-diner"
+     }
+    ]
+   }
   },
   "Mynerve": {
    "strip": "a g k th st &",
@@ -507,7 +1232,25 @@
     "Greek",
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [],
+   "storySources": {
+    "text": "From Google Fonts' description, the font's GitHub page and Luc Devroye's type pages. Not found in them: why it was made, what it's based on, its design ideas, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/mynerve/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/carolinashort/MyNerve"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-101604.html"
+     }
+    ]
+   }
   },
   "Playpen Sans": {
    "strip": "a g y l I &",
@@ -527,7 +1270,46 @@
     "Cyrillic",
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "TypeTogether says casual fonts often look lacking or overly childish and fail to look like genuine handwriting, and saw a chance to solve a real problem. It notes that Chalkboard and Comic Sans were developed before OpenType features existed."
+    },
+    {
+     "row": "How it was made",
+     "text": "Laura Meseguer wrote over a font skeleton with a tablet and digital pen, and the type engineer Joancarles Casasín built a glyph shuffler so that variants change with context and no shape repeats twice in a row."
+    },
+    {
+     "row": "Based on",
+     "text": "TypeTogether's educational Playwrite fonts, which share its structure: it keeps the shapes of their precursive style as a simplified print style, with exit strokes on only a few letters."
+    },
+    {
+     "row": "Design ideas",
+     "text": "TypeTogether aimed for a natural feel that noticeably reduces the strict, systematised look of typography, avoiding excessive optical corrections and keeping looser word spacing, as in handwriting."
+    },
+    {
+     "row": "Made for",
+     "text": "Non-designers and short, informal settings: greeting cards, invitations, casual signs and documents, children's books and educational materials, comics, graphic novels, apps and websites. Its emojis are meant to help parents and primary school teachers encourage young children."
+    }
+   ],
+   "storySources": {
+    "text": "From TypeTogether's making-of article, the font's GitHub page and TypeTogether's page on it. Not found in them: where it's used.",
+    "links": [
+     {
+      "text": "TypeTogether's making-of article",
+      "url": "https://www.type-together.com/making-playpen-sans"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/TypeTogether/Playpen-Sans"
+     },
+     {
+      "text": "TypeTogether's page on it",
+      "url": "https://www.type-together.com/playpen-sans"
+     }
+    ]
+   }
   },
   "Shantell Sans": {
    "strip": "a g y l I &",
@@ -545,7 +1327,46 @@
     "Cyrillic",
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "Shantell Martin wanted to empower people to read and write, whatever their relationship to words. She is dyslexic, and since childhood had liked how playful and easy to read Comic Sans was."
+    },
+    {
+     "row": "How it was made",
+     "text": "Martin wrote pangrams with a favourite felt-tip marker, a Staedtler Lumocolor M, and scanned them; the letters were traced from a centred line through the pen strokes, then expanded into Light and ExtraBold strokes."
+    },
+    {
+     "row": "Based on",
+     "text": "Martin's artwork, handwriting and creative philosophy; she said she wanted to make “a new Comic Sans”."
+    },
+    {
+     "row": "Design ideas",
+     "text": "The a and g use the single-storey forms kids learn in school, to keep it friendly and familiar, and its metrics are set close to common fonts such as Roboto."
+    },
+    {
+     "row": "Where it's used",
+     "text": "Key tags for the Whitney Museum shop in New York City; the back of Cash App's Cash Card; tldraw, a collaborative drawing app, as its main writing font; and a univer.se web-building template."
+    },
+    {
+     "row": "Made for",
+     "text": "Creative expression, typographic play and animation."
+    }
+   ],
+   "storySources": {
+    "text": "From the font's process page and the font's GitHub page.",
+    "links": [
+     {
+      "text": "the font's process page",
+      "url": "https://shantellsans.com/process"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/arrowtype/shantell-sans"
+     }
+    ]
+   }
   },
   "Klee One": {
    "strip": "a g y fi ffl &",
@@ -565,7 +1386,34 @@
     "extended Greek",
     "Cyrillic"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Google says its design sets it apart from traditional script and textbook fonts."
+    },
+    {
+     "row": "Where it's used",
+     "text": "Klee was originally built into macOS, where Iansui's GitHub page says Chinese-language users liked it for its kaishu brush feel, neat shapes, high legibility and warm look. Fonts In Use shows Klee One on the Japanese lyrics of Nanatsukaze's “Replay” lyrics video."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, Fonts In Use and Iansui's GitHub page. Not found in them: why it was made, what it's based on.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/kleeone/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/uses/75823/nanatsukaze-replay-lyrics-video"
+     },
+     {
+      "text": "Iansui's GitHub page",
+      "url": "https://github.com/ButTaiwan/iansui"
+     }
+    ]
+   }
   },
   "Zen Kurenaido": {
    "strip": "a g y l I &",
@@ -584,7 +1432,34 @@
     "Greek",
     "Cyrillic"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Yoshimichi Ohira says that when he designs, he maximises readability using the spacing between characters and lines, the length of rows, indents and the whole page layout."
+    },
+    {
+     "row": "Where it's used",
+     "text": "Fonts In Use records one use: the Emry Merlin series by Robyn Schneider (2023)."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the font's GitHub page and Fonts In Use. Not found in them: why it was made, how it was made, what it's based on, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/zenkurenaido/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/googlefonts/zen-kurenaido"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/typefaces/218276/zen-kurenaido"
+     }
+    ]
+   }
   },
   "Permanent Marker": {
    "strip": "a g R Q ! &",
@@ -600,7 +1475,26 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Where it's used",
+     "text": "The “Makers Assemble” tagline of Mendix World 2021, in outline, and Mayday PAC's social media graphics."
+    }
+   ],
+   "storySources": {
+    "text": "From Fonts In Use and Luc Devroye's type pages. Not found in them: why it was made, how it was made, what it's based on, its design ideas, what it was made for.",
+    "links": [
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/typefaces/8221/permanent-marker"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-28587.html"
+     }
+    ]
+   }
   },
   "Rock Salt": {
    "strip": "a g R K Q &",
@@ -615,7 +1509,17 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [],
+   "storySources": {
+    "text": "From Luc Devroye's type pages. Not found in them: why it was made, how it was made, what it's based on, its design ideas, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-48866.html"
+     }
+    ]
+   }
   },
   "Over the Rainbow": {
    "strip": "a g x y I &",
@@ -630,7 +1534,30 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Google's description says it is slightly connected but not a true script. Geswein's page says it mixes print and cursive, and its slightly irregular outline gives it a marker or fountain-pen feeling."
+    },
+    {
+     "row": "Made for",
+     "text": "Headlines and single lines of text, which Geswein's page says suit its medium thickness."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the designer's site. Not found in them: how it was made, what it's based on, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/overtherainbow/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/downloads/kg-over-the-rainbow/"
+     }
+    ]
+   }
   },
   "Give You Glory": {
    "strip": "a g r k n &",
@@ -645,7 +1572,30 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Geswein's page says its quick, flowing strokes look almost like cursive, and natural changes in weight give it a hand-drawn look."
+    },
+    {
+     "row": "Made for",
+     "text": "Letters, cards or any project that needs a heartfelt, homemade touch, Geswein's page says."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the designer's site. Not found in them: why it was made, how it was made, what it's based on, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/giveyouglory/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/?p=2241"
+     }
+    ]
+   }
   },
   "Yanone Kaffeesatz": {
    "strip": "a g k fi &",
@@ -664,7 +1614,42 @@
     "Cyrillic",
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "Lacking self-confidence and knowledge of the type scene, Yanone decided to publish the family for free under a Creative Commons licence."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Google says its rather thin weights bridge the gap to the present."
+    },
+    {
+     "row": "Where it's used",
+     "text": "Google's description lists German fresh-water gyms, Dubai mall promotions, New Zealand McDonald's ads, and coffee and food packaging and café design around the globe. Fonts In Use shows it on the website of Beans Kaffeespezialitäten."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the font's GitHub page, Fontwerk's designer page and Fonts In Use. Not found in them: how it was made, what it's based on, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/yanonekaffeesatz/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/yanone/kaffeesatz"
+     },
+     {
+      "text": "Fontwerk's designer page",
+      "url": "https://fontwerk.com/designers/yanone"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/uses/6984/beans-kaffeespezialitaeten"
+     }
+    ]
+   }
   },
   "Oswald": {
    "strip": "a g R Q fi &",
@@ -682,7 +1667,30 @@
     "Cyrillic",
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Where it's used",
+     "text": "The QuikTrip website, where it is the main text typeface."
+    },
+    {
+     "row": "Made for",
+     "text": "Free use across the internet, in web browsers on desktop computers, laptops and mobile devices."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and Fonts In Use. Not found in them: why it was made.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/oswald/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/uses/22506/quiktrip"
+     }
+    ]
+   }
   },
   "Pathway Gothic One": {
    "strip": "a g R Q fi &",
@@ -697,7 +1705,21 @@
    "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
    "copyLatinOnly": true,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [],
+   "storySources": {
+    "text": "From Google Fonts' description and the font's GitHub page. Not found in them: why it was made, its design ideas, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/pathwaygothicone/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/etunni/pathway-gothic/blob/master/README.md"
+     }
+    ]
+   }
   },
   "Sofia Sans Extra Condensed": {
    "strip": "a g R Q fi &",
@@ -716,7 +1738,46 @@
     "Greek",
     "Cyrillic"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "In late 2017 the studio Fullmasters was hired to develop a wayfinding system to help visitors find Sofia's tourist sights and attractions."
+    },
+    {
+     "row": "How it was made",
+     "text": "Condensed widths were needed for the different sizes of the two totems and the signboards; the plan grew into a type system with extended language support."
+    },
+    {
+     "row": "Based on",
+     "text": "Lettersoup's typeface Attractive, expanded because a modest budget and short deadline ruled out a new family from scratch. The design draws on early-20th-century technical sans serifs, with confident letterforms, a pronounced vertical impetus and tense curves."
+    },
+    {
+     "row": "Design ideas",
+     "text": "The team settled on a straight-sided sans, with narrow proportions and a generous x-height, as a space-saving workhorse for very diverse environments."
+    },
+    {
+     "row": "Where it's used",
+     "text": "The Chief Architect of Sofia Municipality envisioned it as the de facto official typeface of the Bulgarian capital, and Vision for Sofia uses it as its corporate typeface."
+    },
+    {
+     "row": "Made for",
+     "text": "Lettersoup aimed to create a universally useful font family."
+    }
+   ],
+   "storySources": {
+    "text": "From the font's GitHub page and Lettersoup's site.",
+    "links": [
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/lettersoup/Sofia-Sans/blob/master/README.md"
+     },
+     {
+      "text": "Lettersoup's site",
+      "url": "https://www.lettersoup.de/author/botio/"
+     }
+    ]
+   }
   },
   "Barlow Condensed": {
    "strip": "a g R Q fi &",
@@ -737,7 +1798,46 @@
    "familyScripts": [
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "Jeremy Tribby and EFF's art director, Hugh D'Andrade, liked fonts drawn from the DIN Engschrift grid and agreed there was no good open-source option."
+    },
+    {
+     "row": "How it was made",
+     "text": "Tribby began by sketching and working with hand tools, and formed his ideas for Barlow with the new variable-font technology in mind."
+    },
+    {
+     "row": "Based on",
+     "text": "Tribby says Clearview, Highway Gothic and DIN show in its weights and widths, and the round Basel-school lettering of BART's train signs especially in the heavier weights."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Google calls Barlow a grotesk type family."
+    },
+    {
+     "row": "Made for",
+     "text": "Large and small digital and print use."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the font's GitHub page and the designer's Barlow page. Not found in them: where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/barlowcondensed/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/jpt/barlow/blob/master/README.md"
+     },
+     {
+      "text": "the designer's Barlow page",
+      "url": "https://tribby.pages.dev/fonts/barlow"
+     }
+    ]
+   }
   },
   "Roboto Condensed": {
    "strip": "a g R Q fi &",
@@ -756,7 +1856,34 @@
     "Cyrillic",
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "Wikipedia says a more modern typeface, designed from scratch, was needed for newer displays."
+    },
+    {
+     "row": "How it was made",
+     "text": "Roboto was designed entirely in-house."
+    },
+    {
+     "row": "Where it's used",
+     "text": "Roboto has been used on Google Play, YouTube, Google Maps and Google Images since 2013, and is the default system font on Android."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and Wikipedia's Roboto article. Not found in them: what it's based on, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/robotocondensed/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Wikipedia's Roboto article",
+      "url": "https://en.wikipedia.org/wiki/Roboto"
+     }
+    ]
+   }
   },
   "Fira Sans Condensed": {
    "strip": "a g l I fi &",
@@ -775,7 +1902,50 @@
     "Cyrillic",
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "Telefónica and Mozilla commissioned Fira as part of their joint work on Firefox OS."
+    },
+    {
+     "row": "How it was made",
+     "text": "Mozilla added the condensed style in 2015."
+    },
+    {
+     "row": "Based on",
+     "text": "A slightly wider, calmer adaptation of Spiekermann's Meta, Mozilla's brand typeface at the time. Web Designer Depot says Meta's decorative flair is toned down a great deal, but the basic letter forms are highly similar."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Google says Fira aims to cover the legibility needs of a wide range of handsets, varying in screen quality and rendering."
+    },
+    {
+     "row": "Where it's used",
+     "text": "Fira Sans is Here Technologies' corporate typeface; it also sets the menus and dialogue of the video game Cult of the Lamb, and the body text of the Polish Film Institute's Berlinale 2020 materials."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, Wikipedia's Fira article, Fonts In Use and Webdesigner Depot. Not found in them: what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/firasanscondensed/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Wikipedia's Fira article",
+      "url": "https://en.wikipedia.org/wiki/Fira_(typeface)"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/uses/77885/cult-of-the-lamb-video-game"
+     },
+     {
+      "text": "Webdesigner Depot",
+      "url": "https://www.webdesignerdepot.com/2014/01/firefox-makes-fira-sans-available-for-free/"
+     }
+    ]
+   }
   },
   "Yomogi": {
    "strip": "a g i m W &",
@@ -798,7 +1968,26 @@
     "Cyrillic",
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Google says it makes a strong impression; its GitHub page calls it strong in personality, yet highly readable."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the font's GitHub page. Not found in them: why it was made, how it was made, what it's based on, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/yomogi/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/satsuyako/YomogiFont"
+     }
+    ]
+   }
   },
   "Iansui": {
    "strip": "a g y I fi &",
@@ -816,7 +2005,34 @@
    "familyScripts": [
     "Traditional Chinese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "Fontworks suddenly released Klee One under an open licence in late 2020, which surprised the type world."
+    },
+    {
+     "row": "How it was made",
+     "text": "The Regular was judged too thin and less likely to be wanted. About 3,000 characters were kept as they were, over 4,000 were changed and over 2,000 added."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Strokes that are broken in printed forms are joined into single strokes, and the 7 and the capital I were redrawn to look closer to the way Taiwanese textbooks write them."
+    },
+    {
+     "row": "Made for",
+     "text": "School-age education, such as children's books and character exercise books; it adds characters used in Taiwanese and Hakka."
+    }
+   ],
+   "storySources": {
+    "text": "From the font's GitHub page. Not found in them: where it's used.",
+    "links": [
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/ButTaiwan/iansui"
+     }
+    ]
+   }
   },
   "Yusei Magic": {
    "strip": "a g e s &",
@@ -834,7 +2050,46 @@
    "familyScripts": [
     "Japanese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "Its GitHub page thanks Google Fonts for great support in making the font."
+    },
+    {
+     "row": "Based on",
+     "text": "Tanuki Oil-based Marker (2010), a handwriting-style font that reproduced letters written with a felt-tip pen; Yusei Magic was newly made from it."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Its GitHub page says it combines extra-bold strength with relaxed softness, and its pen-shaped strokes raise visibility and readability."
+    },
+    {
+     "row": "Made for",
+     "text": "Its GitHub page calls it a POP font that can be used for both headings and body text."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the font's GitHub page, Tanuki Font's Tanugo page and Mado no Mori. Not found in them: why it was made, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/yuseimagic/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/tanukifont/YuseiMagic"
+     },
+     {
+      "text": "Tanuki Font's Tanugo page",
+      "url": "https://tanukifont.com/tanugo/"
+     },
+     {
+      "text": "Mado no Mori",
+      "url": "https://forest.watch.impress.co.jp/docs/review/414385.html"
+     }
+    ]
+   }
   },
   "LXGW Marker Gothic": {
    "strip": "a g t y &",
@@ -855,7 +2110,38 @@
     "Cyrillic",
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "LXGW says they are not a professional designer, so characters they added may look slightly out of place beside the original."
+    },
+    {
+     "row": "Based on",
+     "text": "Tanugo, which keeps the friendly feel of its maker's earlier marker font, Tanuki Oil-based Marker, while aiming to be easier to use and read."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Its GitHub page describes a CJK font in a marker-pen writing style."
+    },
+    {
+     "row": "Made for",
+     "text": "Posters, online shop copy, video titles and subtitles, book and newspaper headlines, comics, advertising and games. Its GitHub page advises against body text, programming code and phone interface fonts."
+    }
+   ],
+   "storySources": {
+    "text": "From the font's GitHub page and Tanuki Font's Tanugo page. Not found in them: why it was made, where it's used.",
+    "links": [
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/lxgw/LxgwMarkerGothic"
+     },
+     {
+      "text": "Tanuki Font's Tanugo page",
+      "url": "https://tanukifont.com/tanugo/"
+     }
+    ]
+   }
   },
   "Gowun Dodum": {
    "strip": "a g l I fi &",
@@ -873,7 +2159,42 @@
     "Korean",
     "Vietnamese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "Version 2.0 (2020) redrew the Latin letters and completed all 11,172 modern Hangeul syllables, adding 8,822."
+    },
+    {
+     "row": "Based on",
+     "text": "Gowun Hangeul-dodum, released in 2010; Gowun Dodum is its revised name."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Luc Devroye calls it a humanist sans."
+    },
+    {
+     "row": "Made for",
+     "text": "Hangeul (Korean) typography, with the Latin alphabet included as part of KS X 1001."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the font's GitHub page and Luc Devroye's type pages. Not found in them: why it was made, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/gowundodum/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/yangheeryu/Gowun-Dodum"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-92037.html"
+     }
+    ]
+   }
   },
   "Kiwi Maru": {
    "strip": "a g y fi &",
@@ -891,7 +2212,46 @@
     "Japanese",
     "Cyrillic"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "The designer hoped a round font would change how people express emotions and feelings missing from the analog and digital worlds, and ease the painful feeling of fonts with too many Chinese characters."
+    },
+    {
+     "row": "Based on",
+     "text": "Fonts In Use says it is inspired by Japanese rounded Gothic typefaces of the Showa era (1930s)."
+    },
+    {
+     "row": "Design ideas",
+     "text": "The kanji follow the brush movement of textbook typefaces, to come closer to handwritten shapes. Fonts In Use calls the Latin part a low-contrast slab serif, similar to Archer."
+    },
+    {
+     "row": "Where it's used",
+     "text": "The Japanese lyrics in Thousand Sunny's “Movin' On” lyrics video."
+    },
+    {
+     "row": "Made for",
+     "text": "The designer hopes people will try it experimentally in papers and reports."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the font's GitHub page and Fonts In Use. Not found in them: how it was made.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/kiwimaru/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/Kiwi-KawagotoKajiru/Kiwi-Maru"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/typefaces/247621/kiwi-maru"
+     }
+    ]
+   }
   },
   "Zen Maru Gothic": {
    "strip": "a g y l I &",
@@ -911,7 +2271,46 @@
     "Greek",
     "Cyrillic"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "Ohira says old typefaces and books are the core base of his work."
+    },
+    {
+     "row": "Based on",
+     "text": "The concept of Zen Kaku Gothic N; Ohira released Zen Maru Gothic N in 2012."
+    },
+    {
+     "row": "Design ideas",
+     "text": "The corners are rounded on purpose so they look weather-worn, and Ohira says the simple design brings scalability and rich expression."
+    },
+    {
+     "row": "Where it's used",
+     "text": "Ohira offered the Zen Font family for the signage system of a public facility that had to follow the principles of universal design."
+    },
+    {
+     "row": "Made for",
+     "text": "Google calls it cute and fashionable, soft and easy for any communications."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the font's GitHub page and the Google Fonts blog. Not found in them: why it was made.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/zenmarugothic/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/googlefonts/zen-marugothic/blob/main/README.md"
+     },
+     {
+      "text": "the Google Fonts blog",
+      "url": "https://fonts.googleblog.com/2021/10/the-story-of-zen-fonts-interview-with.html"
+     }
+    ]
+   }
   },
   "Tsukimi Rounded": {
    "strip": "a g r J fi &",
@@ -928,7 +2327,26 @@
    "familyScripts": [
     "Japanese"
    ],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Based on",
+     "text": "The skeleton of the foundry's No. 3 size kana (san-go), whose original type is Mincho style."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Its GitHub page calls it a rounded gothic that keeps the movement of the brush, with a skeleton suited to vertical setting."
+    }
+   ],
+   "storySources": {
+    "text": "From the font's GitHub page. Not found in them: why it was made, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/mt-funa/Tsukimi-Rounded/blob/master/README.md"
+     }
+    ]
+   }
   },
   "Noteworthy": {
    "strip": "a g s y &",
@@ -943,7 +2361,34 @@
    "letters": "Basic English letters, accents such as é, ñ, ü, ą and č, curly quotes, dashes, Greek and Cyrillic.",
    "copyLatinOnly": false,
    "familyScripts": [],
-   "weightLoaded": "Light"
+   "weightLoaded": "Light",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "Luc Devroye says Patrick Griffin of Canada Type created it, around 2009."
+    },
+    {
+     "row": "Based on",
+     "text": "Fonts In Use says it appears to be an expanded version of Tally Text."
+    },
+    {
+     "row": "Where it's used",
+     "text": "It has been on OS X since Lion (10.7) and was the default font of the Notes app in Mountain Lion (10.8). Fonts In Use also lists Brain Rot Mad Libs by Jennifer Fitterman (2026)."
+    }
+   ],
+   "storySources": {
+    "text": "From Fonts In Use and Luc Devroye's type pages. Not found in them: why it was made, its design ideas, what it was made for.",
+    "links": [
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/typefaces/7543/noteworthy"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-57870.html"
+     }
+    ]
+   }
   },
   "Marker Felt": {
    "strip": "a g k y &",
@@ -958,7 +2403,42 @@
    "letters": "Basic English letters, accents such as é, ñ, ü, ą and č, curly quotes, dashes, Greek and Cyrillic.",
    "copyLatinOnly": false,
    "familyScripts": [],
-   "weightLoaded": "Thin"
+   "weightLoaded": "Thin",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "The font's ReadMe says it makes typed messages look as if they had been spontaneously hand printed."
+    },
+    {
+     "row": "How it was made",
+     "text": "Input from registered users led to Version 2, which added more characters."
+    },
+    {
+     "row": "Design ideas",
+     "text": "The ReadMe says it looks like copy handwritten with a fine-point felt-tip marker, for a casual, personal touch."
+    },
+    {
+     "row": "Where it's used",
+     "text": "The first versions of Notes in iOS; a Looney Tunes: Back in Action video game ad (2003); Citadium department stores (2020); and Dick Dale at The Press Club (2012)."
+    },
+    {
+     "row": "Made for",
+     "text": "Eye-catching notices, ad display, or spontaneous, impulsive expression, the ReadMe says."
+    }
+   ],
+   "storySources": {
+    "text": "From Fonts In Use and the font's 1994 ReadMe. Not found in them: what it's based on.",
+    "links": [
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/typefaces/31848/marker-felt"
+     },
+     {
+      "text": "the font's 1994 ReadMe",
+      "url": "https://discmaster.textfiles.com/view/23848/Macworld%20Interactive%20-%20Hardware%20Guide%201994%20(PDO).iso/Fun%20Stuff/Fonts/MarkerFeltThin%20v2/ReadMe...MarkerFeltThin"
+     }
+    ]
+   }
   },
   "Chalkboard SE": {
    "strip": "a g y I &",
@@ -973,7 +2453,30 @@
    "letters": "Basic English letters, accents such as é, ñ, ü, ą and č, curly quotes, dashes, Greek and Cyrillic.",
    "copyLatinOnly": false,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Based on",
+     "text": "Fonts In Use calls Chalkboard Apple's follower of Microsoft's Comic Sans, derived from the heavier Apple Casual."
+    },
+    {
+     "row": "Where it's used",
+     "text": "Små Gryter Har Også Ører – Stiv Heks (2015)."
+    }
+   ],
+   "storySources": {
+    "text": "From Fonts In Use and Luc Devroye's type pages. Not found in them: why it was made, how it was made, its design ideas, what it was made for.",
+    "links": [
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/typefaces/10670/chalkboard"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-42295.html"
+     }
+    ]
+   }
   },
   "Bradley Hand": {
    "strip": "a g y I J &",
@@ -988,7 +2491,38 @@
    "letters": "Basic English letters, accents such as é, ñ, ü, ą and č, curly quotes, dashes, Greek and Cyrillic.",
    "copyLatinOnly": false,
    "familyScripts": [],
-   "weightLoaded": "Bold"
+   "weightLoaded": "Bold",
+   "story": [
+    {
+     "row": "Based on",
+     "text": "The handwriting of Richard Bradley, a British lettering artist and type designer."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Microsoft's font page calls it warm and familiar, with a relaxed rhythm typical of handwriting."
+    },
+    {
+     "row": "Where it's used",
+     "text": "LEGO desk accessories (about 2011)."
+    },
+    {
+     "row": "Made for",
+     "text": "A friendly, everyday typeface that humanises the look of digital text, in Microsoft's words."
+    }
+   ],
+   "storySources": {
+    "text": "From Microsoft's font page and Fonts In Use. Not found in them: how it was made.",
+    "links": [
+     {
+      "text": "Microsoft's font page",
+      "url": "https://learn.microsoft.com/en-us/typography/font-list/bradley-hand-itc"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/typefaces/3280/itc-bradley-hand"
+     }
+    ]
+   }
   },
   "SignPainter": {
    "strip": "a g y f &",
@@ -1003,7 +2537,565 @@
    "letters": "Basic English letters, accents such as é, ñ, ü, ą and č, curly quotes, dashes, Greek and Cyrillic.",
    "copyLatinOnly": false,
    "familyScripts": [],
-   "weightLoaded": "Regular"
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Based on",
+     "text": "Typewolf says it was inspired by vintage hand-painted advertising signs."
+    },
+    {
+     "row": "Where it's used",
+     "text": "Fonts In Use lists its House Script style on Grand Theft Auto V (about 2013), the John Waters Collection on the Criterion Channel (2024) and Le Parisien's Paris Paradis (about 2018)."
+    }
+   ],
+   "storySources": {
+    "text": "From Wikipedia's House Industries article, Typewolf, Luc Devroye's type pages and Fonts In Use. Not found in them: why it was made, how it was made, its design ideas, what it was made for.",
+    "links": [
+     {
+      "text": "Wikipedia's House Industries article",
+      "url": "https://en.wikipedia.org/wiki/House_Industries"
+     },
+     {
+      "text": "Typewolf",
+      "url": "https://www.typewolf.com/sign-painter"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-71010.html"
+     },
+     {
+      "text": "Fonts In Use",
+      "url": "https://fontsinuse.com/typefaces/7338/house-script"
+     }
+    ]
+   }
+  },
+  "Chiron GoRound TC": {
+   "strip": "a g y Q fi &",
+   "desc": "An open-source, free rounded font for Traditional Chinese, with rounded stroke ends on its Latin letters.",
+   "apart": [
+    "The a has a hood, as in printed text; the g is one loop",
+    "The l has a curved foot, which helps tell it from a capital I"
+   ],
+   "madeShort": "Made by Tamcy; on Google Fonts since 2025.",
+   "background": "By Tamcy. Google listed it in June 2025, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the full family can be set to any weight from Extra Light to Black.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Traditional Chinese, Cyrillic and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Traditional Chinese",
+    "Cyrillic",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "Its GitHub page says it was made for designers and users who like this style of letters."
+    },
+    {
+     "row": "How it was made",
+     "text": "A computer program rounds the corners of Chiron Hei's strokes, keeping the same stroke style; the GitHub page warns that not every character comes out ideally."
+    },
+    {
+     "row": "Based on",
+     "text": "Chiron Hei, which is based on Source Han Sans Hong Kong and revised with reference to commercial Traditional Chinese fonts."
+    },
+    {
+     "row": "Design ideas",
+     "text": "A modern stroke style that balances regional standard letterforms with conventional printed forms. The name means giving a square (sans-serif) face a round treatment."
+    }
+   ],
+   "storySources": {
+    "text": "From the font's GitHub page and the Chiron fonts site. Not found in them: where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/chiron-fonts/chiron-go-round-tc"
+     },
+     {
+      "text": "the Chiron fonts site",
+      "url": "https://chiron-fonts.github.io/"
+     }
+    ]
+   }
+  },
+  "Mochiy Pop One": {
+   "strip": "a g k l I &",
+   "desc": "A cute, casual Japanese Gothic display font with heavy, rounded letters.",
+   "apart": [
+    "Very heavy, rounded strokes",
+    "The l has a curved foot, which helps tell it from a capital I",
+    "The a and g are each one loop"
+   ],
+   "madeShort": "Made by FONTDASU; on Google Fonts since 2021.",
+   "background": "By FONTDASU, who began designing typefaces after meeting the Glyphs app in 2016. It has full-width kana; its sister font, Mochiy Pop P, has proportional-width kana. Google listed it in April 2021, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Japanese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Japanese"
+   ],
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "The letters were based on characters a young coworker wrote with a felt-tip pen during a lunch break. First released in October 2018, it was later rebuilt from scratch in Glyphs."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Its GitHub page says the aim was a pop font made from the soft, round, chewy letters that girls write."
+    },
+    {
+     "row": "Where it's used",
+     "text": "Mado no Mori's editors found it on Twitter, in video captions, product-promotion POP signs and manga dialogue."
+    },
+    {
+     "row": "Made for",
+     "text": "Manga, magazines, movies and signs, Google says; its GitHub page adds POP shop signs and says commercial use is free."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the font's GitHub page, Google Fonts' designer profile and Mado no Mori. Not found in them: why it was made, what it's based on.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/mochiypopone/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/fontdasu/Mochiypop"
+     },
+     {
+      "text": "Google Fonts' designer profile",
+      "url": "https://github.com/google/fonts/blob/main/catalog/designers/fontdasu/bio.html"
+     },
+     {
+      "text": "Mado no Mori",
+      "url": "https://forest.watch.impress.co.jp/docs/review/1485469.html"
+     }
+    ]
+   }
+  },
+  "Stick": {
+   "strip": "a g o s M &",
+   "desc": "Cute, playful letters drawn with straight lines, true to the font's name.",
+   "apart": [
+    "Letters are built from straight strokes, so round letters such as o and s come out angular",
+    "The g has a short stroke above it, like an accent",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Fontworks Inc.; on Google Fonts since 2020.",
+   "background": "By Fontworks Inc. Google listed it in December 2020, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Japanese and Cyrillic.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Japanese",
+    "Cyrillic"
+   ],
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "Fontworks says it has a somewhat pastoral feel."
+    },
+    {
+     "row": "Made for",
+     "text": "Both paper and digital content, Google says; Fontworks says it can be used in all kinds of scenes, despite a somewhat mischievous look."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and Fontworks' page on it. Not found in them: why it was made, how it was made, what it's based on, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/stick/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Fontworks' page on it",
+      "url": "https://fontworks.co.jp/fontsearch/stickstd-b/"
+     }
+    ]
+   }
+  },
+  "Darumadrop One": {
+   "strip": "a g k I fi &",
+   "desc": "Heavy, flavourful handwriting with rough, uneven edges.",
+   "apart": [
+    "Heavy strokes with rough, uneven edges",
+    "The capital I has crossbars, which helps tell it from l",
+    "In fi and fl, the letters are drawn as one shape"
+   ],
+   "madeShort": "Made by Maniackers Design; on Google Fonts since 2020.",
+   "background": "By Maniackers Design, which began releasing open-source fonts on its website in 1998. Google listed it in December 2020, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Japanese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Japanese"
+   ],
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "Its GitHub page says it was newly designed only for Google Fonts."
+    },
+    {
+     "row": "How it was made",
+     "text": "Version 1.0 is dated 31 December 2019; it was made with FontLab and Fontographer 5.2J."
+    },
+    {
+     "row": "Based on",
+     "text": "Japanese handwriting and Daruma Otoshi, a Japanese folk-craft game."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Its GitHub page names its themes: folk craft, traditional craft, Showa, zen and Japanese culture."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description, the font's GitHub page and Google Fonts' designer profile. Not found in them: where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/darumadropone/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/ManiackersDesign/darumadrop"
+     },
+     {
+      "text": "Google Fonts' designer profile",
+      "url": "https://github.com/google/fonts/blob/main/catalog/designers/maniackersdesign/bio.html"
+     }
+    ]
+   }
+  },
+  "Short Stack": {
+   "strip": "a g k I Q &",
+   "desc": "Sturdy, clear letters with even strokes, which Google calls whimsical and fun.",
+   "apart": [
+    "The a and g are each one loop",
+    "The capital I has crossbars, which helps tell it from l",
+    "Even strokes in round letters"
+   ],
+   "madeShort": "Made by James Grieshaber; on Google Fonts since 2011.",
+   "background": "By James Grieshaber, from the foundry Sorkin Type Co. Google listed it in August 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Based on",
+     "text": "Childish written letters, Google says; Luc Devroye calls it Grieshaber's free contribution to the Comic Sans genre."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Google calls it a low-contrast, semi-geometric typeface."
+    },
+    {
+     "row": "Made for",
+     "text": "Medium text sizes up to larger display sizes."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and Luc Devroye's type pages. Not found in them: why it was made, how it was made, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/shortstack/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-35839.html"
+     }
+    ]
+   }
+  },
+  "Itim": {
+   "strip": "a g y ft tt &",
+   "desc": "Informal Thai and Latin handwriting with a looped, semi-serif design.",
+   "apart": [
+    "In ff, fi, ft and tt, the letters are drawn as one shape",
+    "The capital I has crossbars, which helps tell it from l",
+    "The a has a hood, as in printed text; the g has two closed loops"
+   ],
+   "madeShort": "Made by Cadson Demak; on Google Fonts since 2015.",
+   "background": "Itim is what Thai people call an ice pop. The project is led by Cadson Demak, a type foundry in Thailand, and Pablo Impallari did the first OpenType handwriting features. Google listed it in July 2015, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Thai and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Thai",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Design ideas",
+     "text": "It has a rounded-tip marker stroke, managed carefully so it stays readable while portraying natural handwriting. OpenType features recreate the impression of handwriting with a fun and friendly voice."
+    },
+    {
+     "row": "Made for",
+     "text": "Headlines and short body text in children's books, picture books, cookbooks and teaching materials in schools."
+    }
+   ],
+   "storySources": {
+    "text": "From the font's GitHub page and Luc Devroye's type pages. Not found in them: what it's based on, where it's used.",
+    "links": [
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/cadsondemak/itim/blob/master/README.md"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-49739.html"
+     }
+    ]
+   }
+  },
+  "Mali": {
+   "strip": "a g y I fi “ &",
+   "desc": "Light, carefree Thai and Latin handwriting with a naive look.",
+   "apart": [
+    "The a and g are each one loop",
+    "The capital I has crossbars, which helps tell it from l",
+    "Curly quotes are drawn as small, hollow 6 and 9 shapes"
+   ],
+   "madeShort": "Made by Cadson Demak; on Google Fonts since 2018.",
+   "background": "By Cadson Demak. Google listed it in August 2018, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family has six weights, from Extra Light to Bold, each with an italic.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Thai and Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Thai",
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Based on",
+     "text": "A sixth grader's handwriting."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and Luc Devroye's type pages. Not found in them: why it was made, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/mali/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-49739.html"
+     }
+    ]
+   }
+  },
+  "Comic Relief": {
+   "strip": "a g y k I &",
+   "desc": "Comic Sans-style lettering with a consistent height, slant and stroke width.",
+   "apart": [
+    "The capital I has crossbars, which helps tell it from l",
+    "The a and g are each one loop",
+    "Even, rounded strokes in upright letters"
+   ],
+   "madeShort": "Made by Jeff Davis; on Google Fonts since 2025.",
+   "background": "By Jeff Davis, also known as Loudifier, who published it in 2013. Google listed it in February 2025, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family also has Bold.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Greek and Cyrillic.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Greek",
+    "Cyrillic"
+   ],
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "Luc Devroye says it was named to displace Comic Sans."
+    },
+    {
+     "row": "How it was made",
+     "text": "Drawn in FontForge."
+    },
+    {
+     "row": "Based on",
+     "text": "Comic Sans MS: it includes every character of Comic Sans MS Regular and Bold as found in standard copies of Windows 7 and earlier."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Jeff Davis says it looks like the handwriting of the teacher's pet in fifth grade, not that of your arthritic grandfather."
+    },
+    {
+     "row": "Made for",
+     "text": "Taking the place of Comic Sans MS without moving, resizing or resetting any part of the copy."
+    }
+   ],
+   "storySources": {
+    "text": "From Luc Devroye's type pages and the font's GitHub page. Not found in them: where it's used.",
+    "links": [
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-67519.html"
+     },
+     {
+      "text": "the font's GitHub page",
+      "url": "https://github.com/loudifier/Comic-Relief/blob/main/README.md"
+     }
+    ]
+   }
+  },
+  "Crafty Girls": {
+   "strip": "a g y W M &",
+   "desc": "Playful, casual handwriting inspired by crochet hooks, yarn, button boxes, thread and glitter.",
+   "apart": [
+    "The g is two closed loops, like a figure eight",
+    "The capital W is drawn as a round, lower-case w",
+    "The l and the capital I are both plain strokes, so they look alike"
+   ],
+   "madeShort": "Made by Tart Workshop; on Google Fonts since 2011.",
+   "background": "Hand drawn by Crystal Kluge, from Tart Workshop. Google listed it in January 2011, under the Apache Licence 2.0.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "How it was made",
+     "text": "Tart Workshop fonts start by hand: Kluge letters them with a steel-nibbed dip pen, often in walnut ink, and Sandler makes them into usable fonts."
+    }
+   ],
+   "storySources": {
+    "text": "From a MyFonts newsletter. Not found in them: why it was made, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "a MyFonts newsletter",
+      "url": "https://myfonts.com/pages/newsletters-cc-201208"
+     }
+    ]
+   }
+  },
+  "Swanky and Moo Moo": {
+   "strip": "a g y l Q &",
+   "desc": "Handwriting based on a young mom's writing, named after the writer's family nicknames.",
+   "apart": [
+    "The l is drawn like a capital L",
+    "Short, wide letters with thin, even strokes"
+   ],
+   "madeShort": "Made by Kimberly Geswein; on Google Fonts since 2011.",
+   "background": "By Kimberly Geswein, based on a young mom's handwriting. Google listed it in April 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "Geswein loves the uniqueness of the letters and the personality they convey."
+    },
+    {
+     "row": "Design ideas",
+     "text": "Geswein's page says its stout stature helps fit text into tight spaces."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and the designer's site. Not found in them: how it was made, where it's used, what it was made for.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/swankyandmoomoo/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "the designer's site",
+      "url": "https://kimberlygeswein.com/?p=4785"
+     }
+    ]
+   }
+  },
+  "Fuzzy Bubbles": {
+   "strip": "a g y I ffl &",
+   "desc": "Cute handwriting in a juvenile style, playful and loose.",
+   "apart": [
+    "The capital I has crossbars, which helps tell it from l",
+    "In ff, fi, fl, ffi and ffl, the letters are drawn as one shape"
+   ],
+   "madeShort": "Made by Robert Leuschke; on Google Fonts since 2021.",
+   "background": "By Robert Leuschke. Google listed it in November 2021, under the SIL Open Font Licence.",
+   "weight": "Regular loads here; the family also has Bold.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes. This copy is Latin only; the full font also has Vietnamese.",
+   "copyLatinOnly": true,
+   "familyScripts": [
+    "Vietnamese"
+   ],
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Made for",
+     "text": "Children's parties, which Google says its innocence suits."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description. Not found in them: why it was made, how it was made, what it's based on, where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/fuzzybubbles/DESCRIPTION.en_us.html"
+     }
+    ]
+   }
+  },
+  "Delius": {
+   "strip": "a g k e A &",
+   "desc": "Upright handwriting whose strokes get thicker at both ends, as a marker line would.",
+   "apart": [
+    "The k is drawn with a loop",
+    "The capital I has crossbars, which helps tell it from l",
+    "The bar of the A sticks out past its left side"
+   ],
+   "madeShort": "Made by Natalia Raices; on Google Fonts since 2011.",
+   "background": "By Natalia Raices; the super-family also has Delius Unicase and Delius Swash Caps. It won an award at Tipos Latinos 2012. Google listed it in July 2011, under the SIL Open Font Licence.",
+   "weight": "Regular only.",
+   "letters": "Basic English letters, accents such as é, ñ and ü, curly quotes and dashes.",
+   "copyLatinOnly": true,
+   "familyScripts": [],
+   "weightLoaded": "Regular",
+   "story": [
+    {
+     "row": "Why it was made",
+     "text": "It was Natalia Raices's graduation typeface at FADU UBA."
+    },
+    {
+     "row": "How it was made",
+     "text": "The tool María Delia Lozupone writes with, a big round marker, defined its stroke and the movement of its lines."
+    },
+    {
+     "row": "Based on",
+     "text": "The handwriting that the artist María Delia Lozupone, known as Delius, uses to letter her own comic books."
+    },
+    {
+     "row": "Made for",
+     "text": "Comic book lettering: Google calls it a high quality comic book lettering typeface super-family."
+    }
+   ],
+   "storySources": {
+    "text": "From Google Fonts' description and Luc Devroye's type pages. Not found in them: where it's used.",
+    "links": [
+     {
+      "text": "Google Fonts' description",
+      "url": "https://github.com/google/fonts/blob/main/ofl/delius/DESCRIPTION.en_us.html"
+     },
+     {
+      "text": "Luc Devroye's type pages",
+      "url": "https://luc.devroye.org/fonts-59120.html"
+     }
+    ]
+   }
   }
  }
 }

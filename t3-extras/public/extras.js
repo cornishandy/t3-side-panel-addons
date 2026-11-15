@@ -93,6 +93,8 @@
     fontMain: Object.freeze({ family: "off", size: null }), // assistant reply prose
     printOnly: true,
     showPartly: false,
+    showHidden: false, // list fonts you hid; off until you ask, and only offered once one is hidden
+    hiddenFonts: Object.freeze([]), // family names hidden from every font list
     interfaceFontsOpen: false,
     settingsOpen: false, // the ✦ panel's Settings show/hide, remembered
     fontPicker: true, // Fonts: "Pick from screen" (hover names the area under the pointer; click opens it)
@@ -105,7 +107,7 @@
     footerMade: "open-short", // the reply footer's Made so far list: start-folded | open-short | always-open | hide
     fontTargets: Object.freeze({ composer: true, quotes: true, projects: true, pills: true, headings: true, replies: true, mine: true, ...Object.fromEntries(INTERFACE_TARGETS.map(([key]) => [key, false])) }),
   });
-  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "printOnly", "showPartly", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen", "popMove"];
+  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "printOnly", "showPartly", "showHidden", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen", "popMove"];
   const MARKERS = ["bar", "outline", "off"];
   const TITLE_LINES = Object.freeze([2, 3, "unlimited"]);
   // The Older section's choices: value, hours (null = by gaps, olderCutoff), panel label, header words.
@@ -317,6 +319,8 @@
     // The raw key is the once marker; explicit Off survives later Main/mine changes.
     out.fontPrompts = fontPick(hasPrompts ? s.fontPrompts : out.fontTargets.mine !== false ? out.fontMain : DEFAULTS.fontPrompts);
     out.fontSchema = 2;
+    // A missing list is none. Names use the same family rule as a pick (not "off").
+    out.hiddenFonts = [...new Set((Array.isArray(s.hiddenFonts) ? s.hiddenFonts : []).filter((n) => typeof n === "string" && n !== "off" && /^[A-Za-z0-9 ]{2,40}$/.test(n)))];
     out.fontSources = normalizeFontSources(Object.prototype.hasOwnProperty.call(s, "fontSources") ? s.fontSources : undefined, out, out.fontTargets.plantext === true);
     return out;
   }
@@ -423,7 +427,20 @@
     const list = [...T3_FONTS, ...families];
     list.listVersion = listVersion;
     list.xRatioMedian = Number.isInteger(c?.xRatioMedian) ? c.xRatioMedian : null;
+    list.uiWidth = Number.isFinite(c?.uiWidth) ? c.uiWidth : null; // the system sentence width the Width lines use
     return list;
+  }
+  /** You hid this family from every list. Independent of the style chips. */
+  function fontUserHidden(f, s) {
+    return Boolean(f && Array.isArray(s?.hiddenFonts) && s.hiddenFonts.includes(f.name));
+  }
+  /** In a list: the style chips, then (unless it is the current choice) a font you hid while Show hidden is off. */
+  function fontListed(f, s, current) {
+    if (!f) return false;
+    if (f.name === current) return true;
+    if (!fontVisible(f, s)) return false;
+    if (fontUserHidden(f, s) && !s?.showHidden) return false;
+    return true;
   }
 
   /** Picker groups, narrowest first (the board's measured sentence width); near-ties put ★ first.
@@ -434,12 +451,15 @@
     return groups.map(([g, label]) => ({
       label,
       options: (Array.isArray(catalog) ? catalog : [])
-        .filter((f) => f && f.group === g && (fontVisible(f, s) || f.name === current))
+        .filter((f) => f && f.group === g && fontListed(f, s, current))
         .sort((a, b) => Math.round(a.width / 10) - Math.round(b.width / 10) || Number(Boolean(b.star)) - Number(Boolean(a.star)) || a.width - b.width)
         .map((f) => {
           const hidden = !fontVisible(f, s);
+          const userHidden = fontUserHidden(f, s);
           const tags = fontTags(f, f.source !== "mac" || native(f.name));
-          return { name: f.name, hidden, label: `${f.name}${f.star ? " ★" : ""}${tags.length ? ` · ${tags.join(", ")}` : ""}${hidden ? " (hidden by the filter)" : ""}` };
+          // Gap G6 (Andy, 14 Nov 2026 7:16 PM)
+          const mark = fontMenuMark(hidden, userHidden);
+          return { name: f.name, hidden, userHidden, label: `${f.name}${f.star ? " ★" : ""}${tags.length ? ` · ${tags.join(", ")}` : ""}${mark}` };
         }),
     })).filter((g) => g.options.length);
   }
@@ -485,6 +505,22 @@
     widthRow: (n) => (n > 0 ? `A sample sentence at the default size is about ${n}% wider than in T3's built-in system font at 100%`
       : n < 0 ? `A sample sentence at the default size is about ${-n}% narrower than in T3's built-in system font at 100%` : FONT_TEXT.widthSame),
     widthSame: "A sample sentence at the default size is about as wide as in T3's built-in system font at 100%",
+    // Panel Width (14 Nov 2026): stacked lines from the unrounded ratio, not the integer widthVsSystem.
+    widthIntro: "A sample sentence, against T3's system font at 100%, is about:",
+    scoreHead: "Screen readability test",
+    scoreExp: " · experimental",
+    scoreHard: "The menu's “hard to read small” mark is from a look at the letters, separate from this test.",
+    scoreMethodTail: "Score = 100 × √(letters × reading), each part capped at 1.15. Moving the accuracy standards by 5 points moves most fonts under 1 point, a few messy hand fonts up to 10.",
+    hideFoot: "Hide this font",
+    unhideFoot: "Unhide", // the menu pill; the About button says unhidePanel
+    unhidePanel: "Unhide this font",
+    hideNote: "Hides it from every font list; Show hidden brings it back.",
+    hideNoteYou: "Hidden by you; Unhide puts it back in every font list.",
+    hideNotePrint: "Hidden by you and by Print only; Unhide undoes only your part.",
+    hideNoteFilter: "Hidden by you and by the filter; Unhide leaves it hidden until Print only and Show semi-cursive are both off.",
+    storyHead: "Story",
+    hiddenByYou: "hidden by you",
+    hiddenShort: "hidden", // line 3 where "hidden by you" would add a line (gate gap Q1, Andy 15 Nov 2026)
     // Using it here: why the default size (the floor form only when the match fell below 80%), the style, bold, usage.
     defaultSize: (size) => `Default size here ${size}%, to bring its lower case close to the height of T3's built-in system font at 100%.`,
     defaultSizeFloor: (size) => `Default size here ${size}%, the smallest size; its lower case is still taller than the lower case of T3's built-in system font at 100%.`,
@@ -544,16 +580,159 @@
    *  f: the catalog family; rec: its record or null; ctx: { median, usage: [{label,size}], hidden: listed though the
    *  filter hides it, native: is a Mac font on this Mac, now: the T3 font's resolved first family }.
    *  Null: nothing to show (a font without a usable record). */
+  /** Signed whole % of the sample sentence at `size` against the system sentence (unrounded ratio × size). */
+  function widthPct(width, uiWidth, size) {
+    if (!Number.isFinite(width) || !(uiWidth > 0) || !Number.isInteger(size)) return null;
+    return Math.round((100 * width * size) / uiWidth / 100 - 100);
+  }
+  /** Panel Width lines. Distinct sizes in order: Default, then 100, then his size. "your" whenever his size
+   *  is its own line (S4 amended, Andy 14 Nov 2026 7:16 PM). Roles on one size share a line. */
+  function widthLines(f, ctx = {}) {
+    if (!f || !Number.isFinite(f.width)) return null;
+    const def = Number.isInteger(f.size) ? f.size : null;
+    if (def === null) return null;
+    const areaSize = Number.isInteger(ctx.areaSize) ? ctx.areaSize : def;
+    const area = typeof ctx.areaLabel === "string" && ctx.areaLabel ? ctx.areaLabel : "this area";
+    const slots = [];
+    const push = (size, role) => {
+      let slot = slots.find((s) => s.size === size);
+      if (!slot) { slot = { size, roles: [] }; slots.push(slot); }
+      if (!slot.roles.includes(role)) slot.roles.push(role);
+    };
+    push(def, "default");
+    push(100, "hundred");
+    push(areaSize, "yours");
+    const lines = [];
+    for (const slot of slots) {
+      const pct = widthPct(f.width, ctx.uiWidth, slot.size);
+      if (pct === null) return null;
+      // Gap G1 (Andy, 14 Nov 2026 7:16 PM)
+      const bit = pct > 0 ? `${pct}% wider` : pct < 0 ? `${-pct}% narrower` : "the same width";
+      let where;
+      if (slot.roles.includes("yours") && !slot.roles.includes("default")) where = `at your ${slot.size}% (${area})`;
+      else if (slot.roles.includes("default") && slot.roles.includes("hundred")) where = "at 100% (Default)";
+      else if (slot.roles.includes("default")) where = `at its Default ${slot.size}%`; // his size equal to Default stays merged: no "your" line
+      else where = "at 100%";
+      lines.push(`${bit} ${where}`);
+    }
+    return { intro: FONT_TEXT.widthIntro, lines };
+  }
+  /** Screen readability block from a family's { score, letters, reading } (v3.1). Null when the numbers are missing. */
+  function screenBlock(f, ctx = {}) {
+    const s = f?.screen;
+    const letters = Number.isFinite(s?.letters) ? s.letters : s?.letter;
+    const reading = Number.isFinite(s?.reading) ? s.reading : s?.familiar;
+    if (!s || !Number.isFinite(s.score) || !Number.isFinite(letters) || !Number.isFinite(reading)) return null;
+    const score = Math.round(s.score); // half up, as JS Math.round; no cap, no rank
+    const band = score >= 95 ? "in the same range as T3's font (100) in this test"
+      : score >= 70 ? "below T3's font (100) in this test"
+      : "well below T3's font (100) in this test";
+    const def = Number.isInteger(f.size) ? f.size : 100;
+    const area = Number.isInteger(ctx.areaSize) ? ctx.areaSize : def;
+    const yours = area === def ? "" : `not your ${area}%, `;
+    const conditions = `Automated blur-and-OCR test: Default ${def}%, 14 px, 2× screen, light background; ${yours}not a test with people. Standard fonts like Arial and Verdana score 98–114 here, so over 100 doesn't mean easier reading; only low scores flag difficulty.`;
+    const method = `Two parts, each against T3's font: its 62 letters and digits told apart as blur grows (an ideal-observer model): ${Number(letters).toFixed(2)}×; two paragraphs read by OCR as blur grows, averaged over accuracy standards from 70% to 95%: ${Number(reading).toFixed(2)}×. ${FONT_TEXT.scoreMethodTail}`;
+    return {
+      score, letters: Number(Number(letters).toFixed(2)), reading: Number(Number(reading).toFixed(2)), band, conditions, method,
+      hardNote: f.hard ? FONT_TEXT.scoreHard : null,
+      cardLine: `Screen readability test (experimental, at its Default): ${score}, ${band.replace(" in this test", "")}.`,
+    };
+  }
+  /** The sources line, or null. Links are https only, first non-overlapping match. */
+  function storySourcesOf(src) {
+    if (!src || typeof src.text !== "string" || !src.text || src.text.length > 600) return null;
+    const text = src.text;
+    const used = [];
+    const links = [];
+    for (const l of (Array.isArray(src.links) ? src.links : []).slice(0, 8)) {
+      if (!l || typeof l.text !== "string" || !l.text || typeof l.url !== "string" || !l.url.startsWith("https://") || l.url.length >= 500) continue;
+      let at = text.indexOf(l.text);
+      while (at >= 0 && used.some(([a, b]) => at < b && at + l.text.length > a)) at = text.indexOf(l.text, at + 1);
+      if (at < 0) continue; // missing, or it would nest inside a link already placed
+      used.push([at, at + l.text.length]);
+      links.push({ text: l.text, url: l.url, start: at });
+    }
+    links.sort((a, b) => a.start - b.start);
+    return { text, links };
+  }
+  /** Story rows and the sources line. No rows and no sources line: null. Links are https only. */
+  function storyBlock(rec) {
+    const raw = Array.isArray(rec?.story) ? rec.story : [];
+    const rows = raw.filter((r) => r && typeof r.row === "string" && r.row && typeof r.text === "string" && r.text && r.row.length <= 600 && r.text.length <= 600).slice(0, 8)
+      .map((r) => ({ row: r.row, text: r.text }));
+    const sources = storySourcesOf(rec?.storySources);
+    // Gap G3 (Andy, 14 Nov 2026 7:16 PM)
+    if (!rows.length && !sources) return null;
+    return { rows, sources };
+  }
+  /** One dot-tag for the menu's hidden states. The pill's Unhide on a both-ways row leaves the filter mark. */
+  function fontMenuMark(hidden, userHidden) {
+    if (hidden && userHidden) return " · hidden by the filter and by you";
+    if (hidden) return " · hidden by the filter";
+    if (userHidden) return " · hidden by you";
+    return "";
+  }
+  function fontMenuMarkAfterPill(hiddenByFilter, userHidden) {
+    return fontMenuMark(Boolean(hiddenByFilter), Boolean(userHidden));
+  }
+  /** About's Hide / Unhide foot. Null for T3's own fonts and a Mac font missing on this Mac. */
+  function hideFootCopy(f, s, native = true) {
+    if (!f || f.source === "t3" || (f.source === "mac" && native === false)) return null;
+    if (!fontUserHidden(f, s)) return { button: FONT_TEXT.hideFoot, note: FONT_TEXT.hideNote };
+    // Gap G5 (Andy, 14 Nov 2026 7:16 PM)
+    if (fontVisible(f, s)) return { button: FONT_TEXT.unhidePanel, note: FONT_TEXT.hideNoteYou };
+    if (f.style === "partly" && s?.printOnly) return { button: FONT_TEXT.unhidePanel, note: FONT_TEXT.hideNotePrint };
+    if (f.style === "joined") return { button: FONT_TEXT.unhidePanel, note: FONT_TEXT.hideNoteFilter };
+    // DESIGN-GAP: hidden by you, not listed by the chips, and neither a semi-cursive font with Print only on nor a cursive font.
+    return { button: FONT_TEXT.unhidePanel, note: FONT_TEXT.hideNoteYou };
+  }
+  /** Which pane-swap lines stay. `fits` is read after each try. Null: not even the must-show lines fit.
+   *  Score is tried after Technical and before Background; a miss restores the earlier lines and tries Background. */
+  function fitSwapKeep(opts, fits) {
+    const st = { strip: true, traits: "warn", tech: "off", score: false, bg: false, hidden: false };
+    if (!fits(st)) {
+      st.strip = false;
+      if (!fits(st)) return null;
+      return st; // the strip goes before any optional line; dropping it leaves the must-show lines only
+    }
+    if (opts.traits) {
+      st.traits = "all";
+      if (!fits(st)) st.traits = "warn";
+    } else st.traits = "all";
+    st.tech = "whole";
+    if (!fits(st)) {
+      st.tech = "first";
+      if (!fits(st)) st.tech = "off";
+    }
+    const techKept = st.tech; // Gap G4 (Andy, 14 Nov 2026 7:16 PM): never shorten Technical to admit the score
+    if (opts.score) {
+      st.score = true;
+      if (!fits(st)) st.score = false;
+    }
+    // Gate gap Q3 (Andy, 15 Nov 2026; changes 10G′): the credit once every trait showed, Technical no longer
+    // required when at least one ordinary trait is on screen; never back-filled where a trait was dropped.
+    if (st.traits === "all" && (st.tech !== "off" || opts.ordinary)) {
+      st.bg = true;
+      if (!fits(st)) st.bg = false;
+    }
+    if (opts.hidden && st.strip && st.traits === "all" && st.tech === "whole" && st.bg) {
+      st.hidden = true;
+      if (!fits(st)) st.hidden = false;
+    }
+    st.tech = techKept;
+    return st;
+  }
   function fontAbout(f, rec, ctx = {}) {
     if (!f) return null;
     const usage = ctx.usage ?? [];
     const hiddenLine = !ctx.hidden ? null : f.style === "joined" ? FONT_TEXT.hiddenCursive : FONT_TEXT.hiddenPrint;
+    const userHidden = Boolean(ctx.userHidden);
     if (f.source === "t3") {
       const which = T3_FONT_KIND[f.name];
       const sentence = which ? FONT_TEXT.t3Follows(which, ctx.now || FONT_TEXT.nowSystem) : FONT_TEXT.t3System;
-      return { kind: "t3", name: f.name, nameCss: f.css, sentence, usage: usageSentence(usage, { noSize: true }), hiddenLine };
+      return { kind: "t3", name: f.name, nameCss: f.css, sentence, usage: usageSentence(usage, { noSize: true }), hiddenLine, userHidden };
     }
-    if (f.source === "mac" && ctx.native === false) return { kind: "missing", name: f.name, nameCss: null, sentence: FONT_TEXT.macMissing };
+    if (f.source === "mac" && ctx.native === false) return { kind: "missing", name: f.name, nameCss: null, sentence: FONT_TEXT.macMissing, userHidden };
     if (!recordOk(rec) || !Number.isInteger(f.xRatio) || !Number.isInteger(ctx.median)) return null;
     const rawApart = Array.isArray(rec.apart) ? rec.apart : [], kept = rawApart.flatMap((x, i) => (typeof x === "string" && x ? [i] : []));
     const apart = kept.map((i) => rawApart[i]); // warning indexes name the record's own traits: they follow them past this filter
@@ -564,9 +743,12 @@
     const size = Number.isInteger(f.size) ? f.size : 100, floor = f.sizeClamped && size <= 80;
     const sizeWords = f.smallCaps ? (floor ? FONT_TEXT.defaultSizeSmallCapsFloor(size) : FONT_TEXT.defaultSizeSmallCaps(size)) : floor ? FONT_TEXT.defaultSizeFloor(size) : FONT_TEXT.defaultSize(size);
     const using = [sizeWords, FONT_TEXT.style[f.style] ?? null, BOLD_SAME_CHECKED[f.source] === true && f.oneWeight ? FONT_TEXT.boldSame : null, usageSentence(usage)].filter(Boolean).join(" ");
+    const width = widthLines(f, ctx);
+    const screen = screenBlock(f, ctx);
+    const story = storyBlock(rec);
     const rows = [
       [FONT_TEXT.lowerCaseLabel, f.smallCaps ? FONT_TEXT.smallCapsRow(f.xRatio) : FONT_TEXT.lowerCaseRow(f.xRatio, ctx.median)],
-      Number.isInteger(f.widthVsSystem) ? [FONT_TEXT.widthLabel, FONT_TEXT.widthRow(f.widthVsSystem)] : null,
+      width ? [FONT_TEXT.widthLabel, width] : null,
       typeof rec.weight === "string" && rec.weight ? [FONT_TEXT.weightLabel, rec.weight] : null,
       typeof rec.letters === "string" && rec.letters ? [FONT_TEXT.lettersLabel, rec.letters] : null,
     ].filter(Boolean);
@@ -574,6 +756,7 @@
       kind: "font", name: f.name, nameCss: null, strip: rec.strip, desc: rec.desc, apart, card,
       cardWarn: card.map((_, i) => i).filter((i) => warn.has(i)), // the card's traits that warn how the font draws in T3
       background: creditText(rec.madeShort), technical, technicalFirst, usage: usageSentence(usage), hiddenLine,
+      userHidden, screen, story,
       panel: { using, background: creditText(rec.background || rec.madeShort), rows },
     };
   }
@@ -2144,7 +2327,7 @@
 
   const core = {
     rowAgeHours, olderCutoff, olderRows, olderTitle, OLDER_AFTER, TITLE_LINES, titleSuffix, gapsBefore,
-    DEFAULTS, POP_KINDS, readSpots, spotFrom, clearSpot, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute,
+    DEFAULTS, POP_KINDS, readSpots, spotFrom, clearSpot, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontUserHidden, fontListed, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute, widthPct, widthLines, screenBlock, storyBlock, fontMenuMark, fontMenuMarkAfterPill, hideFootCopy, fitSwapKeep,
     FONT_GROUPS, normalizeCatalog, FONT_TEXT, BOLD_SAME_CHECKED, firstFamily, usageSentence, fontAbout, creditText, besideSpot, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, FONT_SIMILAR_GROUPS, similarFontAreas, usagePageHash, usageContainerMatches,
     FOOTER_TEAM, FOOTER_MADE_MODES, FOOTER_CARD, FOOTER_MADE, FOOTER_DETAILS, footerPass, madePass, madeCount, newestAssistantId, timelineFromFiber, readHostTimeline, hostNewestId, laneIsWide, macAppOn, readMacPlatform, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
@@ -2849,7 +3032,7 @@
     pop.el.replaceChildren(...[pop.build()].flat(4).filter((n) => n !== null && n !== undefined && n !== false));
     if (settings.popMove) pop.el.querySelector(".t3x-pop-head")?.prepend(grip("this popup"));
     pop.el.scrollTop = keep;
-    if (pop.kind === "panel") warmSelectedNames();
+    if (pop.kind === "panel") { warmSelectedNames(); watchFsHide(pop.el.querySelector(".t3x-fs")); }
     if (focusKey) {
       const next = pop.el.querySelector(`[data-focus="${CSS.escape(focusKey)}"]`);
       const match = /^(prev|next|minus|plus|reset)-(\w+)$/.exec(focusKey);
@@ -4363,7 +4546,8 @@
     const similarBack=h("button",{type:"button",class:"t3x-btn",onclick:()=>undoSimilar()},"Undo");
     const similar=h("div",{class:"t3x-font-similar",role:"group","aria-label":"Similar areas",hidden:true},similarNote,h("div",{class:"t3x-font-similar-actions"},similarApply,similarBack));
     const choose=family=>{const r=ROLE[fontNav.role];if(family!=="off"&&(family!==settings[r.key].family||settings.fontSources[fontNav.role]!=="own"))change({[r.key]:{family,size:null},fontSources:{...settings.fontSources,[fontNav.role]:"own"}});};
-    const family=h("select",{class:"t3x-select t3x-font-select",id:"t3x-font-family","aria-label":"Font family","data-focus":"workspace-family",onpointerdown:e=>warmMenuNames(e.currentTarget),onkeydown:e=>{if([" ","Enter","ArrowDown","ArrowUp","F4"].includes(e.key))warmMenuNames(e.currentTarget);},onchange:e=>choose(e.currentTarget.value),onblur:()=>{if(fontWorkspace?.pending)syncFontWorkspace();}});
+    const family=h("select",{class:"t3x-select t3x-font-select",id:"t3x-font-family","aria-label":"Font family","data-focus":"workspace-family",onpointerdown:e=>{if(!fontSelectOpen())flushPendingFontMenu();warmMenuNames(e.currentTarget);},onkeydown:e=>{if([" ","Enter","ArrowDown","ArrowUp","F4"].includes(e.key)){if(!fontSelectOpen())flushPendingFontMenu();warmMenuNames(e.currentTarget);}else if(e.key==="Escape")queueMicrotask(()=>{if(fontWorkspace&&!fontSelectOpen())flushPendingFontMenu();});},onchange:e=>choose(e.currentTarget.value),onblur:()=>{if(fontWorkspace?.pending){syncFontWorkspace();if(pop?.kind==="panel"&&!fontSelectOpen())fillPopover();}}});
+    family.addEventListener("toggle",()=>{if(!fontSelectOpen())flushPendingFontMenu();});
     const prev=h("button",{type:"button",class:"t3x-btn","aria-label":"Previous font",onclick:()=>choose(fontNeighbor(catalog,settings,settings[ROLE[fontNav.role].key].family,-1,nativeAvailable,fontNav.role))},"Previous");
     const next=h("button",{type:"button",class:"t3x-btn","aria-label":"Next font",onclick:()=>choose(fontNeighbor(catalog,settings,settings[ROLE[fontNav.role].key].family,1,nativeAvailable,fontNav.role))},"Next");
     const size=h("output",{id:"t3x-font-size","aria-live":"polite"});
@@ -4372,7 +4556,8 @@
     const plus=h("button",{type:"button",class:"t3x-btn","aria-label":"Larger font",onclick:()=>step(5)},"+");
     const reset=h("button",{type:"button",class:"t3x-btn",onclick:()=>toggleDefaultSize(fontNav.role)},"Default size");
     const filter=(key,label)=>h("button",{type:"button",class:"t3x-chipbtn","data-filter":key,"aria-pressed":String(settings[key]),onclick:()=>change({[key]:!settings[key]})},label);
-    const own=h("div",{class:"t3x-font-own"},h("div",{class:"t3x-chips"},filter("printOnly","Print only"),filter("showPartly","Show semi-cursive")),h("p",{class:"t3x-note",text:"Turn both off to include script fonts. Narrowest first; ★ marks a good fit."}),h("label",{for:"t3x-font-family",text:"Font family"}),h("div",{class:"t3x-workspace-browse"},prev,family,next),h("div",{class:"t3x-workspace-size",role:"group","aria-label":"Font size"},h("span",{text:"Size"}),minus,size,plus,reset));
+    const showHiddenChip=h("button",{type:"button",class:"t3x-chipbtn","data-filter":"showHidden",hidden:true,"aria-pressed":String(settings.showHidden),onclick:()=>change({showHidden:!settings.showHidden})},"Show hidden (0)");
+    const own=h("div",{class:"t3x-font-own"},h("div",{class:"t3x-chips"},filter("printOnly","Print only"),filter("showPartly","Show semi-cursive"),showHiddenChip),h("p",{class:"t3x-note",text:"Turn both off to include script fonts. Narrowest first; ★ marks a good fit."}),h("label",{for:"t3x-font-family",text:"Font family"}),h("div",{class:"t3x-workspace-browse"},prev,family,next),h("div",{class:"t3x-workspace-size",role:"group","aria-label":"Font size"},h("span",{text:"Size"}),minus,size,plus,reset));
     const fontNote=h("p",{class:"t3x-note"});
     const sample=h("div",{class:"t3x-font-preview t3x-workspace-sample"});
     const pickNote=h("p",{class:"t3x-font-picknote",role:"note",hidden:true});
@@ -4385,10 +4570,11 @@
     const aboutPanel=h("section",{class:"t3x-fabout","aria-label":FONT_TEXT.panelTitle,hidden:true});
     const dockSentence=h("p",{class:"t3x-font-docksentence"}),dockBody=h("div",{class:"t3x-fabout t3x-fabout-docked"});
     const dockSummary=h("summary",{text:FONT_TEXT.panelTitle}),dockDetails=h("details",{class:"t3x-font-dockdetails"},dockSummary,dockBody);
-    const dockAbout=h("div",{class:"t3x-font-dockabout",hidden:true},dockSentence,dockDetails);
+    const dockFoot=h("div",{class:"t3x-font-dockfoot",hidden:true});
+    const dockAbout=h("div",{class:"t3x-font-dockabout",hidden:true},dockSentence,dockFoot,dockDetails);
     editor.append(back,returnButton,editorTitle,pickNote,h("div",{class:"t3x-font-tools"},showBtn),h("strong",{class:"t3x-font-scope-label",text:"Applies to"}),scope,targets,h("label",{for:"t3x-font-source",text:"Font source"}),source,resolved,editSource,similar,own,fontNote,dockAbout,h("div",{class:"t3x-font-preview-label",text:"Preview"}),sample,h("p",{class:"t3x-note t3x-font-preview-note",text:"Changes apply immediately. A preview illustrates the face; native surfaces may have different text sizes and layout."}),aboutPanel,dockbar);
     el.append(h("div",{class:"t3x-font-dockgrip"},grip("the Fonts card")),h("header",{class:"t3x-font-workspace-head"},grip("Fonts"),h("div",{},title,h("p",{text:"Choose an area, then its font"})),h("div",{class:"t3x-font-head-actions"},h("button",{type:"button",class:"t3x-btn t3x-font-small",title:"Shrink to a small card for this area, placed clear of its text",onclick:()=>shrinkFonts()},"Small card"),settings.fontPicker?h("button",{type:"button",class:"t3x-btn",onclick:()=>startFontPick()},"Pick from screen"):null,h("button",{type:"button",class:"t3x-btn","aria-label":"Close Fonts",onclick:()=>closeFontWorkspace()},"Close"))),h("div",{class:"t3x-font-workspace-body"},h("nav",{class:"t3x-font-navigation","aria-label":"Font areas"},h("label",{for:"t3x-font-search",text:"Find an area"}),search,index),editor));
-    fontWorkspace={el,trigger:anchor,search,index,editor,navigation:el.querySelector(".t3x-font-navigation"),lastFocus:null,switchingArea:true,rows,empty,guidance,title:editorTitle,scope,targets,source,resolved,editSource,similar,similarNote,similarApply,similarBack,own,family,prev,next,minus,plus,size,reset,sample,fontNote,returnButton,pickNote,showBtn,role:null,optionsKey:null,aboutPanel,dockAbout,dockSentence,dockDetails,dockBody,dockbar,aboutKey:null};
+    fontWorkspace={el,trigger:anchor,search,index,editor,navigation:el.querySelector(".t3x-font-navigation"),lastFocus:null,switchingArea:true,rows,empty,guidance,title:editorTitle,scope,targets,source,resolved,editSource,similar,similarNote,similarApply,similarBack,own,family,prev,next,minus,plus,size,reset,sample,fontNote,returnButton,pickNote,showBtn,role:null,optionsKey:null,aboutPanel,dockAbout,dockSentence,dockFoot,dockDetails,dockBody,dockbar,aboutKey:null};
     fontWorkspace.hover=fontMenuHover(fontWorkspace);
     // Docked: opening About keeps the card's outer box as it was (its text scrolls inside), and the scroll keeps
     // clear of the foot bar's actual height (Pick other text, All fonts…, Done), which stays put.
@@ -4412,7 +4598,7 @@
     if(dock){el.dataset.mode="dock";el.setAttribute("aria-labelledby","t3x-font-editor-title");}
     D.body.append(el);loadAbout();syncFontWorkspace(true);
     pickNote.textContent=note;pickNote.hidden=!note;
-    if(dock){fontWorkspace.dockAnchor=dockAnchor;el.show();placeCard(el,dock);}
+    if(dock){fontWorkspace.dockAnchor=dockAnchor;fontWorkspace.dockPicked=dock;el.show();placeCard(el,dock);}
     else{el.showModal();placeBigSaved(el);}
     index.scrollTop=fontNav.indexScroll;editor.scrollTop=fontNav.scroll.get(fontNav.role)||0;
     fontWorkspace.switchingArea=false;
@@ -4433,6 +4619,127 @@
     }
     for(const section of ui.index.querySelectorAll(".t3x-font-area-group"))section.hidden=![...section.querySelectorAll(".t3x-font-area")].some(b=>!b.hidden);
     ui.empty.hidden=count>0;
+  }
+  let hideStayId = null; // the ✦ row whose Hide stays visible after a keyboard or pointer hide
+  let pillGuardOn = false;
+  let fsHideObserver = null;
+  let fsHideLock = false;
+  function setFontHidden(name, hidden) {
+    if (typeof name !== "string" || !/^[A-Za-z0-9 ]{2,40}$/.test(name) || name === "off") return;
+    const has = settings.hiddenFonts.includes(name);
+    if (has === hidden) return;
+    change({ hiddenFonts: hidden ? [...settings.hiddenFonts, name] : settings.hiddenFonts.filter((n) => n !== name) });
+  }
+  /** The closed menu's face. replaceChildren wipes it, so every rebuild prepends it again. */
+  function mountFontMenuButton(select) {
+    const btn = D.createElement("button");
+    btn.type = "button";
+    btn.tabIndex = -1;
+    btn.append(D.createElement("selectedcontent"));
+    select.prepend(btn);
+  }
+  /** One menu row: name, tags, the hidden mark, and the Hide pill. The pill does not choose the font.
+   *  The mark sits in the tag span (same size and font as "· new"); the closed face shows .mkt too (gate gap Q2, 15 Nov 2026). */
+  function fontMenuOption(select, o, current) {
+    const mark = fontMenuMark(o.hidden, o.userHidden);
+    const metaText = o.label.slice(o.name.length, mark ? o.label.length - mark.length : undefined);
+    const opt = h("option", {
+      value: o.name, style: nameStyle(o.name),
+      class: [o.userHidden ? "t3x-font-userhidden" : "", o.name === current ? "t3x-font-hot" : ""].filter(Boolean).join(" ") || null,
+    }, h("span", { text: o.name }), h("span", { class: "t3x-font-meta" }, metaText, mark ? h("span", { class: "mkt", text: mark }) : null));
+    const pill = h("span", { class: "mk", "aria-hidden": "true", text: o.userHidden ? FONT_TEXT.unhideFoot : "Hide" });
+    opt.append(pill);
+    // Chromium 152 closes the menu from the select's own listener, which runs before a listener on the
+    // pill. Stopping the event at the document, on the way down, is early enough that the click neither
+    // chooses the font nor closes the menu.
+    if (!pillGuardOn) {
+      pillGuardOn = true;
+      for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+        D.addEventListener(type, (e) => {
+          const hit = e.target?.closest?.(".mk");
+          const menu = hit?.closest?.("select");
+          if (!hit || !menu) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (type !== "click") return;
+          const row = hit.closest("option");
+          if (!row || row.disabled) return;
+          const prev = menu.value;
+          const next = !settings.hiddenFonts.includes(row.value);
+          row.classList.toggle("t3x-font-userhidden", next);
+          hit.textContent = next ? FONT_TEXT.unhideFoot : "Hide";
+          const mark = row.querySelector(".mkt");
+          const filter = Boolean(mark && mark.textContent.includes("hidden by the filter"));
+          const text = fontMenuMarkAfterPill(filter, next);
+          const meta = row.querySelector(".t3x-font-meta");
+          if (text) {
+            if (mark) mark.textContent = text;
+            else meta?.append(h("span", { class: "mkt", text }));
+          } else if (mark) mark.remove();
+          setFontHidden(row.value, next);
+          queueMicrotask(() => { if (menu.value !== prev) menu.value = prev; });
+        }, true);
+      }
+    }
+    return opt;
+  }
+  function watchFsHide(root) {
+    fsHideObserver?.disconnect();
+    fsHideObserver = null;
+    if (!root) return;
+    const run = () => {
+      if (fsHideLock) return;
+      fsHideLock = true;
+      try { for (const row of root.querySelectorAll(".t3x-fs-row")) { fitFsHiddenPos(row); fitFsHideRow(row); } }
+      finally { fsHideLock = false; }
+    };
+    fsHideObserver = new ResizeObserver(guarded("fs-hide", run));
+    fsHideObserver.observe(root);
+    run();
+  }
+  /** Gate gap Q1 (Andy, 15 Nov 2026): a row hidden by you says "hidden by you" on line 3 where that keeps line 3
+   *  to one line, else "hidden", which fits the slot "34 of 60" holds. Every hide route; re-checked on resize. */
+  function fitFsHiddenPos(row) {
+    const pos = row.querySelector(".t3x-fs-pos[data-you]"), meta = row.querySelector(".t3x-fs-meta");
+    if (!pos || !meta) return;
+    pos.textContent = FONT_TEXT.hiddenShort;
+    const short = meta.offsetHeight;
+    pos.textContent = FONT_TEXT.hiddenByYou;
+    if (meta.offsetHeight > short) pos.textContent = FONT_TEXT.hiddenShort;
+  }
+  /** The Hide control stays only where hiding moves nothing: the button, and line 3's "hidden by you"
+   *  in place of the N-of-M slot at its resting width. "Use for similar" may shift; it is in the flow. */
+  function fitFsHideRow(row) {
+    const slot = row.querySelector(".t3x-fs-hide-slot");
+    if (!slot) return;
+    const head = row.querySelector(".t3x-fs-head");
+    const lead = row.querySelector(".t3x-fs-lead");
+    const similar = row.querySelector(".t3x-fs-similar");
+    const meta = row.querySelector(".t3x-fs-meta");
+    const pos = row.querySelector(".t3x-fs-pos");
+    const metrics = () => ({
+      row: row.offsetHeight, head: head ? head.offsetHeight : 0,
+      lead: lead ? lead.getClientRects().length : 0, sim: similar ? similar.offsetTop : 0,
+      meta: meta ? meta.offsetHeight : 0,
+    });
+    row.classList.remove("t3x-fs-hide-off");
+    const shown = metrics();
+    const saved = pos ? { text: pos.textContent, min: pos.style.minWidth } : null;
+    if (pos) { pos.textContent = FONT_TEXT.hiddenByYou; if (meta && meta.offsetHeight > shown.meta) pos.textContent = FONT_TEXT.hiddenShort; }
+    const marked = metrics();
+    if (pos && saved) { pos.textContent = saved.text; pos.style.minWidth = saved.min; }
+    row.classList.add("t3x-fs-hide-off");
+    const bare = metrics();
+    const same = shown.row === bare.row && shown.head === bare.head && shown.lead === bare.lead && shown.sim === bare.sim
+      && shown.meta === marked.meta && shown.row === marked.row;
+    if (same) row.classList.remove("t3x-fs-hide-off");
+  }
+  /** Rebuild a menu that changed while it was open, once it has closed (Escape included) or just before it opens again. */
+  function flushPendingFontMenu() {
+    const ui = fontWorkspace;
+    if (!ui?.pending || fontSelectOpen()) return;
+    syncFontWorkspace();
+    if (pop?.kind === "panel" && !fontSelectOpen()) fillPopover();
   }
   function syncFontWorkspace(force=false) {
     const ui=fontWorkspace;if(!ui)return;
@@ -4468,9 +4775,10 @@
     const options=fontOptions(catalog,settings,pick.family,nativeAvailable,id),optionsKey=JSON.stringify([options,pick.family]);
     if(ui.optionsKey!==optionsKey){
       if(!fontSelectOpen()){
-        ui.family.replaceChildren(...options.map(g=>h("optgroup",{label:g.label},g.options.filter(o=>o.name!=="off").map(o=>h("option",{value:o.name,style:nameStyle(o.name)},h("span",{text:o.name}),h("span",{class:"t3x-font-meta",text:o.label.slice(o.name.length)}))))));
+        ui.family.replaceChildren(...options.map(g=>h("optgroup",{label:g.label},g.options.filter(o=>o.name!=="off").map(o=>fontMenuOption(ui.family,o,pick.family)))));
         if(pick.family==="off")ui.family.prepend(h("option",{value:"off",text:catalog?"Choose a font":"Loading fonts…",disabled:true}));
         else if(![...ui.family.options].some(o=>o.value===pick.family))ui.family.prepend(h("option",{value:pick.family,text:`${pick.family} (unavailable)`}));
+        mountFontMenuButton(ui.family);
         ui.optionsKey=optionsKey;ui.pending=false;
       }else ui.pending=true;
     }
@@ -4483,6 +4791,9 @@
     // Default goes both ways: after it, the same button reads "Back to 130%"; with nothing to go back to it greys out.
     ui.reset.disabled=disabled||(n===def&&back===null);ui.reset.textContent=n===def&&back!==null?`Back to ${back}%`:`Default ${def}%`;
     for(const filter of ui.own.querySelectorAll("[data-filter]"))filter.setAttribute("aria-pressed",String(settings[filter.dataset.filter]));
+    const hiddenN=(settings.hiddenFonts||[]).filter(n=>catalog?.some(f=>f.name===n)).length;
+    const hiddenChip=ui.own.querySelector('[data-filter="showHidden"]');
+    if(hiddenChip){hiddenChip.hidden=hiddenN<1;hiddenChip.textContent=`Show hidden (${hiddenN})`;}
     const ef=catalog?.find(f=>f.name===effective.family),t3=ef?.source==="t3"&&id!=="viz";
     const loaded=t3||roleFaces[id]?.key===`${effective.family}|${sizeOf(ef,effective)}`;
     ui.fontNote.textContent=effective.family==="off"?"Your saved own font and size stay stored while this area uses the default or follows another area.":ef?.source==="t3"?(t3?"Follows your T3 setting as it changes. The size buttons don't apply to T3's own fonts.":"Visualizations can't use T3's own fonts, so they keep T3's default."):!loaded?"Loading this font, or unavailable. Text keeps T3’s font until the face is ready.":"Font ready. Digits 0–9 keep T3’s font.";
@@ -4508,17 +4819,98 @@
     const key = show ? JSON.stringify(m) : "";
     if (ui.aboutKey !== key) {
       ui.aboutKey = key;
-      ui.aboutPanel.replaceChildren(...(!show ? [] : failed ? [h("p", { class: "t3x-fabout-failed", text: note })] : aboutPanelBody(m)).filter(Boolean));
+      // Gap G7 (Andy, 14 Nov 2026 7:16 PM)
+      const failedFoot = show && failed ? aboutFoot(m) : null;
+      ui.aboutPanel.replaceChildren(...(!show ? [] : failed ? [h("p", { class: "t3x-fabout-failed", text: note }), failedFoot] : aboutPanelBody(m)).filter(Boolean));
       ui.dockSentence.textContent = !show ? "" : failed ? note : m.kind === "font" ? m.desc : m.sentence;
       ui.dockBody.replaceChildren(...(show && m.kind === "font" ? aboutPanelBody(m, { title: false, desc: false }) : []).filter(Boolean));
+      // Gate gap Q4 (Andy, 15 Nov 2026): the same foot directly under the docked card's failed sentence.
+      ui.dockFoot.replaceChildren(...[show && failed ? aboutFoot(m) : null].filter(Boolean));
+      // Gate gap Q4: once the failed sentence and foot arrive, keep the docked card clear of the picked text.
+      // The loaded state's placement is unchanged.
+      if (show && failed && ui.el.dataset.mode === "dock") requestAnimationFrame(guarded("dock-failed-place", () => fitFailedDock(ui)));
     }
+    ui.dockFoot.hidden = !ui.dockFoot.childElementCount;
     ui.aboutPanel.hidden = !show;
     ui.aboutPanel.classList.toggle("t3x-fabout-failedbox", show && failed);
     ui.dockSentence.classList.toggle("t3x-font-docksentence-failed", show && failed);
     ui.dockAbout.hidden = !show;
     ui.dockDetails.hidden = !show || m.kind !== "font";
-    if (ui.el.dataset.mode !== "dock" || !ui.dockDetails.open || ui.dockDetails.hidden) ui.el.style.removeProperty("height");
+    // fitFailedDock pins a height when the failed card fits nowhere clear of the text. Dropping it here
+    // would undo that pin. Opening About on a loaded font still keeps the height its own click sets.
+    const failedDock = show && failed && ui.el.dataset.mode === "dock";
+    if (!failedDock && (ui.el.dataset.mode !== "dock" || !ui.dockDetails.open || ui.dockDetails.hidden)) {
+      ui.el.style.removeProperty("height");
+      ui.el.style.removeProperty("max-height");
+    }
     padDockScroll(ui);
+  }
+  /** The picked text a docked card must stay clear of: the anchor's box and its text, so a short line
+   *  still counts the whole element (the popup test) and a line that sticks out still counts (the late pick). */
+  function dockKeep(ui) {
+    const el = ui.dockAnchor?.isConnected ? ui.dockAnchor : null;
+    let box = null;
+    if (el) {
+      const b = el.getBoundingClientRect();
+      if (b.width > 0 || b.height > 0) box = { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
+      const r = D.createRange();
+      r.selectNodeContents(el);
+      const t = r.getBoundingClientRect();
+      if (t.width > 0 || t.height > 0) {
+        const text = { left: t.left, top: t.top, right: t.right, bottom: t.bottom };
+        box = box ? { left: Math.min(box.left, text.left), top: Math.min(box.top, text.top), right: Math.max(box.right, text.right), bottom: Math.max(box.bottom, text.bottom) } : text;
+      }
+    }
+    if (box) return box;
+    const p = ui.dockPicked;
+    return p && p.right > p.left && p.bottom > p.top ? { left: p.left, top: p.top, right: p.right, bottom: p.bottom } : null;
+  }
+  const boxHits = (x, y, w, h, r) => !!r && x < r.right && r.left < x + w && y < r.bottom && r.top < y + h;
+  const cardHits = (el, keep) => { if (!keep) return false; const b = el.getBoundingClientRect(); return boxHits(b.left, b.top, b.width, b.height, keep); };
+  /** A spot at the card's current size leaves the picked text uncovered (a saved spot counts). */
+  function dockSpotClear(el, keep) {
+    const m = 12, w = el.offsetWidth, h = el.offsetHeight, vw = innerWidth, vh = innerHeight;
+    if (!keep) return true;
+    if (!(w > 0) || !(h > 0)) return false;
+    if (!settings.popMove) {
+      const beside = keep.right + m + w <= vw - m || keep.left - m - w >= m;
+      return beside || keep.bottom + m + h <= vh - m || keep.top - m - h >= m;
+    }
+    const spot = settings.popSpots.card;
+    if (spot) {
+      const [x, y] = spotXY(el, spot);
+      const left = clamp(x, m, Math.max(m, vw - w - m)), top = clamp(y, m, Math.max(m, vh - h - m));
+      if (!boxHits(left, top, w, h, keep)) return true;
+    }
+    const avoid = areaRects(fontNav.role).slice(0, 120).map((c) => c.rect);
+    const at = clearSpot(w, h, avoid, { vw, vh, m, keep });
+    return !boxHits(at.left, at.top, w, h, keep);
+  }
+  /** Pin the docked card to the larger gap above or below the picked text, inside the window margins. */
+  function pinDockGap(el, keep) {
+    const m = 12;
+    const above = keep ? Math.max(0, keep.top - m) : 0;
+    const below = keep ? Math.max(0, innerHeight - m - keep.bottom) : 0;
+    const useAbove = !keep || above >= below;
+    const cap = Math.min(600, Math.max(0, innerHeight - 2 * m));
+    const gap = Math.floor(Math.min(cap, useAbove ? above : below));
+    if (gap > 0 && gap < el.offsetHeight - 0.5) {
+      el.style.height = `${gap}px`;
+    }
+    const top = useAbove ? m : Math.max(m, keep ? keep.bottom : m);
+    moveBox(el, Math.max(m, innerWidth - el.offsetWidth - m), top, null, m);
+  }
+  /** Failed / no-details dock only. Re-place when the grown card has a spot clear of the picked text.
+   *  When it does not, keep the outer box at the clear gap and let the body scroll, as opening About does. */
+  function fitFailedDock(ui) {
+    if (fontWorkspace !== ui || !ui.el.open || ui.el.dataset.mode !== "dock") return;
+    if (ui.dockAbout.hidden || !ui.dockSentence.classList.contains("t3x-font-docksentence-failed")) return;
+    const keep = dockKeep(ui);
+    ui.el.style.removeProperty("height");
+    ui.el.style.removeProperty("max-height");
+    if (!dockSpotClear(ui.el, keep)) pinDockGap(ui.el, keep);
+    placeCard(ui.el, keep);
+    if (cardHits(ui.el, keep)) pinDockGap(ui.el, keep);
   }
   /** The docked card's scroll keeps the foot bar's height clear (scroll-padding), recomputed as it changes. */
   function padDockScroll(ui) {
@@ -4618,7 +5010,9 @@
     if (settings.burnTells) fetchBurn();
     else burnData = null;
     render();
-    if (pop?.kind === "panel") fillPopover();
+    // Rebuilding the panel throws away an open font menu. The pill has already updated that row; the
+    // menu's blur applies the rebuild once it has closed.
+    if (pop?.kind === "panel" && !fontSelectOpen()) fillPopover();
     if (pop && patch && Object.prototype.hasOwnProperty.call(patch, "popMove")) place();
     syncFontWorkspace();
   }
@@ -5003,7 +5397,7 @@
     ui.el.dataset.mode = "dock";
     ui.el.removeAttribute("data-t3x-moved");
     ui.el.setAttribute("aria-labelledby", "t3x-font-editor-title");
-    ui.dockAnchor = null;
+    ui.dockAnchor = null; ui.dockPicked = null;
     ui.el.show();
     syncFontWorkspace();
     placeCard(ui.el);
@@ -5128,15 +5522,21 @@
    *  couldn't load (no records, records for another list, or an unusable record): the panel says so, cards don't
    *  show; { kind: "norecord" } when the records loaded but this family has none (7A): the panel says that instead.
    *  names: whose area names the usage line uses ("panel" for the ✦ card; else the Fonts window's). */
-  function aboutModelFor(name, { hidden = false, names = "fonts" } = {}) {
+  function aboutModelFor(name, { hidden = false, names = "fonts", areaId = null } = {}) {
     const f = catalog?.find((x) => x.name === name);
     if (!f || !catalog) return null;
     const native = f.source === "mac" ? nativeAvailable(f.name) : true;
-    if (f.source !== "t3" && native && !aboutRecords) { loadAbout(); return aboutStatus === "failed" ? { kind: "failed", name } : null; } // loadAbout retries at most once a minute
+    if (f.source !== "t3" && native && !aboutRecords) { loadAbout(); return aboutStatus === "failed" ? { kind: "failed", name, userHidden: fontUserHidden(f, settings) } : null; } // loadAbout retries at most once a minute
     const rec = aboutRecords?.get(name) ?? null;
-    const m = fontAbout(f, rec, { median: catalog.xRatioMedian, usage: usageOf(name, names), hidden: hidden && !fontVisible(f, settings), native, now: f.source === "t3" ? t3FontNow(f.name) : null });
-    if (!m && !rec && aboutStatus === "ready") return { kind: "norecord", name }; // "ready": the records are this list's
-    return m ?? { kind: "failed", name };
+    const id = areaId || fontNav.role;
+    const areaSize = id && f.source !== "t3" && ROLE[id] ? sizeOf(f, activePick(id)) : (Number.isInteger(f.size) ? f.size : null); // the size the area draws at, also when it follows another area (Fable gate, 14 Nov 2026)
+    const areaLabel = id ? (fontArea(id)?.label ?? areaTitle(id)) : "";
+    const m = fontAbout(f, rec, {
+      median: catalog.xRatioMedian, usage: usageOf(name, names), hidden: hidden && !fontVisible(f, settings), native,
+      now: f.source === "t3" ? t3FontNow(f.name) : null, areaSize, areaLabel, uiWidth: catalog.uiWidth, userHidden: fontUserHidden(f, settings),
+    });
+    if (!m && !rec && aboutStatus === "ready") return { kind: "norecord", name, userHidden: fontUserHidden(f, settings) }; // "ready": the records are this list's
+    return m ?? { kind: "failed", name, userHidden: fontUserHidden(f, settings) };
   }
   /** "loaded", "loading" or "failed": a font kind shows once its name face has loaded; T3's own fonts and
    *  missing Mac fonts load nothing. */
@@ -5161,35 +5561,108 @@
     const strip = h("div", { class: "t3x-fcard-strip", text: m.strip });
     strip.style.fontFamily = aboutFaceCss(m);
     return [name, strip, h("p", { class: "t3x-fcard-desc", text: m.desc }), m.card.length ? h("ul", {}, m.card.map((x) => h("li", { text: x }))) : null,
-      h("p", { class: "t3x-fcard-line t3x-fcard-bg", text: m.background }), h("p", { class: "t3x-fcard-line t3x-fcard-tech", text: m.technical }), h("p", { class: "t3x-fcard-use", text: m.usage }), hidden].filter(Boolean);
+      h("p", { class: "t3x-fcard-line t3x-fcard-bg", text: m.background }), h("p", { class: "t3x-fcard-line t3x-fcard-tech", text: m.technical }),
+      m.screen ? h("p", { class: "t3x-fcard-line t3x-fcard-score", text: m.screen.cardLine }) : null,
+      h("p", { class: "t3x-fcard-use", text: m.usage }), hidden].filter(Boolean);
   }
   /** 10G′ (14 Nov 2026): fit the pane swap's lines to its box, whole lines only, by priority. Must show: the name,
    *  letter strip, sentence, usage and any trait that warns how the font draws in T3 (in its place among the traits);
-   *  when those don't fit, the letter strip goes first (every font), then no swap. Then the traits; then Technical
-   *  whole, else its first sentence (also when the traits didn't fit); Background only when the traits and a
-   *  Technical form both show. The "Hidden by…" line comes last (2C, 14 Nov 2026): only when every line above shows
-   *  whole (strip, traits, Technical whole, Background) and it still fits; it never costs a line or the swap. On T3's
-   *  own fonts it goes before the swap does. False: nothing fits whole, so no swap. */
+   *  when those don't fit, the letter strip goes first (every font), then no swap. Then all traits; then Technical
+   *  whole, else its first sentence; then the score; then Background. If the score does not fit with Background
+   *  hidden, the score goes and Background shows when it fits. Technical is never shortened to admit the score.
+   *  The full hover card keeps its drawn order. The "Hidden by…" line comes last (2C, 14 Nov 2026): only when the
+   *  strip, all traits, Technical whole and Background show, and it still fits. On T3's own fonts it goes before
+   *  the swap does. False: nothing fits whole, so no swap. */
+  function applySwapState(swap, m, st) {
+    const hidden = swap.querySelector(".t3x-fcard-hidden");
+    const score = swap.querySelector(".t3x-fcard-score");
+    const strip = swap.querySelector(".t3x-fcard-strip");
+    const ul = swap.querySelector("ul");
+    const lis = ul ? [...ul.children] : [];
+    const bg = swap.querySelector(".t3x-fcard-bg");
+    const tech = swap.querySelector(".t3x-fcard-tech");
+    const warn = new Set(lis.filter((_, i) => m.cardWarn?.includes(i)));
+    if (strip) strip.hidden = !st.strip;
+    if (ul) {
+      ul.hidden = st.traits !== "all" && !warn.size;
+      for (const li of lis) li.hidden = st.traits !== "all" && !warn.has(li);
+    }
+    if (tech) {
+      tech.hidden = st.tech === "off";
+      tech.textContent = st.tech === "first" ? m.technicalFirst : m.technical;
+    }
+    if (bg) bg.hidden = !st.bg;
+    if (score) score.hidden = !st.score;
+    if (hidden) hidden.hidden = !st.hidden;
+  }
   function fitSwapLines(swap, m) {
     const fits = () => swap.scrollHeight <= swap.clientHeight + 0.5;
     const hidden = swap.querySelector(".t3x-fcard-hidden");
-    if (m.kind !== "font") { if (hidden && !fits()) hidden.hidden = true; return fits(); } // T3's own and missing Mac fonts: the sentence only
-    if (hidden) hidden.hidden = true;
-    const strip = swap.querySelector(".t3x-fcard-strip"), ul = swap.querySelector("ul"), lis = ul ? [...ul.children] : [];
-    const bg = swap.querySelector(".t3x-fcard-bg"), tech = swap.querySelector(".t3x-fcard-tech");
-    const warn = lis.filter((_, i) => m.cardWarn?.includes(i));
-    const traits = (all) => { if (!ul) return; ul.hidden = !all && !warn.length; for (const li of lis) li.hidden = !all && !warn.includes(li); };
-    bg.hidden = true; tech.hidden = true; traits(false);
-    if (!fits()) { strip.hidden = true; if (!fits()) return false; }
-    let traitsAll = !ul;
-    if (ul) { traits(true); traitsAll = fits(); if (!traitsAll) traits(false); }
-    tech.hidden = false;
-    if (!fits()) { tech.textContent = m.technicalFirst; if (!fits()) tech.hidden = true; } // its ending goes only when that saves a line
-    if (traitsAll && !tech.hidden) { bg.hidden = false; if (!fits()) bg.hidden = true; }
-    if (hidden && !strip.hidden && traitsAll && tech.textContent === m.technical && !bg.hidden) { hidden.hidden = false; if (!fits()) hidden.hidden = true; }
-    return true;
+    const score = swap.querySelector(".t3x-fcard-score");
+    if (m.kind !== "font") {
+      if (score) score.hidden = true;
+      if (hidden && !fits()) hidden.hidden = true;
+      return fits();
+    }
+    // Gap G4 (Andy, 14 Nov 2026 7:16 PM)
+    const kept = fitSwapKeep(
+      { traits: !!swap.querySelector("ul"), score: !!score, hidden: !!hidden, ordinary: (m.card?.length ?? 0) > (m.cardWarn?.length ?? 0) },
+      (st) => { applySwapState(swap, m, st); return fits(); },
+    );
+    // A rejected try leaves that line painted; the returned state is the one that fits.
+    if (kept) applySwapState(swap, m, kept);
+    return !!kept;
   }
   const aboutCardEl = (m) => h("div", { [OWN]: "font-card", class: "t3x-fcard" }, aboutCardBody(m));
+  /** Hide / Unhide at the foot of an About panel Andy can hide, including a failed or no-details panel. */
+  function aboutFoot(m) {
+    if (!m?.name) return null;
+    const f = catalog?.find((x) => x.name === m.name);
+    const native = f?.source === "mac" ? nativeAvailable(f.name) : true;
+    const copy = hideFootCopy(f, settings, native);
+    // Gap G5 (Andy, 14 Nov 2026 7:16 PM)
+    if (!copy) return null;
+    return h("p", { class: "t3x-fabout-foot" },
+      h("button", { type: "button", class: "t3x-btn t3x-fabout-hide", "data-focus": "about-hide", onclick: () => setFontHidden(m.name, !settings.hiddenFonts.includes(m.name)) }, copy.button),
+      h("span", { class: "t3x-fabout-hidenote", text: copy.note }));
+  }
+  function scoreSection(screen) {
+    if (!screen) return null;
+    return h("div", { class: "t3x-fabout-sec t3x-fabout-score" },
+      h("h4", {}, FONT_TEXT.scoreHead, h("span", { class: "t3x-fabout-exp", text: FONT_TEXT.scoreExp })),
+      h("p", {}, h("span", { class: "t3x-fabout-score-num", text: String(screen.score) }), ` · ${screen.band}`),
+      h("p", { class: "t3x-fabout-cond", text: screen.conditions }),
+      screen.hardNote ? h("p", { class: "t3x-fabout-hardnote", text: screen.hardNote }) : null,
+      h("details", { class: "t3x-fabout-method" }, h("summary", { text: "How it's measured" }), h("p", { text: screen.method })));
+  }
+  function storySourceLine(sources) {
+    if (!sources?.text) return null;
+    const p = h("p", { class: "t3x-fabout-sources" });
+    let i = 0;
+    for (const link of sources.links || []) {
+      if (link.start > i) p.append(D.createTextNode(sources.text.slice(i, link.start)));
+      const a = h("a", { href: link.url, target: "_blank", rel: "noopener noreferrer", text: link.text });
+      a.addEventListener("click", (e) => { if (!String(link.url).startsWith("https://")) e.preventDefault(); });
+      p.append(a);
+      i = link.start + link.text.length;
+    }
+    if (i < sources.text.length) p.append(D.createTextNode(sources.text.slice(i)));
+    return p;
+  }
+  function storySection(story) {
+    // Gap G3 (Andy, 14 Nov 2026 7:16 PM)
+    if (!story?.rows?.length && !story?.sources?.text) return null;
+    return h("div", { class: "t3x-fabout-story" },
+      h("h4", { text: FONT_TEXT.storyHead }),
+      story.rows?.length ? h("dl", {}, story.rows.flatMap((r) => [h("dt", { text: r.row }), h("dd", { text: r.text })])) : null,
+      storySourceLine(story.sources));
+  }
+  function widthDd(width) {
+    const dd = h("dd");
+    dd.append(h("span", { class: "t3x-fabout-wline", text: width.intro }));
+    for (const line of width.lines) dd.append(h("span", { class: "t3x-fabout-wline", text: line }));
+    return dd;
+  }
   /** The panel's text: title (unless the docked card's summary stands in), name and strip, sentence, then
    *  What sets it apart | Using it here; Background | Technical. T3's own fonts and missing Mac fonts: their sentence. */
   function aboutPanelBody(m, { title = true, desc = true } = {}) {
@@ -5197,17 +5670,20 @@
     name.style.fontFamily = aboutFaceCss(m);
     const head = h("div", { class: "t3x-fabout-head" }, name);
     const out = [title ? h("div", { class: "t3x-fabout-title", text: FONT_TEXT.panelTitle }) : null, head];
-    // T3's own fonts: their sentence and where you use them; a Mac font not on this Mac: its sentence.
+    // T3's own fonts: their sentence and where you use them; a Mac font not on this Mac: its sentence. Neither gets Hide.
+    // Gap G7 (Andy, 14 Nov 2026 7:16 PM)
     if (m.kind !== "font") return [...out, h("p", { class: "t3x-fabout-desc", text: m.sentence }), m.kind === "t3" ? h("p", { class: "t3x-fabout-use", text: m.usage }) : null];
     const strip = h("span", { class: "t3x-fabout-strip", text: m.strip });
     strip.style.fontFamily = aboutFaceCss(m);
     head.append(strip);
     const sec = (t, ...kids) => h("div", { class: "t3x-fabout-sec" }, h("h4", { text: t }), ...kids);
+    const background = sec(FONT_TEXT.backgroundHead, h("p", { text: m.panel.background }));
+    if (m.screen) background.append(scoreSection(m.screen));
+    const technical = sec(FONT_TEXT.technicalHead, h("dl", {}, m.panel.rows.flatMap(([k, v]) => [h("dt", { text: k }), v && v.intro ? widthDd(v) : h("dd", { text: v })])));
     return [...out, desc ? h("p", { class: "t3x-fabout-desc", text: m.desc }) : null, h("div", { class: "t3x-fabout-grid" },
       sec(FONT_TEXT.apartHead, h("ul", {}, m.apart.map((x) => h("li", { text: x })))),
       sec(FONT_TEXT.usingHead, h("p", { text: m.panel.using })),
-      sec(FONT_TEXT.backgroundHead, h("p", { text: m.panel.background })),
-      sec(FONT_TEXT.technicalHead, h("dl", {}, m.panel.rows.flatMap(([k, v]) => [h("dt", { text: k }), h("dd", { text: v })]))))];
+      background, technical, storySection(m.story)), aboutFoot(m)];
   }
 
   /** S1′: while the font menu is open, the highlighted option's card sits in the area list's viewport (left and
@@ -5275,9 +5751,13 @@
       if (!fitSwapLines(swap, m)) swap.style.display = "none"; // 10G′: not even the must-show lines fit whole: no swap
     }
     const swapHead = () => h("div", { class: "t3x-fswap-area", text: FONT_TEXT.paneSwapHead(fontArea(fontNav.role)?.label ?? "") });
+    function markHot(name) {
+      for (const o of ui.family.querySelectorAll("option")) o.classList.toggle("t3x-font-hot", !!name && o.value === name);
+    }
     function highlight(name) {
       if (name === st.highlight) return;
       st.highlight = name;
+      markHot(name || ui.family.value);
       if (!name) { clearTimeout(st.timer); st.timer = 0; st.live = false; return st.swapped ? null : hide(); }
       watch();
       queueFontName(name, true);
@@ -5376,7 +5856,7 @@
     rowCard.pending = null;
     const none = () => { rowTipBack(); return null; }; // ruled out: the name's tooltip comes back
     if (disposed || !btn.isConnected || pop?.kind !== "panel" || !pop.el.contains(btn)) return none();
-    const name = settings[ROLE[id].key].family, m = aboutModelFor(name, { hidden: true, names: "panel" });
+    const name = settings[ROLE[id].key].family, m = aboutModelFor(name, { hidden: true, names: "panel", areaId: id });
     if (!m) return none();
     const face = aboutFace(m);
     if (face === "failed") return none();
@@ -5423,6 +5903,20 @@
       }, pick.family);
       name.style.fontFamily = t3 ? f.css : loaded ? `"${ROLE[id].alias}",var(--font-sans)` : "var(--font-sans)";
       const offer = similarOffer(id);
+      const you = Boolean(f && fontUserHidden(f, settings));
+      const hideWord = you ? "Unhide" : "Hide";
+      const hideName = you ? `Unhide ${pick.family}` : `Hide ${pick.family} from every font list (Show hidden brings it back)`;
+      const hideBtn = pick.family !== "off" ? h("button", {
+        type: "button", class: "t3x-fs-hide", "data-focus": `fs-hide-${id}`, title: hideName, "aria-label": hideName,
+        onclick: (e) => {
+          if (e.currentTarget.closest(".t3x-fs-row")?.classList.contains("t3x-fs-hide-off")) return;
+          const hiding = !settings.hiddenFonts.includes(pick.family);
+          if (hiding) hideStayId = id;
+          else if (hideStayId === id) hideStayId = null;
+          setFontHidden(pick.family, hiding);
+        },
+      }, hideWord) : null;
+      const hideSlot = hideBtn ? h("span", { class: "t3x-fs-hide-slot" }, h("span", { class: "t3x-fs-hide t3x-fs-hide-sizer", "aria-hidden": "true", text: "Unhide" }), hideBtn) : null;
       const similar = offer && h("button", {
         type: "button", class: "t3x-fs-similar", "data-focus": `fs-similar-${id}`, title: offer.text,
         "aria-label": offer.areas.length ? `${offer.text} Applies now; Undo appears here.` : `Undo: ${offer.text}`,
@@ -5471,15 +5965,25 @@
         if (shown > NAME_CAP) name.style.fontSize = `${Math.round(2000 * NAME_CAP / shown) / 100}px`;
         if (capped) name.title = `${pick.family}. Shown at ${NAME_CAP}% here; the app uses ${n}%. Click to edit in Fonts; ← → try the previous or next font.`;
       }
-      const pos = at >= 0 ? h("span", { class: "t3x-fs-pos", text: `${at + 1} of ${entries.length}` }) : null;
+      const pos = at >= 0 ? h("span", you ? { class: "t3x-fs-pos", "data-you": "1", title: FONT_TEXT.hiddenByYou, "aria-label": FONT_TEXT.hiddenByYou, text: FONT_TEXT.hiddenByYou } : { class: "t3x-fs-pos", text: `${at + 1} of ${entries.length}` }) : null;
       if (pos) pos.style.minWidth = `${posCh}ch`;
       // Three fixed lines: the area and its action; the font; its size, Default and place in the list.
-      return h("div", { class: "t3x-fs-row" },
+      const row = h("div", { class: you && hideStayId === id ? "t3x-fs-row t3x-fs-hide-stay" : "t3x-fs-row" },
         h("div", { class: "t3x-fs-head" },
           h("span", { class: "t3x-fs-lead" }, h("span", { class: "t3x-fs-label", text: label }), also.length ? h("span", { class: "t3x-fs-also", text: `+\u00a0${also.join(", ")}` }) : null),
-          similar),
+          hideSlot, similar),
         h("div", { class: "t3x-fs-pick" }, arrow(-1), name, arrow(1)),
         h("div", { class: "t3x-fs-meta" }, sizeLine, pos));
+      const releaseStay = () => {
+        if (hideStayId !== id) return;
+        queueMicrotask(() => {
+          if (hideStayId !== id || !row.isConnected) return;
+          if (!row.matches(":hover") && !row.contains(D.activeElement)) { hideStayId = null; row.classList.remove("t3x-fs-hide-stay"); }
+        });
+      };
+      row.addEventListener("pointerleave", releaseStay);
+      row.addEventListener("focusout", releaseStay);
+      return row;
     }));
   }
 

@@ -119,13 +119,13 @@ test("main text font: its own pick, off by default, two targets on by default, k
 test("Print only (default) hides partly joined and joined; the chips reveal them as specified", () => {
   const base = C.readSettings(null);
   const printOnly = names(C.fontOptions(fonts, base, "off"));
-  assert.equal(printOnly.length, 59 - 13 - 2);
+  assert.equal(printOnly.length, 71 - 13 - 2);
   assert.ok(!printOnly.includes("Caveat") && !printOnly.includes("SignPainter"));
   const partly = names(C.fontOptions(fonts, { ...base, showPartly: true }, "off"));
-  assert.equal(partly.length, 59 - 2);
+  assert.equal(partly.length, 71 - 2);
   assert.ok(partly.includes("Caveat") && !partly.includes("Over the Rainbow"));
   const all = names(C.fontOptions(fonts, { ...base, printOnly: false, showPartly: false }, "off"));
-  assert.equal(all.length, 59, "joined fonts appear when both chips are off");
+  assert.equal(all.length, 71, "joined fonts appear when both chips are off");
   // A migrated joined choice stays listed, labelled, never silently replaced.
   const kept = C.fontOptions(fonts, base, "SignPainter").flatMap((g) => g.options).find((o) => o.name === "SignPainter");
   assert.ok(kept.hidden);
@@ -137,7 +137,7 @@ test("Print only (default) hides partly joined and joined; the chips reveal them
 test("pickers: three groups (Rounded print after Handwritten), narrowest first, tags from the measurements", () => {
   const groups = plain(C.fontOptions(fonts, C.readSettings(null), "off", () => true));
   assert.deepEqual(groups.map((g) => g.label), ["Handwritten", "Rounded print", "Condensed print"]);
-  assert.deepEqual(groups[1].options.map((o) => o.name).sort(), ["Gowun Dodum", "Kiwi Maru", "Tsukimi Rounded", "Zen Maru Gothic"]);
+  assert.deepEqual(groups[1].options.map((o) => o.name).sort(), ["Chiron GoRound TC", "Darumadrop One", "Gowun Dodum", "Kiwi Maru", "Mochiy Pop One", "Stick", "Tsukimi Rounded", "Zen Maru Gothic"]);
   const hand = groups[0].options;
   assert.equal(hand[0].name, "Just Another Hand", "the narrowest hand first");
   const widths = hand.map((o) => fonts.find((f) => f.name === o.name).width);

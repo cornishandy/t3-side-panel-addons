@@ -1,6 +1,6 @@
 {
  "note": "Test fixture only: two records in the font-about.json schema, adapted from the round 2 mock (mock/data2.json, plain text, not HTML). The shipped font-about.json comes from the writer's checked file through tools/fonts.mjs about.",
- "listVersion": 2,
+ "listVersion": 3,
  "records": {
   "Klee One": {
    "strip": "a g y fi ffl &",

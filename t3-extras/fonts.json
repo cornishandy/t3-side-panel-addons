@@ -1,7 +1,7 @@
 {
  "note": "Fonts for the Heading and Body pickers: one place for the list, each family's style verdict and its measurements. Google families are fetched once by install.sh from the pinned fonts.gstatic.com URLs below (latin subset, one weight) with their licence from github.com/google/fonts at a pinned commit; each file must match its sha256. macOS families need nothing. Rebuild with tools/fonts.mjs. listVersion counts changes to this list: families added in a change carry newIn = that version and show \"new\" in the menus until the next change, which bumps listVersion. xRatio (lower case as a whole % of capital height), widthVsSystem (the sample sentence at the default size against T3’s built-in system font at 100%, signed whole %), sizeClamped and xRatioMedian come from tools/fonts.mjs measure; narrow and tall compare with the Handwritten medians of the families without newIn.",
- "listVersion": 2,
- "styleSource": "Gemini 4 Argon by eye, 19 Oct 2026 (coordinator: Noteworthy is print). star = Argon's top 8 for Andy's taste; hard = hard to read at 14-16 px. The eight families with newIn 2 (13 Nov 2026): Claude Opus 5.5, the builder, by eye at 14, 15 and 16 px in T3’s chrome-headless-shell 157 (a sentence, a pangram, 1Il|O0, curly quotes and dashes): all print, none hard to read small, none starred. oneWeight: the family has one weight (Google’s METADATA at the pinned commit: one weight and no weight axis; the Mac families’ files). smallCaps: the lower case is drawn as small capitals. dashesTouch: in T3 (its web UI, Chromium 152 and 157, 13 Nov 2026) the em dash runs into the next word (its ink reaches about twice its advance), so the record says so.",
+ "listVersion": 3,
+ "styleSource": "Gemini 4 Argon by eye, 19 Oct 2026 (coordinator: Noteworthy is print). star = Argon's top 8 for Andy's taste; hard = hard to read at 14-16 px. The eight families with newIn 2 (13 Nov 2026): Claude Opus 5.5, the builder, by eye at 14, 15 and 16 px in T3’s chrome-headless-shell 157 (a sentence, a pangram, 1Il|O0, curly quotes and dashes): all print, none hard to read small, none starred. oneWeight: the family has one weight (Google’s METADATA at the pinned commit: one weight and no weight axis; the Mac families’ files). smallCaps: the lower case is drawn as small capitals. dashesTouch: in T3 (its web UI, Chromium 152 and 157, 13 Nov 2026) the em dash runs into the next word (its ink reaches about twice its advance), so the record says so. hard re-judged 14 Nov 2026 by the consensus team at true size.",
  "families": [
   {
    "name": "Amatic SC",
@@ -9,7 +9,7 @@
    "group": "hand",
    "style": "print",
    "star": false,
-   "hard": false,
+   "hard": true,
    "file": "amatic-sc-latin-400.woff2",
    "licence": "LICENSE-amatic-sc.txt",
    "licenceType": "OFL-1.1",
@@ -21,7 +21,12 @@
    "sizeClamped": true,
    "xRatio": 88,
    "widthVsSystem": -46,
-   "smallCaps": true
+   "smallCaps": true,
+   "screen": {
+    "score": 37,
+    "letters": 0.353,
+    "reading": 0.388
+   }
   },
   {
    "name": "Just Another Hand",
@@ -29,7 +34,7 @@
    "group": "hand",
    "style": "print",
    "star": true,
-   "hard": false,
+   "hard": true,
    "file": "just-another-hand-latin-400.woff2",
    "licence": "LICENSE-just-another-hand.txt",
    "licenceType": "Apache-2.0",
@@ -41,7 +46,12 @@
    "sizeClamped": false,
    "xRatio": 57,
    "widthVsSystem": -37,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 67,
+    "letters": 1.031,
+    "reading": 0.436
+   }
   },
   {
    "name": "Sue Ellen Francisco",
@@ -61,7 +71,12 @@
    "sizeClamped": false,
    "xRatio": 41,
    "widthVsSystem": -12,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 84.6,
+    "letters": 1.164,
+    "reading": 0.622
+   }
   },
   {
    "name": "Covered By Your Grace",
@@ -81,7 +96,12 @@
    "sizeClamped": false,
    "xRatio": 62,
    "widthVsSystem": -9,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 83.6,
+    "letters": 1.026,
+    "reading": 0.681
+   }
   },
   {
    "name": "Nanum Pen Script",
@@ -101,7 +121,12 @@
    "sizeClamped": false,
    "xRatio": 90,
    "widthVsSystem": -16,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 75.1,
+    "letters": 0.793,
+    "reading": 0.712
+   }
   },
   {
    "name": "Reenie Beanie",
@@ -109,7 +134,7 @@
    "group": "hand",
    "style": "partly",
    "star": false,
-   "hard": true,
+   "hard": false,
    "file": "reenie-beanie-latin-400.woff2",
    "licence": "LICENSE-reenie-beanie.txt",
    "licenceType": "OFL-1.1",
@@ -121,7 +146,12 @@
    "sizeClamped": false,
    "xRatio": 65,
    "widthVsSystem": 8,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 83.4,
+    "letters": 1.107,
+    "reading": 0.629
+   }
   },
   {
    "name": "Shadows Into Light",
@@ -141,7 +171,12 @@
    "sizeClamped": false,
    "xRatio": 81,
    "widthVsSystem": -13,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 71.8,
+    "letters": 0.958,
+    "reading": 0.539
+   }
   },
   {
    "name": "Shadows Into Light Two",
@@ -161,7 +196,12 @@
    "sizeClamped": false,
    "xRatio": 73,
    "widthVsSystem": -18,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 73.9,
+    "letters": 0.9,
+    "reading": 0.606
+   }
   },
   {
    "name": "Loved by the King",
@@ -169,7 +209,7 @@
    "group": "hand",
    "style": "print",
    "star": false,
-   "hard": false,
+   "hard": true,
    "file": "loved-by-the-king-latin-400.woff2",
    "licence": "LICENSE-loved-by-the-king.txt",
    "licenceType": "OFL-1.1",
@@ -181,7 +221,12 @@
    "sizeClamped": false,
    "xRatio": 69,
    "widthVsSystem": -31,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 59.2,
+    "letters": 0.832,
+    "reading": 0.422
+   }
   },
   {
    "name": "Annie Use Your Telescope",
@@ -201,7 +246,12 @@
    "sizeClamped": false,
    "xRatio": 64,
    "widthVsSystem": -14,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 89.8,
+    "letters": 0.986,
+    "reading": 0.818
+   }
   },
   {
    "name": "Just Me Again Down Here",
@@ -209,7 +259,7 @@
    "group": "hand",
    "style": "partly",
    "star": false,
-   "hard": true,
+   "hard": false,
    "file": "just-me-again-down-here-latin-400.woff2",
    "licence": "LICENSE-just-me-again-down-here.txt",
    "licenceType": "OFL-1.1",
@@ -221,7 +271,12 @@
    "sizeClamped": false,
    "xRatio": 61,
    "widthVsSystem": 13,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 99.9,
+    "letters": 1.209,
+    "reading": 0.869
+   }
   },
   {
    "name": "The Girl Next Door",
@@ -229,7 +284,7 @@
    "group": "hand",
    "style": "print",
    "star": false,
-   "hard": true,
+   "hard": false,
    "file": "the-girl-next-door-latin-400.woff2",
    "licence": "LICENSE-the-girl-next-door.txt",
    "licenceType": "OFL-1.1",
@@ -241,7 +296,12 @@
    "sizeClamped": false,
    "xRatio": 77,
    "widthVsSystem": 11,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 90.4,
+    "letters": 0.994,
+    "reading": 0.821
+   }
   },
   {
    "name": "Waiting for the Sunrise",
@@ -261,7 +321,12 @@
    "sizeClamped": false,
    "xRatio": 75,
    "widthVsSystem": -3,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 78.6,
+    "letters": 0.99,
+    "reading": 0.624
+   }
   },
   {
    "name": "Sedgwick Ave",
@@ -269,7 +334,7 @@
    "group": "hand",
    "style": "partly",
    "star": false,
-   "hard": true,
+   "hard": false,
    "file": "sedgwick-ave-latin-400.woff2",
    "licence": "LICENSE-sedgwick-ave.txt",
    "licenceType": "OFL-1.1",
@@ -281,7 +346,12 @@
    "sizeClamped": true,
    "xRatio": 78,
    "widthVsSystem": -22,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 84.9,
+    "letters": 0.955,
+    "reading": 0.754
+   }
   },
   {
    "name": "Neucha",
@@ -301,7 +371,12 @@
    "sizeClamped": false,
    "xRatio": 72,
    "widthVsSystem": -14,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 98.4,
+    "letters": 1.014,
+    "reading": 0.956
+   }
   },
   {
    "name": "Dekko",
@@ -321,7 +396,12 @@
    "sizeClamped": false,
    "xRatio": 80,
    "widthVsSystem": 2,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 103.5,
+    "letters": 1.013,
+    "reading": 1.056
+   }
   },
   {
    "name": "Kalam",
@@ -340,7 +420,12 @@
    "size": 100,
    "sizeClamped": false,
    "xRatio": 71,
-   "widthVsSystem": 2
+   "widthVsSystem": 2,
+   "screen": {
+    "score": 98.1,
+    "letters": 0.985,
+    "reading": 0.977
+   }
   },
   {
    "name": "Gaegu",
@@ -359,7 +444,12 @@
    "size": 135,
    "sizeClamped": false,
    "xRatio": 69,
-   "widthVsSystem": 36
+   "widthVsSystem": 36,
+   "screen": {
+    "score": 112.9,
+    "letters": 1.108,
+    "reading": 1.247
+   }
   },
   {
    "name": "Gamja Flower",
@@ -379,7 +469,12 @@
    "sizeClamped": false,
    "xRatio": 63,
    "widthVsSystem": 28,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 114.2,
+    "letters": 1.135,
+    "reading": 1.242
+   }
   },
   {
    "name": "Hi Melody",
@@ -399,7 +494,12 @@
    "sizeClamped": false,
    "xRatio": 65,
    "widthVsSystem": 23,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 114.5,
+    "letters": 1.14,
+    "reading": 1.167
+   }
   },
   {
    "name": "Caveat",
@@ -418,7 +518,12 @@
    "size": 140,
    "sizeClamped": false,
    "xRatio": 52,
-   "widthVsSystem": 13
+   "widthVsSystem": 13,
+   "screen": {
+    "score": 106.8,
+    "letters": 1.188,
+    "reading": 0.993
+   }
   },
   {
    "name": "Caveat Brush",
@@ -438,7 +543,12 @@
    "sizeClamped": false,
    "xRatio": 63,
    "widthVsSystem": 0,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 103.6,
+    "letters": 1.049,
+    "reading": 1.023
+   }
   },
   {
    "name": "Patrick Hand",
@@ -458,7 +568,12 @@
    "sizeClamped": false,
    "xRatio": 71,
    "widthVsSystem": -8,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 102.1,
+    "letters": 1.022,
+    "reading": 1.019
+   }
   },
   {
    "name": "Patrick Hand SC",
@@ -479,7 +594,12 @@
    "xRatio": 70,
    "widthVsSystem": -5,
    "oneWeight": true,
-   "smallCaps": true
+   "smallCaps": true,
+   "screen": {
+    "score": 83.5,
+    "letters": 0.951,
+    "reading": 0.733
+   }
   },
   {
    "name": "Handlee",
@@ -499,7 +619,12 @@
    "sizeClamped": false,
    "xRatio": 71,
    "widthVsSystem": -5,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 98.3,
+    "letters": 1.006,
+    "reading": 0.96
+   }
   },
   {
    "name": "Indie Flower",
@@ -519,7 +644,12 @@
    "sizeClamped": false,
    "xRatio": 65,
    "widthVsSystem": 13,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 100,
+    "letters": 1.142,
+    "reading": 0.876
+   }
   },
   {
    "name": "Architects Daughter",
@@ -539,7 +669,12 @@
    "sizeClamped": false,
    "xRatio": 66,
    "widthVsSystem": 26,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 105.3,
+    "letters": 1.141,
+    "reading": 0.971
+   }
   },
   {
    "name": "Gloria Hallelujah",
@@ -559,7 +694,12 @@
    "sizeClamped": false,
    "xRatio": 72,
    "widthVsSystem": 12,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 96.1,
+    "letters": 1.189,
+    "reading": 0.803
+   }
   },
   {
    "name": "Coming Soon",
@@ -579,7 +719,12 @@
    "sizeClamped": false,
    "xRatio": 75,
    "widthVsSystem": -3,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 96.9,
+    "letters": 0.977,
+    "reading": 0.962
+   }
   },
   {
    "name": "Schoolbell",
@@ -599,7 +744,12 @@
    "sizeClamped": false,
    "xRatio": 59,
    "widthVsSystem": 10,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 108.3,
+    "letters": 1.148,
+    "reading": 1.023
+   }
   },
   {
    "name": "Mynerve",
@@ -619,7 +769,12 @@
    "sizeClamped": false,
    "xRatio": 63,
    "widthVsSystem": 12,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 105.4,
+    "letters": 1.217,
+    "reading": 0.967
+   }
   },
   {
    "name": "Playpen Sans",
@@ -638,7 +793,12 @@
    "size": 95,
    "sizeClamped": false,
    "xRatio": 70,
-   "widthVsSystem": 9
+   "widthVsSystem": 9,
+   "screen": {
+    "score": 107.9,
+    "letters": 1.065,
+    "reading": 1.094
+   }
   },
   {
    "name": "Shantell Sans",
@@ -657,7 +817,12 @@
    "size": 100,
    "sizeClamped": false,
    "xRatio": 71,
-   "widthVsSystem": 17
+   "widthVsSystem": 17,
+   "screen": {
+    "score": 107.3,
+    "letters": 1.078,
+    "reading": 1.068
+   }
   },
   {
    "name": "Klee One",
@@ -676,7 +841,12 @@
    "size": 105,
    "sizeClamped": false,
    "xRatio": 69,
-   "widthVsSystem": 19
+   "widthVsSystem": 19,
+   "screen": {
+    "score": 108.9,
+    "letters": 1.045,
+    "reading": 1.134
+   }
   },
   {
    "name": "Zen Kurenaido",
@@ -696,7 +866,12 @@
    "sizeClamped": false,
    "xRatio": 59,
    "widthVsSystem": 11,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 113.5,
+    "letters": 1.121,
+    "reading": 1.176
+   }
   },
   {
    "name": "Permanent Marker",
@@ -716,7 +891,12 @@
    "sizeClamped": false,
    "xRatio": 82,
    "widthVsSystem": 1,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 79.9,
+    "letters": 0.961,
+    "reading": 0.664
+   }
   },
   {
    "name": "Rock Salt",
@@ -736,7 +916,12 @@
    "sizeClamped": true,
    "xRatio": 68,
    "widthVsSystem": 17,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 81.3,
+    "letters": 1.166,
+    "reading": 0.575
+   }
   },
   {
    "name": "Over the Rainbow",
@@ -756,7 +941,12 @@
    "sizeClamped": false,
    "xRatio": 72,
    "widthVsSystem": -16,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 49.1,
+    "letters": 0.931,
+    "reading": 0.259
+   }
   },
   {
    "name": "Give You Glory",
@@ -776,7 +966,12 @@
    "sizeClamped": false,
    "xRatio": 75,
    "widthVsSystem": -3,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 63.3,
+    "letters": 1.06,
+    "reading": 0.378
+   }
   },
   {
    "name": "Yomogi",
@@ -798,7 +993,12 @@
    "xRatio": 68,
    "widthVsSystem": 20,
    "oneWeight": true,
-   "dashesTouch": true
+   "dashesTouch": true,
+   "screen": {
+    "score": 99.7,
+    "letters": 0.918,
+    "reading": 1.083
+   }
   },
   {
    "name": "Iansui",
@@ -820,7 +1020,12 @@
    "sizeClamped": false,
    "xRatio": 69,
    "widthVsSystem": 19,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 110,
+    "letters": 1.067,
+    "reading": 1.134
+   }
   },
   {
    "name": "Yusei Magic",
@@ -841,7 +1046,12 @@
    "sizeClamped": false,
    "xRatio": 67,
    "widthVsSystem": 11,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 102.6,
+    "letters": 1.049,
+    "reading": 1.003
+   }
   },
   {
    "name": "LXGW Marker Gothic",
@@ -862,7 +1072,12 @@
    "sizeClamped": false,
    "xRatio": 68,
    "widthVsSystem": 12,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 103,
+    "letters": 0.994,
+    "reading": 1.068
+   }
   },
   {
    "name": "Noteworthy",
@@ -882,7 +1097,12 @@
    "size": 95,
    "sizeClamped": false,
    "xRatio": 62,
-   "widthVsSystem": -13
+   "widthVsSystem": -13,
+   "screen": {
+    "score": 94.1,
+    "letters": 1.016,
+    "reading": 0.871
+   }
   },
   {
    "name": "Marker Felt",
@@ -902,7 +1122,12 @@
    "size": 90,
    "sizeClamped": false,
    "xRatio": 69,
-   "widthVsSystem": -13
+   "widthVsSystem": -13,
+   "screen": {
+    "score": 90.8,
+    "letters": 0.925,
+    "reading": 0.892
+   }
   },
   {
    "name": "Chalkboard SE",
@@ -922,7 +1147,12 @@
    "size": 105,
    "sizeClamped": false,
    "xRatio": 73,
-   "widthVsSystem": 14
+   "widthVsSystem": 14,
+   "screen": {
+    "score": 110.9,
+    "letters": 1.106,
+    "reading": 1.111
+   }
   },
   {
    "name": "Bradley Hand",
@@ -943,7 +1173,12 @@
    "sizeClamped": false,
    "xRatio": 79,
    "widthVsSystem": 24,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 108.8,
+    "letters": 1.217,
+    "reading": 1.028
+   }
   },
   {
    "name": "SignPainter",
@@ -963,7 +1198,12 @@
    "size": 125,
    "sizeClamped": false,
    "xRatio": 64,
-   "widthVsSystem": -8
+   "widthVsSystem": -8,
+   "screen": {
+    "score": 86.9,
+    "letters": 1.049,
+    "reading": 0.72
+   }
   },
   {
    "name": "Gowun Dodum",
@@ -984,7 +1224,12 @@
    "sizeClamped": false,
    "xRatio": 70,
    "widthVsSystem": -4,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 97.6,
+    "letters": 0.943,
+    "reading": 1.01
+   }
   },
   {
    "name": "Kiwi Maru",
@@ -1004,7 +1249,12 @@
    "size": 95,
    "sizeClamped": false,
    "xRatio": 70,
-   "widthVsSystem": 15
+   "widthVsSystem": 15,
+   "screen": {
+    "score": 106.7,
+    "letters": 0.998,
+    "reading": 1.14
+   }
   },
   {
    "name": "Zen Maru Gothic",
@@ -1024,7 +1274,12 @@
    "size": 105,
    "sizeClamped": false,
    "xRatio": 68,
-   "widthVsSystem": 8
+   "widthVsSystem": 8,
+   "screen": {
+    "score": 108.2,
+    "letters": 1.076,
+    "reading": 1.089
+   }
   },
   {
    "name": "Tsukimi Rounded",
@@ -1044,7 +1299,12 @@
    "size": 100,
    "sizeClamped": false,
    "xRatio": 64,
-   "widthVsSystem": 17
+   "widthVsSystem": 17,
+   "screen": {
+    "score": 114.1,
+    "letters": 1.134,
+    "reading": 1.148
+   }
   },
   {
    "name": "Yanone Kaffeesatz",
@@ -1063,7 +1323,12 @@
    "size": 100,
    "sizeClamped": false,
    "xRatio": 71,
-   "widthVsSystem": -28
+   "widthVsSystem": -28,
+   "screen": {
+    "score": 85,
+    "letters": 0.859,
+    "reading": 0.842
+   }
   },
   {
    "name": "Oswald",
@@ -1082,7 +1347,12 @@
    "size": 90,
    "sizeClamped": false,
    "xRatio": 71,
-   "widthVsSystem": -23
+   "widthVsSystem": -23,
+   "screen": {
+    "score": 81.4,
+    "letters": 0.791,
+    "reading": 0.837
+   }
   },
   {
    "name": "Pathway Gothic One",
@@ -1102,7 +1372,12 @@
    "sizeClamped": false,
    "xRatio": 77,
    "widthVsSystem": -31,
-   "oneWeight": true
+   "oneWeight": true,
+   "screen": {
+    "score": 73,
+    "letters": 0.681,
+    "reading": 0.783
+   }
   },
   {
    "name": "Sofia Sans Extra Condensed",
@@ -1121,7 +1396,12 @@
    "size": 105,
    "sizeClamped": false,
    "xRatio": 74,
-   "widthVsSystem": -33
+   "widthVsSystem": -33,
+   "screen": {
+    "score": 78,
+    "letters": 0.757,
+    "reading": 0.803
+   }
   },
   {
    "name": "Barlow Condensed",
@@ -1140,7 +1420,12 @@
    "size": 100,
    "sizeClamped": false,
    "xRatio": 72,
-   "widthVsSystem": -20
+   "widthVsSystem": -20,
+   "screen": {
+    "score": 83.9,
+    "letters": 0.818,
+    "reading": 0.861
+   }
   },
   {
    "name": "Roboto Condensed",
@@ -1159,7 +1444,12 @@
    "size": 95,
    "sizeClamped": false,
    "xRatio": 74,
-   "widthVsSystem": -12
+   "widthVsSystem": -12,
+   "screen": {
+    "score": 93.3,
+    "letters": 0.897,
+    "reading": 0.971
+   }
   },
   {
    "name": "Fira Sans Condensed",
@@ -1178,7 +1468,312 @@
    "size": 95,
    "sizeClamped": false,
    "xRatio": 76,
-   "widthVsSystem": -9
+   "widthVsSystem": -9,
+   "screen": {
+    "score": 93.9,
+    "letters": 0.905,
+    "reading": 0.975
+   }
+  },
+  {
+   "name": "Chiron GoRound TC",
+   "source": "google",
+   "group": "round",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "newIn": 3,
+   "file": "chiron-goround-tc-latin-400.woff2",
+   "licence": "LICENSE-chiron-goround-tc.txt",
+   "licenceType": "OFL-1.1",
+   "width": 908.2,
+   "tallness": 1.51,
+   "narrow": false,
+   "tall": false,
+   "size": 105,
+   "sizeClamped": false,
+   "xRatio": 69,
+   "widthVsSystem": 13,
+   "screen": {
+    "score": 108,
+    "letters": 1.083,
+    "reading": 1.077
+   }
+  },
+  {
+   "name": "Mochiy Pop One",
+   "source": "google",
+   "group": "round",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "newIn": 3,
+   "file": "mochiy-pop-one-latin-400.woff2",
+   "licence": "LICENSE-mochiy-pop-one.txt",
+   "licenceType": "OFL-1.1",
+   "width": 1109.2,
+   "tallness": 1.4,
+   "narrow": false,
+   "tall": false,
+   "size": 90,
+   "sizeClamped": false,
+   "xRatio": 69,
+   "widthVsSystem": 19,
+   "screen": {
+    "score": 113.9,
+    "letters": 1.185,
+    "reading": 1.129
+   }
+  },
+  {
+   "name": "Stick",
+   "source": "google",
+   "group": "round",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "newIn": 3,
+   "file": "stick-latin-400.woff2",
+   "licence": "LICENSE-stick.txt",
+   "licenceType": "OFL-1.1",
+   "width": 930.9,
+   "tallness": 1.47,
+   "narrow": false,
+   "tall": false,
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 73,
+   "widthVsSystem": 11,
+   "screen": {
+    "score": 105.6,
+    "letters": 1.054,
+    "reading": 1.058
+   }
+  },
+  {
+   "name": "Darumadrop One",
+   "source": "google",
+   "group": "round",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "newIn": 3,
+   "file": "darumadrop-one-latin-400.woff2",
+   "licence": "LICENSE-darumadrop-one.txt",
+   "licenceType": "OFL-1.1",
+   "width": 856.9,
+   "tallness": 1.35,
+   "narrow": false,
+   "tall": false,
+   "size": 110,
+   "sizeClamped": false,
+   "xRatio": 77,
+   "widthVsSystem": 12,
+   "screen": {
+    "score": 103.8,
+    "letters": 1.07,
+    "reading": 1.006
+   }
+  },
+  {
+   "name": "Short Stack",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "newIn": 3,
+   "file": "short-stack-latin-400.woff2",
+   "licence": "LICENSE-short-stack.txt",
+   "licenceType": "OFL-1.1",
+   "width": 1136.8,
+   "tallness": 1.13,
+   "narrow": false,
+   "tall": false,
+   "size": 95,
+   "sizeClamped": false,
+   "xRatio": 81,
+   "widthVsSystem": 28,
+   "screen": {
+    "score": 110,
+    "letters": 1.053,
+    "reading": 1.181
+   }
+  },
+  {
+   "name": "Itim",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "newIn": 3,
+   "file": "itim-latin-400.woff2",
+   "licence": "LICENSE-itim.txt",
+   "licenceType": "OFL-1.1",
+   "width": 845.7,
+   "tallness": 1.44,
+   "narrow": false,
+   "tall": false,
+   "size": 120,
+   "sizeClamped": false,
+   "xRatio": 68,
+   "widthVsSystem": 21,
+   "screen": {
+    "score": 115,
+    "letters": 1.164,
+    "reading": 1.175
+   }
+  },
+  {
+   "name": "Mali",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "newIn": 3,
+   "file": "mali-latin-400.woff2",
+   "licence": "LICENSE-mali.txt",
+   "licenceType": "OFL-1.1",
+   "width": 985.5,
+   "tallness": 1.41,
+   "narrow": false,
+   "tall": false,
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 71,
+   "widthVsSystem": 17,
+   "screen": {
+    "score": 107.8,
+    "letters": 1.053,
+    "reading": 1.104
+   }
+  },
+  {
+   "name": "Comic Relief",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "newIn": 3,
+   "file": "comic-relief-latin-400.woff2",
+   "licence": "LICENSE-comic-relief.txt",
+   "licenceType": "OFL-1.1",
+   "width": 924.6,
+   "tallness": 1.53,
+   "narrow": false,
+   "tall": false,
+   "size": 95,
+   "sizeClamped": false,
+   "xRatio": 72,
+   "widthVsSystem": 4,
+   "screen": {
+    "score": 107.5,
+    "letters": 1.059,
+    "reading": 1.092
+   }
+  },
+  {
+   "name": "Crafty Girls",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "newIn": 3,
+   "file": "crafty-girls-latin-400.woff2",
+   "licence": "LICENSE-crafty-girls.txt",
+   "licenceType": "Apache-2.0",
+   "width": 1017.1,
+   "tallness": 1.42,
+   "narrow": false,
+   "tall": false,
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 68,
+   "widthVsSystem": 21,
+   "screen": {
+    "score": 107.3,
+    "letters": 1.168,
+    "reading": 1.001
+   }
+  },
+  {
+   "name": "Swanky and Moo Moo",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "newIn": 3,
+   "file": "swanky-and-moo-moo-latin-400.woff2",
+   "licence": "LICENSE-swanky-and-moo-moo.txt",
+   "licenceType": "OFL-1.1",
+   "width": 828.4,
+   "tallness": 1.04,
+   "narrow": false,
+   "tall": false,
+   "size": 150,
+   "sizeClamped": false,
+   "xRatio": 74,
+   "widthVsSystem": 48,
+   "screen": {
+    "score": 102,
+    "letters": 1.274,
+    "reading": 0.904
+   }
+  },
+  {
+   "name": "Fuzzy Bubbles",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "newIn": 3,
+   "file": "fuzzy-bubbles-latin-400.woff2",
+   "licence": "LICENSE-fuzzy-bubbles.txt",
+   "licenceType": "OFL-1.1",
+   "width": 1038.4,
+   "tallness": 1.29,
+   "narrow": false,
+   "tall": false,
+   "size": 95,
+   "sizeClamped": false,
+   "xRatio": 76,
+   "widthVsSystem": 17,
+   "screen": {
+    "score": 104.9,
+    "letters": 1.06,
+    "reading": 1.038
+   }
+  },
+  {
+   "name": "Delius",
+   "source": "google",
+   "group": "hand",
+   "style": "print",
+   "star": false,
+   "hard": false,
+   "newIn": 3,
+   "file": "delius-latin-400.woff2",
+   "licence": "LICENSE-delius.txt",
+   "licenceType": "OFL-1.1",
+   "width": 890.8,
+   "tallness": 1.64,
+   "narrow": false,
+   "tall": false,
+   "size": 100,
+   "sizeClamped": false,
+   "xRatio": 67,
+   "widthVsSystem": 6,
+   "screen": {
+    "score": 105.3,
+    "letters": 1.055,
+    "reading": 1.052
+   }
   }
  ],
  "files": [
@@ -1721,6 +2316,126 @@
    "file": "LICENSE-fira-sans-condensed.txt",
    "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/firasanscondensed/OFL.txt",
    "sha256": "8f24842e9174beda18a556c2ae7d54f5dc444340c19a3a9ef77e23bca366adbd"
+  },
+  {
+   "file": "chiron-goround-tc-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/chirongoroundtc/v5/tssEAopDbiwZ4xauFDX3yQ3Ywoaj6kNR0yP4oqNo8RKqbBq5GwUmwiKR1ISD.woff2",
+   "sha256": "18c16af84e17dff05696ca940043795b91c0e8c4e3f80657a61ca8e60605f8f8"
+  },
+  {
+   "file": "LICENSE-chiron-goround-tc.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/chirongoroundtc/OFL.txt",
+   "sha256": "7b9cc84fe1935d1418de4af57b4106038fb836b3a162e1b86507c7fc8543a759"
+  },
+  {
+   "file": "mochiy-pop-one-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/mochiypopone/v12/QdVPSTA9Jh-gg-5XZP2UmU4O9nw3BXoYZ7Aj.woff2",
+   "sha256": "5b66adb405feda34a6bf45eadc404aebedcf0858873805fd6a4ba71f12396a63"
+  },
+  {
+   "file": "LICENSE-mochiy-pop-one.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/mochiypopone/OFL.txt",
+   "sha256": "76be26178f13ef82866cf6a5c54272191bb583c203ad7035021c7681c9043558"
+  },
+  {
+   "file": "stick-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/stick/v21/Qw3TZQpMCyTtJRvYtvRhM-oE.woff2",
+   "sha256": "0f1b2659059655158b769703eaf9b258275c12edabfc219d8df5eeecc812cda6"
+  },
+  {
+   "file": "LICENSE-stick.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/stick/OFL.txt",
+   "sha256": "35187dd015d0c0006d57f99815fb3f81304c4445f04c3fa35bc533a7a4b00676"
+  },
+  {
+   "file": "darumadrop-one-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/darumadropone/v14/cY9cfjeIW11dpCKgRLi675a87LhADpKTZhPo.woff2",
+   "sha256": "addead442d98d6979471a8489ca48b5ccc44530883e0fbdbb47f2d0fb0db0ec8"
+  },
+  {
+   "file": "LICENSE-darumadrop-one.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/darumadropone/OFL.txt",
+   "sha256": "bd898c86fb555f060ee9e5d318d631bbdcd196b98ae8019e0077421f46da132f"
+  },
+  {
+   "file": "short-stack-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/shortstack/v16/bMrzmS2X6p0jZC6EcmPFX9SVe34h0Wq7.woff2",
+   "sha256": "aa59ece459cc28b2aa8f9507b833ffe210d979a4eda108de2b9966e10e79adaf"
+  },
+  {
+   "file": "LICENSE-short-stack.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/shortstack/OFL.txt",
+   "sha256": "fe079cdbbad0f6520eb0a8235bce65b21596dd0c4c5a2694b3325cc87313b618"
+  },
+  {
+   "file": "itim-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/itim/v16/0nknC9ziJOYe8ANAkOzaZwQ.woff2",
+   "sha256": "3f987d550902ca5e70efe1919a346e84b2dd870dfd47d2f81fd6c443b5d26094"
+  },
+  {
+   "file": "LICENSE-itim.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/itim/OFL.txt",
+   "sha256": "1f00d1f970b4ea469b6936e599b599bb217edaab792e586658ef2e71cf438685"
+  },
+  {
+   "file": "mali-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/mali/v13/N0ba2SRONuN4SC3ED35yKd4.woff2",
+   "sha256": "18a1427c60b2b0a137b9878292576dd27bc4e67544558805b56a5b2f14a6b5b2"
+  },
+  {
+   "file": "LICENSE-mali.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/mali/OFL.txt",
+   "sha256": "bc1175730d609233043cde47e48f69831f012e85537c5ec1a2cf4836757c1540"
+  },
+  {
+   "file": "comic-relief-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/comicrelief/v2/BCauqZkHrvL55SZ8uaEhHMYGWxhgLAguKw.woff2",
+   "sha256": "ed9df0a2789a50a0575a563ca5b25800bb7424e1d593d98be3e0b3a13636c1fb"
+  },
+  {
+   "file": "LICENSE-comic-relief.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/comicrelief/OFL.txt",
+   "sha256": "009b3056cef5c9bcaff872bfb0e27fa4a0f8cc6f6984cc490caf5618748d766b"
+  },
+  {
+   "file": "crafty-girls-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/craftygirls/v16/va9B4kXI39VaDdlPJo8N_NveRhf6Xl7Glw.woff2",
+   "sha256": "85007b2eef2f15d4b61c258498f17ddafc4070086f2327903b33d27ba7922f37"
+  },
+  {
+   "file": "LICENSE-crafty-girls.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/apache/craftygirls/LICENSE.txt",
+   "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+   "file": "swanky-and-moo-moo-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/swankyandmoomoo/v24/flUlRrKz24IuWVI_WJYTYcqbEsMUZ3kksrnlZa0CYA.woff2",
+   "sha256": "ae2490870f897b9c50e570400682aed0b762911ed9a7803f488c37ea32214d8e"
+  },
+  {
+   "file": "LICENSE-swanky-and-moo-moo.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/swankyandmoomoo/OFL.txt",
+   "sha256": "0e441ae9f18ad0c294cc5b6ae3974c2db1614cab220598578b1b58c4cc334485"
+  },
+  {
+   "file": "fuzzy-bubbles-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/fuzzybubbles/v9/6qLGKZMbrgv9pwtjPEVNV0F2BnTzZjkoaks.woff2",
+   "sha256": "222aec0901872e7d09dd1eafd3c903483d022c00561b079b72f29d02fc76f104"
+  },
+  {
+   "file": "LICENSE-fuzzy-bubbles.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/fuzzybubbles/OFL.txt",
+   "sha256": "373164fa83991434f3fcfb9ef3cd0d8d4ffc44407841c08d9d6a43c07ffab978"
+  },
+  {
+   "file": "delius-latin-400.woff2",
+   "url": "https://fonts.gstatic.com/s/delius/v21/PN_xRfK0pW_9e1rdZsg_rz7b_g.woff2",
+   "sha256": "d3d201995f93f2eb1201467909efd0294272bbe110bc1bdcba7ced3280c3c22c"
+  },
+  {
+   "file": "LICENSE-delius.txt",
+   "url": "https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/delius/OFL.txt",
+   "sha256": "d8eb8611f8c98d20cbf18a28425652d6022dc2a5cca15026b920f1f2bc92a612"
   }
  ],
  "googleFontsCommit": "47d54ca1ebb14fd864695f1d39dc734f39017c33",

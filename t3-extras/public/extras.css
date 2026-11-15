@@ -730,16 +730,23 @@ html:is([data-t3x-fh], [data-t3x-fb], [data-t3x-fm], [data-t3x-fc], [data-t3x-fq
 .t3x-font-browse { display: flex; align-items: center; gap: 5px; }
 .t3x-font-browse .t3x-select { flex: 1; min-width: 0; width: 0; }
 .t3x-font-nav { flex: none; width: 28px; height: 28px; padding: 0; font: 500 20px/1 var(--font-sans); }
-.t3x-font-native, .t3x-font-meta { font-family: var(--font-sans); }
-.t3x-font-meta { font-size: 11px; color: var(--muted-foreground); }
+.t3x-font-native, .t3x-font-meta, .t3x-font-select option .mkt { font-family: var(--font-sans); }
+.t3x-font-meta, .t3x-font-select option .mkt { font-size: 11px; color: var(--muted-foreground); }
 .t3x-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @supports (appearance: base-select) {
   .t3x-font-select, .t3x-font-select::picker(select) { appearance: base-select; }
   .t3x-font-select::picker(select) { max-width: min(520px, calc(100vw - 16px)); max-height: 55vh; overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--foreground); font: 400 13px/1.5 var(--font-sans); }
-  .t3x-font-select option { padding: 5px 8px; white-space: normal; overflow-wrap: anywhere; }
+  .t3x-font-select option { display: flex; align-items: baseline; gap: 8px; padding: 5px 8px; white-space: normal; overflow-wrap: anywhere; }
   .t3x-font-select optgroup { font-family: var(--font-sans); }
   .t3x-font-select option:checked { background: color-mix(in oklab, var(--foreground) 12%, var(--background)); }
   .t3x-font-select option:focus { outline: 2px solid var(--primary); outline-offset: -2px; }
+  .t3x-font-select option .mk { margin-left: auto; padding: 1px 8px; border: 1px solid var(--border); border-radius: 5px; font: 500 12px/1.4 var(--font-sans); color: var(--muted-foreground); visibility: hidden; }
+  .t3x-font-select option.t3x-font-hot .mk,
+  .t3x-font-select option:hover .mk,
+  .t3x-font-select option:focus .mk { visibility: visible; }
+  .t3x-font-select::picker(select) option.t3x-font-userhidden { opacity: .55; }
+  /* Gate gap Q2 (Andy, 15 Nov 2026): the closed face shows the hidden mark (.mkt), as the open row does; it may wrap. */
+  .t3x-font-select selectedcontent .mk { display: none; }
 }
 .t3x-stepper { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .t3x-step { width: 28px; padding: 0; font-size: 14px; }
@@ -1111,6 +1118,20 @@ button.t3x-fs-def { cursor: pointer; }
   flex: none; margin-top: 1px; border: 1px solid var(--border); border-radius: 999px; background: transparent;
   color: inherit; cursor: pointer; padding: 0 7px; font: 10.5px/16px var(--font-sans);
 }
+/* Hide sits before "Use for similar". The slot is as wide as "Unhide". Opacity 0 at rest; the hit area is an overlay. */
+.t3x-fs-hide-slot { display: inline-grid; flex: none; align-self: center; }
+.t3x-fs-hide-slot > * { grid-area: 1 / 1; }
+.t3x-fs-hide {
+  position: relative; height: 16px; border: 0; background: transparent; color: var(--muted-foreground);
+  cursor: pointer; padding: 0 4px; font: 10.5px/16px var(--font-sans); opacity: 0;
+}
+.t3x-fs-hide::before { content: ""; position: absolute; left: 50%; top: 50%; width: 20px; height: 18px; transform: translate(-50%, -50%); }
+.t3x-fs-hide-sizer { visibility: hidden; pointer-events: none; }
+.t3x-fs-row:hover .t3x-fs-hide:not(.t3x-fs-hide-sizer),
+.t3x-fs-row:focus-within .t3x-fs-hide:not(.t3x-fs-hide-sizer),
+.t3x-fs-row.t3x-fs-hide-stay .t3x-fs-hide:not(.t3x-fs-hide-sizer) { opacity: 1; }
+.t3x-fs-hide:hover:not(.t3x-fs-hide-sizer) { color: var(--foreground); text-decoration: underline; }
+.t3x-fs-row.t3x-fs-hide-off .t3x-fs-hide-slot { display: none; }
 .t3x-fs-step:hover:not([disabled]), .t3x-fs-name:hover, .t3x-fs-similar:hover, .t3x-fs-sz:hover:not([disabled]), button.t3x-fs-def:hover { background: var(--accent); }
 .t3x-fs button:focus-visible { outline: 2px solid var(--ring, currentColor); outline-offset: 1px; }
 
@@ -1184,6 +1205,21 @@ button.t3x-fs-def { cursor: pointer; }
 .t3x-fabout dl { display:grid; grid-template-columns:auto 1fr; gap:1px 10px; margin:0; }
 .t3x-fabout dt { color:var(--muted-foreground); }
 .t3x-fabout dd { margin:0; }
+.t3x-fabout-wline { display:block; }
+.t3x-fabout-score { margin-top:10px; }
+.t3x-fabout-score-num { font:600 15px/1.3 var(--font-sans); }
+.t3x-fabout-exp { color:var(--muted-foreground); font-weight:400; }
+.t3x-fabout-cond, .t3x-fabout-hardnote, .t3x-fabout-method p, .t3x-fabout-sources { color:var(--muted-foreground); font-size:11.5px; }
+.t3x-fabout-hardnote, .t3x-fabout-method { margin-top:4px; }
+.t3x-fabout-method > summary { display:block; color:var(--muted-foreground); font-size:11.5px; cursor:pointer; list-style:none; }
+.t3x-fabout-method > summary::-webkit-details-marker { display:none; }
+.t3x-fabout-method > summary::before { content:"▸ "; }
+.t3x-fabout-method[open] > summary::before { content:"▾ "; }
+.t3x-fabout-story { grid-column:1 / -1; margin-top:10px; }
+.t3x-fabout-story h4 { margin:0 0 3px; font:600 12px/1.3 var(--font-sans); color:var(--muted-foreground); }
+.t3x-fabout-foot { margin-top:8px; }
+.t3x-fabout-hide { font-size:12px; }
+.t3x-fabout-hidenote { color:var(--muted-foreground); font-size:11.5px; }
 .t3x-fabout-use { margin-top:6px; color:var(--muted-foreground); }
 /* Details that couldn't load: one muted line in the panel's place, no box. */
 .t3x-fabout.t3x-fabout-failedbox { padding:0; border:0; border-radius:0; }
