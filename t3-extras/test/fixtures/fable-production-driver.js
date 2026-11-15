@@ -22,6 +22,7 @@ const settings = { usageComposer: true, handoverButton: false };
 const lastState = null;
 const toolGates = () => ({ handover: false });
 const handoverBlocker = () => null;
+/*PIECES*/
 const bars = { /*BARS*/ };
 const chip = { /*CHIP*/ };
 

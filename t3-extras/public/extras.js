@@ -2616,6 +2616,7 @@
     checkVersionReady.then(() => checkWake(true));
     if (lastState) lastState = { ...lastState, handover: { ...(lastState.handover ?? {}), chain: null } }; // clear on navigation
     if (pop?.kind === "chain" || pop?.kind === "handover") closePopover();
+    checkUI();
     fetchState();
     return true;
   }
@@ -3286,6 +3287,37 @@
   };
   const viewKey = (v) => `${v.id}|${v.hasData}|${v.noMeter}|${!v.hasData ? v.fetchedAt : ""}|${v.lp?.leftExact?.toFixed(1)}|${v.lp?.timeLeftExact?.toFixed(1)}|${v.sp?.leftExact?.toFixed(1)}|${v.sp?.pace}|${v.blocked}|${v.stale}|${v.barScoped?.model ?? ""}|${(v.scoped ?? []).map((e) => `${e.model}:${e.left}:${e.leftExact.toFixed(1)}:${e.resetsAt ?? ""}`).join(",")}|${v.stopLeft ?? ""}|${(v.scopedNoReading ?? []).map((e) => e.model).join(",")}`;
 
+  // Display names and Settings labels share one source; keeper identifiers stay in CHECK_NAMES.
+  const ADDON_NAMES = [
+    { id: "threadtitles", name: "Thread titles font", plural: false, setting: null, settingsLabel: "Fonts… → Thread titles" },
+    { id: "onerow", name: "One-row titles", plural: true, setting: "oneRowTitles", settingsLabel: "One-row titles" },
+    { id: "compact", name: "Compact threads", plural: true, setting: "compactThreads", settingsLabel: "Compact threads" },
+    { id: "marker", name: "Selected thread marker", plural: false, setting: "marker", settingsLabel: "Selected thread marker" },
+    { id: "older", name: "Older threads section", plural: false, setting: "foldOlder", settingsLabel: "Older threads section" },
+    { id: "bars", name: "One row per lab in sidebar", plural: false, setting: "usageSidebar", settingsLabel: "One row per lab in sidebar" },
+    { id: "glyphs", name: "Header glyphs", plural: true, setting: "usageHeader", settingsLabel: "Header glyphs" },
+    { id: "chain", name: "Handover chain pill", plural: false, setting: "chainPill", settingsLabel: "Handover chain pill" },
+    { id: "burn", name: "Thread burn tells in the header", plural: true, setting: "burnTells", settingsLabel: "Thread burn tells" },
+    { id: "meter", name: "Tightest lab in composer", plural: false, setting: "usageComposer", settingsLabel: "Tightest lab in composer" },
+    { id: "handover", name: "Prepare handover button", plural: false, setting: "handoverButton", settingsLabel: "Prepare handover button" },
+    { id: "shortbars", name: null, plural: false, setting: "usageSidebarShort", settingsLabel: "Compact lab rows in a short window" },
+  ];
+  const addonSettingLabel = (setting) => ADDON_NAMES.find(n => n.setting === setting).settingsLabel;
+
+  // These return the same truthy data the renderers need, so checking and rendering cannot drift.
+  const pieceVisible = {
+    glyphs: () => settings.usageHeader,
+    chain: () => settings.chainPill && toolGates(lastState).handover && isLocalThread() && lastState?.handover?.chain,
+    burn: () => {
+      const view = settings.burnTells && burnData && isLocalThread() ? burnView(burnData.threads[route.threadId]) : null;
+      return view?.chip ? view : null;
+    },
+    meter: (vs, now, summary = composerSummary(vs, now)) => settings.usageComposer && summary,
+    handover: () => settings.handoverButton && toolGates(lastState).handover,
+    bars: () => settings.usageSidebar,
+    older: (list, ages = activeRows(list).map(rowAge)) => settings.foldOlder && olderRows(ages, settings.olderAfter).some(Boolean),
+  };
+
   // Header: the chain pill, and one compact B glyph per lab with data (no labels; tooltips).
   const HEADER_ANCHOR = "[data-workspace-titlebar-controls]";
   features.header = {
@@ -3311,8 +3343,8 @@
     mount: (anchor, node) => anchor.prepend(node),
     update(node, vs, now) {
       const chain = node.querySelector(".t3x-chain");
-      const c = lastState?.handover?.chain;
-      const showChain = settings.chainPill && toolGates(lastState).handover && isLocalThread() && c;
+      const c = pieceVisible.chain();
+      const showChain = Boolean(c);
       chain.hidden = !showChain;
       if (showChain) {
         chain.textContent = chainLabel(c);
@@ -3320,7 +3352,7 @@
       }
       // The open thread's own heat, as on its sidebar row (warm, hot or blazing).
       const heat = node.querySelector(".t3x-burn-hdr");
-      const hv = settings.burnTells && burnData && isLocalThread() ? burnView(burnData.threads[route.threadId]) : null;
+      const hv = pieceVisible.burn();
       heat.hidden = !hv?.chip;
       if (hv?.chip) {
         heat.textContent = hv.chip;
@@ -3329,7 +3361,7 @@
         heat.setAttribute("aria-label", hv.tooltip);
       }
       const usage = node.querySelector(".t3x-hdr-usage");
-      usage.hidden = !settings.usageHeader;
+      usage.hidden = !pieceVisible.glyphs();
       const labs = visibleLabs(vs);
       if (sig(usage, labs.map(viewKey).join(";"))) {
         usage.replaceChildren(...(labs.length
@@ -3357,14 +3389,14 @@
     mount: (anchor, node) => anchor.prepend(node),
     update(node, vs, now) {
       const btn = node.querySelector(".t3x-handover");
-      btn.hidden = !settings.handoverButton || !toolGates(lastState).handover;
+      btn.hidden = !pieceVisible.handover();
       const why = handoverBlocker();
       btn.setAttribute("aria-disabled", String(Boolean(why)));
       btn.title = why ?? "Adds a handover request to the end of your message; you send it.";
       btn.setAttribute("aria-label", why ? `Prepare handover (unavailable: ${why})` : "Prepare handover: adds a request to the end of your message; you send it");
       const meters = node.querySelector(".t3x-meters");
       const c = composerSummary(vs, now);
-      meters.hidden = !settings.usageComposer || !c;
+      meters.hidden = !pieceVisible.meter(vs, now, c);
       if (!c) return;
       const v = c.view;
       if (sig(meters, `${viewKey(v)}|${c.main}|${lowRefills(v).map((r) => `${r.which}${r.at}`).join()}`)) {
@@ -3392,7 +3424,7 @@
     };
   }
   features.bars = {
-    on: () => settings.usageSidebar,
+    on: pieceVisible.bars,
     node: null,
     find: () => single('[data-slot="sidebar-footer"]'),
     build() {
@@ -3495,6 +3527,8 @@
     return rowAgeHours(slot?.firstElementChild?.textContent);
   }
   const ageText = (hrs) => (hrs < 24 ? `${Math.floor(hrs)}h` : `${Math.floor(hrs / 24)}d`);
+  // While a row is dragged T3 fills its zero-height markers with hints.
+  const olderDragging = (list) => Boolean(list.querySelector(':scope > li:is([data-testid="sidebar-pinned-header"], [data-testid="sidebar-pinned-divider"], [data-testid="sidebar-active-placeholder"]):has(> *)'));
   features.older = {
     on: () => settings.foldOlder,
     node: null,
@@ -3512,8 +3546,7 @@
     mount: (list, node) => list.append(node),
     update(node) {
       const list = node.parentElement;
-      // While a row is dragged T3 fills its zero-height markers with hints: change nothing then.
-      if (list.querySelector(':scope > li:is([data-testid="sidebar-pinned-header"], [data-testid="sidebar-pinned-divider"], [data-testid="sidebar-active-placeholder"]):has(> *)')) return;
+      if (olderDragging(list)) return;
       const rows = activeRows(list);
       const ages = rows.map(rowAge);
       const isOlder = olderRows(ages, settings.olderAfter);
@@ -3521,7 +3554,7 @@
       const set = new Set(older);
       for (const li of list.querySelectorAll(":scope > li[data-t3x-older]")) if (!set.has(li)) li.removeAttribute("data-t3x-older");
       for (const li of older) if (!li.hasAttribute("data-t3x-older")) li.setAttribute("data-t3x-older", "");
-      node.hidden = older.length === 0;
+      node.hidden = !pieceVisible.older(list, ages);
       if (!older.length) return;
       if (node.nextElementSibling !== older[0]) list.insertBefore(node, older[0]);
       const open = settings.olderOpen;
@@ -3628,9 +3661,6 @@
   // No DOM text, ids, settings values or discovered font families enter a result.
   const CHECKER_VERSION = "1";
   const CHECK_NAMES = { threadtitles: "Thread titles font", onerow: "One-row titles", compact: "Compact threads", marker: "Selected thread marker", panel: "panel", bars: "bars", header: "header", composer: "composer", older: "Older" };
-  // Until Andy decides how the inserted parts are named (a design question, 15 Nov 2026), the box, dot and tooltip
-  // name only the four sidebar-row add-ons his approved look (S3) shows. Inserted parts are still checked and reported.
-  const CHECK_SHOWN = new Set(["threadtitles", "onerow", "compact", "marker"]);
   const CHECK_CACHE = "t3x:break-check:v1";
   let checkVersion = null, checkPair = null, checkEpoch = 0, checkIdentity = null;
   let checkResults = {};
@@ -3673,6 +3703,13 @@
     if (id === "marker") return settings.marker !== "off";
     return features[id].on();
   }
+  // Both readings and display-time naming require the same current on-screen anchor.
+  function checkAnchor(id) {
+    const el = id === "header" ? single(HEADER_ANCHOR).el : features[id].find().el;
+    if (!checkVisible(el)) return null;
+    if (id === "older" && (olderDragging(el) || !pieceVisible.older(el))) return null;
+    return el;
+  }
   function checkRead() {
     const out = {};
     // Eligibility is independent of TITLE_SEL. Grouping hides native rows, so it is unchecked.
@@ -3705,10 +3742,8 @@
     // Older also requires a qualifying age according to its existing folding function.
     for (const id of ORDER) {
       if (!checkOn(id)) continue;
-      const f = features[id], found = f.find();
-      const el = id === "header" ? single(HEADER_ANCHOR).el : found.el;
-      if (!checkVisible(el)) continue;
-      if (id === "older" && !olderRows(activeRows(el).map(rowAge), settings.olderAfter).some(Boolean)) continue;
+      const f = features[id], el = checkAnchor(id);
+      if (!el) continue;
       result(id, 1, f.node?.isConnected && el.contains(f.node) ? 1 : 0);
     }
     return out;
@@ -3770,32 +3805,47 @@
       checkUI();
     });
   }
-  function checkBroken() {
+  function checkDisplay() {
     const build = checkBuild();
-    if (!build || build.key !== checkIdentity || lastState?.compat?.trial?.alertsStopped) return [];
-    return Object.keys(CHECK_NAMES).filter(id => CHECK_SHOWN.has(id) && checkOn(id) && checkResults[id]?.result === "broken" && !(lastState?.compat?.outcomes ?? []).some(x => x.build === build.full && x.addon === CHECK_NAMES[id] && x.outcome === "false-alarm"));
+    if (!build || build.key !== checkIdentity || lastState?.compat?.trial?.alertsStopped) return { parts: [], names: [] };
+    const now = Date.now(), vs = currentViews(now);
+    const pieces = { header: ["glyphs", "chain", "burn"], composer: ["meter", "handover"] };
+    const parts = Object.keys(CHECK_NAMES).filter(id => checkOn(id) && checkResults[id]?.result === "broken" && !(lastState?.compat?.outcomes ?? []).some(x => x.build === build.full && x.addon === CHECK_NAMES[id] && x.outcome === "false-alarm"))
+      .map(id => {
+        if (id === "panel" || (features[id] && !checkAnchor(id))) return { id, names: [] };
+        const names = ADDON_NAMES.filter(n => (pieces[id] ?? [id]).includes(n.id) &&
+          (pieces[id] ? pieceVisible[n.id](vs, now) : true));
+        return { id, names };
+      }).filter(p => p.names.length);
+    return { parts, names: ADDON_NAMES.filter(n => parts.some(p => p.names.includes(n))) };
   }
-  function checkCopy(build, ids) {
-    const checks = { threadtitles:`title hook with the add-on's font ("${ROLE.threadtitles.alias}"); failed check: title's font wasn't the add-on's font`, onerow:"title with one-row ellipsis", compact:"compact title layout", marker:"selected thread marker", panel:"panel node inside its anchor", bars:"bars node inside its anchor", header:"header node inside its anchor", composer:"composer node inside its anchor", older:"Older node for qualifying rows" };
+  function checkBroken() { return checkDisplay().parts.map(p => p.id); }
+  function checkCopy(build, parts) {
+    const checks = { threadtitles:`title hook with the add-on's font ("${ROLE.threadtitles.alias}"); failed check: title's font wasn't the add-on's font`, onerow:"title with one-row ellipsis", compact:"compact title layout", marker:"selected thread marker" };
     return [`T3 version: ${build.full}`, `Add-ons version: ${checkVersion}`, `Checker version: ${CHECKER_VERSION}`,
-      ...ids.map(id => `${CHECK_NAMES[id]}: looked for ${checks[id]}; eligible rows seen: ${checkResults[id].seen}; rows matched: ${checkResults[id].matched}.`),
-      "Repo: ~/Documents/ChatGPT/t3-side-panel-addons", ...ids.flatMap(id => [
+      ...parts.map(({id, names}) => [
+        `${id}: ${names.map(n => n.name).join("; ")} (as shown on the thread open when copied).`,
+        ...names.map(n => n.setting ? `${n.name} — Settings label "${n.settingsLabel}"` : `${n.name} — ${n.settingsLabel}`),
+        checks[id] ? `looked for ${checks[id]}; eligible rows seen: ${checkResults[id].seen}; rows matched: ${checkResults[id].matched}.`
+          : "its spot on screen: yes; the add-on's node inside it: no.",
+      ].join("\n")),
+      "Repo: ~/Documents/ChatGPT/t3-side-panel-addons", ...parts.flatMap(({id}) => [
         `node ~/.local/share/t3-sidebar-keeper/keeper.mjs --false-alarm "${CHECK_NAMES[id]}" --build "${build.full}"`,
         `node ~/.local/share/t3-sidebar-keeper/keeper.mjs --confirm-real "${CHECK_NAMES[id]}" --build "${build.full}"`])].join("\n");
   }
   function checkBox() {
-    const ids = checkBroken(), build = checkBuild();
-    if (!ids.length) return null;
-    const names = ids.map(id => CHECK_NAMES[id]);
-    const list = names.length === 1 ? names[0] : names.slice(0, -1).join(", ") + " and " + names.at(-1);
-    const text = names.length === 1 ? `On T3 build ${build.label}, ${list} isn't showing.` : `On T3 build ${build.label}, ${names.length} add-ons aren't showing: ${list}.`;
+    const {parts, names} = checkDisplay(), build = checkBuild();
+    if (!names.length) return null;
+    const labels = names.map(n => n.name);
+    const list = labels.length === 1 ? labels[0] : labels.slice(0, -1).join(", ") + " and " + labels.at(-1);
+    const text = names.length === 1 ? `On T3 build ${build.label}, ${list} ${names[0].plural ? "aren't" : "isn't"} showing.` : `On T3 build ${build.label}, ${names.length} add-ons aren't showing: ${list}.`;
     const hint = h("span", {class:"t3x-muted", text:"Paste it into an agent thread"});
     const btn = h("button", {type:"button", class:"t3x-btn t3x-check-copy", onclick:async () => {
-      try { await navigator.clipboard.writeText(checkCopy(build, ids)); btn.textContent = "Copied"; }
+      try { await navigator.clipboard.writeText(checkCopy(checkBuild(), checkDisplay().parts)); btn.textContent = "Copied"; }
       catch { btn.textContent = "Couldn't copy"; hint.hidden = true; }
       later(2000, () => { btn.textContent = "Copy fix request"; hint.hidden = false; });
     }}, "Copy fix request");
-    return h("div", {class:"t3x-warn t3x-check", role:"status", "data-check-ids":ids.join(",")}, h("div", {text}), h("div", {class:"t3x-check-actions"}, btn, hint));
+    return h("div", {class:"t3x-warn t3x-check", role:"status", "data-check-ids":parts.map(p => p.id).join(","), "data-check-names":names.map(n => n.id).join(",")}, h("div", {text}), h("div", {class:"t3x-check-actions"}, btn, hint));
   }
   function checkSeen() {
     const box = pop?.kind === "panel" ? pop.el.querySelector(".t3x-check") : null;
@@ -3815,9 +3865,9 @@
     if (viewed) checkUI();
   }
   function checkUI() {
-    const ids = checkBroken(), build = checkBuild(), star = features.panel.node?.querySelector(".t3x-star");
+    const {parts, names} = checkDisplay(), ids = parts.map(p => p.id), build = checkBuild(), star = features.panel.node?.querySelector(".t3x-star");
     if (star) {
-      const title = ids.length ? `Add-ons · ${ids.length} ${ids.length === 1 ? "isn't" : "aren't"} showing` : "Add-ons";
+      const title = names.length ? `Add-ons · ${names.length} ${names.length === 1 ? "isn't" : "aren't"} showing` : "Add-ons";
       star.title = title;
       star.setAttribute("aria-label", ids.length ? title : "Add-ons (switch each one on or off)");
       const dot = ids.some(id => !checkShown.has(JSON.stringify([build.full, id])) && !checkViewed.has(JSON.stringify([build.full, id])));
@@ -3826,7 +3876,7 @@
     }
     if (pop?.kind === "panel") {
       const old = pop.el.querySelector(".t3x-check"), next = checkBox();
-      if (old?.dataset.checkIds !== next?.dataset.checkIds) {
+      if (old?.dataset.checkNames !== next?.dataset.checkNames) {
         if (old) old.remove();
         if (next) pop.el.querySelector(".t3x-pop-head").after(next);
       }
@@ -4171,6 +4221,7 @@
   function render() {
     if (paused || disposed) return;
     ensure();
+    checkUI();
     if (pop?.kind === "usage" || pop?.kind === "chain") fillPopover();
   }
 
@@ -5368,24 +5419,24 @@
       h("details", { class: "t3x-more", open: settings.settingsOpen, ontoggle: (e) => { if (e.currentTarget.open !== settings.settingsOpen) { settings = readSettings(JSON.stringify({ ...settings, settingsOpen: e.currentTarget.open })); saveSettings(); } } },
       h("summary", { "data-focus": "more" }, h("span", { text: "Settings" })),
       h("section", {}, h("h3", { text: "Usage" }),
-        sw("Header glyphs (one per lab)", "usageHeader", where("header")),
-        sw("Composer: the tightest lab", "usageComposer", where("composer")),
-        sw("Sidebar: one row per lab", "usageSidebar", where("bars")),
-        settings.usageSidebar ? sw("Sidebar: compact in a short window", "usageSidebarShort", `One line per lab while the window is under ${SHORT_WINDOW} px tall.`) : null,
-        sw("Thread burn tells", "burnTells", "Antigravity threads (Gemini and Claude AG) aren't measured. Estimated API cost equivalent; not your subscription charge.")),
+        sw(addonSettingLabel("usageHeader"), "usageHeader", where("header")),
+        sw(addonSettingLabel("usageComposer"), "usageComposer", where("composer")),
+        sw(addonSettingLabel("usageSidebar"), "usageSidebar", where("bars")),
+        settings.usageSidebar ? sw(addonSettingLabel("usageSidebarShort"), "usageSidebarShort", `One line per lab while the window is under ${SHORT_WINDOW} px tall.`) : null,
+        sw(addonSettingLabel("burnTells"), "burnTells", "Antigravity threads (Gemini and Claude AG) aren't measured. Estimated API cost equivalent; not your subscription charge.")),
       h("section", {}, h("h3", { text: "Handover" }),
-        sw("Prepare handover button", "handoverButton", toolGates(lastState).handover ? "Adds a request to your message; you send it." : "needs the handover tool"),
-        sw("Handover chain pill", "chainPill", toolGates(lastState).handover ? (mode ? `Handover mode: ${mode}` : null) : "needs the handover tool")),
+        sw(addonSettingLabel("handoverButton"), "handoverButton", toolGates(lastState).handover ? "Adds a request to your message; you send it." : "needs the handover tool"),
+        sw(addonSettingLabel("chainPill"), "chainPill", toolGates(lastState).handover ? (mode ? `Handover mode: ${mode}` : null) : "needs the handover tool")),
       h("section", {}, h("h3", { text: "Sidebar" }),
-        sw("Compact threads", "compactThreads", "Project icon and title on one line; hover the icon for the project and branch."),
-        sw("One-row titles", "oneRowTitles", "Long titles end in \u2026 but keep a trailing number like (2). Off: titles wrap only as needed, "
+        sw(addonSettingLabel("compactThreads"), "compactThreads", "Project icon and title on one line; hover the icon for the project and branch."),
+        sw(addonSettingLabel("oneRowTitles"), "oneRowTitles", "Long titles end in \u2026 but keep a trailing number like (2). Off: titles wrap only as needed, "
           + (settings.compactThreads ? "up to the lines picked below." : "in full (pick a limit with compact threads on).")),
         settings.compactThreads && !settings.oneRowTitles ? h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label t3x-indent-label", text: "Lines at most" }),
           h("div", { class: "t3x-radios", role: "radiogroup", "aria-label": "Lines at most" },
             TITLE_LINES.map((n) => radio("titleLines", n, settings.titleLines, n === "unlimited" ? "No limit" : `${n} lines`, (v) => change({ titleLines: v }))))) : null,
         sw("Pinned label and line", "pinnedLabel", "A small \u201cPinned\u201d label above pinned threads and a line below them."),
         sw("Gaps by time", "timeGaps", "A small gap between threads last active 25+ min apart, instead of lines between rows."),
-        sw("Older threads section", "foldOlder", (settings.olderAfter === "auto"
+        sw(addonSettingLabel("foldOlder"), "foldOlder", (settings.olderAfter === "auto"
           ? "Auto: threads idle well past your newest few (by gaps in activity) fold under one \u201cOlder\u201d header."
           : `Threads last active more than ${OLDER_AFTER.find(([v]) => v === settings.olderAfter)[3]} ago fold under one \u201c${olderTitle(settings.olderAfter)}\u201d header. Auto groups by gaps in activity instead.`)
           + " The open thread and rows showing a status (Working, Done\u2026) stay out."),
@@ -5398,8 +5449,8 @@
           sw("Project name in full", "projectFull", "Wraps instead of ending in \u2026; the status stays on the right."),
         ],
         sw("Stronger Working divider", "workingHeader", "The Working header in T3's working colour, bold, with a thicker line."),
-        h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: "Selected thread marker" }),
-          h("div", { class: "t3x-radios", role: "radiogroup", "aria-label": "Selected thread marker" },
+        h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: addonSettingLabel("marker") }),
+          h("div", { class: "t3x-radios", role: "radiogroup", "aria-label": addonSettingLabel("marker") },
             radio("marker", "bar", settings.marker, "Bar + bold", (v) => change({ marker: v })),
             radio("marker", "outline", settings.marker, "Outline", (v) => change({ marker: v })),
             radio("marker", "off", settings.marker, "Off", (v) => change({ marker: v }))))),
@@ -6455,6 +6506,7 @@
     lastRun = performance.now();
     checkRoute();
     ensure();
+    checkUI();
   });
   const rowText = (n) => Boolean(n?.parentElement?.closest('[data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]'));
   observer = new MutationObserver((records) => {

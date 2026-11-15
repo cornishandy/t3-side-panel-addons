@@ -49,9 +49,10 @@ function productionScript() {
   const bars = cut("    update(node, vs, now) {", "\n  };", src.indexOf("  features.bars = {"));
   const chip = cut("    update(node, vs, now) {", "\n  };", src.indexOf("  features.composer = {"));
   const measure = cut("  function makeMeasure(", "  features.bars = {");
+  const pieces = cut("  const pieceVisible =", "\n\n  // Header:");
   const key = cut("  const viewKey =", "\n");
   const driver = fs.readFileSync(new URL("./fixtures/fable-production-driver.js", import.meta.url), "utf8");
-  return `<script>\n(() => {\n${driver.replace("/*MEASURE*/", () => measure).replace("/*KEY*/", () => key).replace("/*BARS*/", () => bars).replace("/*CHIP*/", () => chip)}\n})();\n</script>`;
+  return `<script>\n(() => {\n${driver.replace("/*PIECES*/", () => pieces).replace("/*MEASURE*/", () => measure).replace("/*KEY*/", () => key).replace("/*BARS*/", () => bars).replace("/*CHIP*/", () => chip)}\n})();\n</script>`;
 }
 
 function page() {

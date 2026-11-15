@@ -14,7 +14,7 @@ export async function fixture(t, page) {
   fonts.files.push({file:'fixture.ttf'});writeFixtureFont();
   function writeFixtureFont() {fs.mkdirSync(path.join(dir,'fonts'));fs.writeFileSync(path.join(dir,'fonts/fixture.ttf'),fixtureFont());}
   fs.writeFileSync(path.join(dir,'fonts.json'),JSON.stringify(fonts));
-  const js=fs.readFileSync(path.join(SRC,'public/extras.js'),'utf8').replace('const BASE = "http://127.0.0.1:8793/";','const BASE = location.origin + "/";');
+  const js=fs.readFileSync(path.join(SRC,'public/extras.js'),'utf8').replace('const BASE = "http://127.0.0.1:8793/";','const BASE = location.origin + "/";').replace('features, change, openPanel, ready:checkVersionReady', 'features, change, openPanel, fetchState, fetchBurn, ready:checkVersionReady');
   const css=fs.readFileSync(path.join(SRC,'public/extras.css'),'utf8');
   fs.writeFileSync(path.join(dir,'public/extras.js'),js); fs.writeFileSync(path.join(dir,'public/extras.css'),css);
   const keeper=path.join(dir,'keeper.json'), compat=path.join(dir,'compat.json'), screen=path.join(dir,'screen.json');
