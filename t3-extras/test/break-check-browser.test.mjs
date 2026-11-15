@@ -53,7 +53,7 @@ test('break check on real 4736 rows, eligibility, agreement, recovery, warnings 
     assert.ok(await ev(`performance.getEntriesByType('resource').some(x=>x.name.endsWith('/main-fixture.js'))`));
     assert.equal(await ev('window.__T3X_CHECK_TEST__.snapshot().version'),await(await f.get('/version')).text());
     await until(`window.__T3X_CHECK_TEST__.snapshot().results.threadtitles?.result==='ok'`);
-    assert.equal(await ev(`Boolean(document.querySelector('.t3x-check,.t3x-check-dot'))`),false);
+    assert.equal(await ev(`Boolean(document.querySelector('.t3x-breakcheck,.t3x-check-dot'))`),false);
   });
   await t.test('downloaded font uses the same alias and stays healthy',async()=>{
     await change({fontThreadtitles:{family:'Downloaded fixture'}});
@@ -61,7 +61,7 @@ test('break check on real 4736 rows, eligibility, agreement, recovery, warnings 
     assert.equal((await read()).threadtitles.result,'ok');
     assert.ok(f.requests.includes('/fonts/fixture.ttf'));
     await wake();await wait(5100);assert.equal((await result()).threadtitles.result,'ok');
-    assert.equal(await ev(`Boolean(document.querySelector('.t3x-check,.t3x-check-dot'))`),false);
+    assert.equal(await ev(`Boolean(document.querySelector('.t3x-breakcheck,.t3x-check-dot'))`),false);
     await change({fontThreadtitles:{family:'T3 system font'}});
   });
   await t.test('eligibility ignores title hooks and excludes rename, drafts, search, zero height, offscreen, hidden and grouping',async()=>{
@@ -103,7 +103,7 @@ test('break check on real 4736 rows, eligibility, agreement, recovery, warnings 
   });
   await t.test('healthy pair clears unseen box, dot and tooltip within the same build',async()=>{
     await restore();await wake();await until(`!window.__T3X_CHECK_TEST__.broken().length`);
-    assert.equal(await ev(`Boolean(document.querySelector('.t3x-check,.t3x-check-dot'))`),false);assert.equal(await ev(`document.querySelector('.t3x-star').title`),'Add-ons');
+    assert.equal(await ev(`Boolean(document.querySelector('.t3x-breakcheck,.t3x-check-dot'))`),false);assert.equal(await ev(`document.querySelector('.t3x-star').title`),'Add-ons');
     assert.equal(JSON.parse(fs.readFileSync(f.screen)).results.find(x=>x.id==='threadtitles').result,'ok');
   });
   await t.test('main asset mismatch, missing build and no resource entry are unchecked',async()=>{
@@ -115,8 +115,8 @@ test('break check on real 4736 rows, eligibility, agreement, recovery, warnings 
   });
   await t.test('one and four names, private copy, clipboard outcomes and shown only while in view',async()=>{
     await ev(`window.__T3X_CHECK_TEST__.openPanel(document.querySelector('#anchor'));document.querySelector('.t3x-pop').style.maxHeight='150px';document.querySelector('.t3x-pop').scrollTop=1000;1`);
-    await wait(100);assert.equal(await ev(`document.querySelector('.t3x-check').getAttribute('role')`),'status');
-    assert.equal(await ev(`document.querySelector('.t3x-check > div').textContent`),"On T3 build 4736, Thread titles font isn't showing.");
+    await wait(100);assert.equal(await ev(`document.querySelector('.t3x-breakcheck').getAttribute('role')`),'status');
+    assert.equal(await ev(`document.querySelector('.t3x-breakcheck > div').textContent`),"On T3 build 4736, Thread titles font isn't showing.");
     assert.equal(f.requests.filter(x=>x.includes('kind=shown')).length,0);assert.equal(await ev(`Boolean(document.querySelector('.t3x-check-dot'))`),true);
     await ev(`document.hasFocus=()=>false;document.querySelector('.t3x-pop').scrollTop=0;1`);await wait(150);
     assert.equal(f.requests.filter(x=>x.includes('kind=shown')).length,0,'unfocused view is not a shown event');
@@ -131,13 +131,13 @@ test('break check on real 4736 rows, eligibility, agreement, recovery, warnings 
     await wait(2100);await ev(`window.copyFails=true;document.querySelector('.t3x-check-copy').click();1`);await until(`document.querySelector('.t3x-check-copy').textContent==="Couldn't copy"`);assert.equal(await ev(`document.querySelector('.t3x-check-actions .t3x-muted').hidden`),true);await wait(2100);assert.equal(await ev(`document.querySelector('.t3x-check-copy').textContent`),'Copy fix request');
     await change({oneRowTitles:true,compactThreads:true,marker:'bar'});
     await ev(`document.querySelector('[data-testid="sidebar-row-card"]').setAttribute('aria-current','page');document.head.insertAdjacentHTML('beforeend','<style id="broken-marker">[aria-current]::after{content:none!important}</style>');1`);await wake();await until(`window.__T3X_CHECK_TEST__.broken().length===4`);
-    assert.equal(await ev(`document.querySelector('.t3x-check > div').textContent`),"On T3 build 4736, 4 add-ons aren't showing: Thread titles font, One-row titles, Compact threads and Selected thread marker.");
+    assert.equal(await ev(`document.querySelector('.t3x-breakcheck > div').textContent`),"On T3 build 4736, 4 add-ons aren't showing: Thread titles font, One-row titles, Compact threads and Selected thread marker.");
     assert.equal(await ev(`document.querySelector('.t3x-star').title`),"Add-ons · 4 aren't showing");
     assert.doesNotMatch(f.requests.join('\n'),/PRIVATE_TITLE|PRIVATE_FONT_CANARY|private-1/);assert.doesNotMatch(fs.readFileSync(f.screen,'utf8'),/PRIVATE_TITLE|PRIVATE_FONT_CANARY|private-1/);
   });
   await t.test('false alarm hides its line and two distinct outcomes suppress all alert surfaces',async()=>{
     f.write(f.compat,{outcomes:[{build:BUILD,addon:'Thread titles font',outcome:'false-alarm'}],trial:{startedAt:'2026-11-01',endsAt:'2026-11-29'}});await ev(`window.dispatchEvent(new Event('focus'));1`);await wait(300);assert.equal(await ev('window.__T3X_CHECK_TEST__.broken().length'),3);
-    f.write(f.compat,{outcomes:[{build:BUILD,addon:'Thread titles font',outcome:'false-alarm'},{build:BUILD,addon:'One-row titles',outcome:'false-alarm'}],trial:{startedAt:'2026-11-01',endsAt:'2026-11-29'}});await ev(`window.dispatchEvent(new Event('focus'));1`);await until(`!document.querySelector('.t3x-check,.t3x-check-dot')`);
+    f.write(f.compat,{outcomes:[{build:BUILD,addon:'Thread titles font',outcome:'false-alarm'},{build:BUILD,addon:'One-row titles',outcome:'false-alarm'}],trial:{startedAt:'2026-11-01',endsAt:'2026-11-29'}});await ev(`window.dispatchEvent(new Event('focus'));1`);await until(`!document.querySelector('.t3x-breakcheck,.t3x-check-dot')`);
     assert.equal(await ev(`document.querySelector('.t3x-star').title`),'Add-ons');
   });
   assert.deepEqual(c.errors,[]);
@@ -173,7 +173,7 @@ const HOT={threads:{thread1:{tier:'hot',rateUsdPerHour:42,hotForMin:6}}};
 
 test('break-check names: approved labels, visible pieces, anchors, copy and refreshes', {timeout:150000},async t=>{
   const f=await fixture(t,namesPage),c=await chrome(t,f.base+'/',f.dir),{ev,until,send}=c;
-  const text=()=>ev(`document.querySelector('.t3x-check > div')?.textContent??null`);
+  const text=()=>ev(`document.querySelector('.t3x-breakcheck > div')?.textContent??null`);
   const title=()=>ev(`document.querySelector('.t3x-star').title`);
   const dot=()=>ev(`Boolean(document.querySelector('.t3x-check-dot'))`);
   const open=async()=>{await ev(`if(!document.querySelector('.t3x-pop'))window.__T3X_CHECK_TEST__.openPanel(document.querySelector('#anchor'));1`);};
@@ -207,7 +207,7 @@ test('break-check names: approved labels, visible pieces, anchors, copy and refr
     await seed({ids:['header'],settings:{chainPill:true},hash:'#/remote1/thread1'});await open();
     assert.equal(await text(),null);assert.equal(await dot(),false);assert.equal(await title(),'Add-ons');
     await ev(`location.hash='#/local01/thread1';1`);
-    await until(`document.querySelector('.t3x-check > div')?.textContent==="On T3 build 4736, Handover chain pill isn't showing."`);
+    await until(`document.querySelector('.t3x-breakcheck > div')?.textContent==="On T3 build 4736, Handover chain pill isn't showing."`);
   });
   await t.test('composer counts its two visible pieces but copy has one internal part and command pair',async()=>{
     await seed({ids:['composer'],settings:{usageComposer:true,handoverButton:true},state:{...LOCAL,usage:USAGE}});await open();
@@ -219,9 +219,31 @@ test('break-check names: approved labels, visible pieces, anchors, copy and refr
     for(const command of ['false-alarm','confirm-real'])assert.equal(copied.split(`--${command} "composer"`).length-1,1);
     for(const header of ['T3 version: '+BUILD,'Add-ons version:','Checker version: 1','Repo: ~/Documents/ChatGPT/t3-side-panel-addons'])assert.ok(copied.includes(header));
   });
+  await t.test('a narrow composer surface names only the pieces its CSS still shows',async()=>{
+    await seed({ids:['composer'],settings:{usageComposer:true,handoverButton:true},state:{...LOCAL,usage:USAGE}});await open();
+    await ev(`const a=document.querySelector('[data-chat-composer-actions]'),w=document.createElement('div');w.id='surface';w.style.cssText='container: composer-surface / inline-size; width: 480px';a.before(w);w.append(a);window.__T3X_CHECK_TEST__.ui();1`);
+    assert.equal(await text(),"On T3 build 4736, Prepare handover button isn't showing.");
+    assert.equal(await title(),"Add-ons · 1 isn't showing");
+    await ev(`document.querySelector('#surface').style.width='600px';window.__T3X_CHECK_TEST__.ui();1`);
+    assert.equal(await text(),"On T3 build 4736, 2 add-ons aren't showing: Tightest lab in composer and Prepare handover button.");
+  });
+  await t.test('the box keeps the warning look: its own class, text above the actions, built once per name set',async()=>{
+    await seed({ids:['header'],settings:{usageHeader:true}});await open();
+    const look=await ev(`(()=>{const b=document.querySelector('.t3x-breakcheck'),[t,a]=b.children;return {check:b.classList.contains('t3x-check'),warn:b.classList.contains('t3x-warn'),display:getComputedStyle(b).display,stacked:a.getBoundingClientRect().top>=t.getBoundingClientRect().bottom-1};})()`);
+    assert.deepEqual(look,{check:false,warn:true,display:'block',stacked:true});
+    assert.equal(await ev(`(()=>{const b=document.querySelector('.t3x-breakcheck');window.__T3X_CHECK_TEST__.ui();window.__T3X_CHECK_TEST__.ui();return b===document.querySelector('.t3x-breakcheck');})()`),true);
+  });
+  await t.test('Older stays named through a drag while its reading is skipped',async()=>{
+    await seed({ids:['older'],settings:{foldOlder:true}});await open();
+    assert.equal(await text(),"On T3 build 4736, Older threads section isn't showing.");
+    await ev(`document.querySelector('[data-testid="sidebar-active-placeholder"]').innerHTML='<i>drag hint</i>';window.__T3X_CHECK_TEST__.ui();1`);
+    assert.equal(await ev(`window.__T3X_CHECK_TEST__.read().older`),undefined);
+    assert.equal(await text(),"On T3 build 4736, Older threads section isn't showing.");
+    await ev(`document.querySelector('[data-testid="sidebar-active-placeholder"]').replaceChildren();1`);
+  });
   await t.test('row, Older, bars and header names follow table order; copy preserves per-part diagnostics',async()=>{
     await seed({ids:['threadtitles','older','bars','header','panel'],settings:{fontThreadtitles:{family:'T3 system font'},foldOlder:true,usageSidebar:true,usageHeader:true,chainPill:true,burnTells:true},burn:HOT});await open();
-    await until(`document.querySelector('.t3x-check')?.dataset.checkNames.includes('burn')`);
+    await until(`document.querySelector('.t3x-breakcheck')?.dataset.checkNames.includes('burn')`);
     assert.equal(await text(),"On T3 build 4736, 6 add-ons aren't showing: Thread titles font, Older threads section, One row per lab in sidebar, Header glyphs, Handover chain pill and Thread burn tells in the header.");
     const copied=await copy();assert.match(copied,/threadtitles: Thread titles font/);assert.match(copied,/Fonts… → Thread titles/);
     assert.match(copied,/looked for title hook[\s\S]*eligible rows seen: 2; rows matched: 0\./);
@@ -246,7 +268,7 @@ test('break-check names: approved labels, visible pieces, anchors, copy and refr
     assert.ok(JSON.parse(fs.readFileSync(f.screen)).results[0].firstShownAt);
     const before=f.requests.filter(x=>x.includes('kind=shown')&&x.includes('addon=header')).length;
     await ev(`location.hash='#/local01/thread2';1`);
-    await until(`document.querySelector('.t3x-check')?.dataset.checkNames==='glyphs,chain'`);
+    await until(`document.querySelector('.t3x-breakcheck')?.dataset.checkNames==='glyphs,chain'`);
     assert.equal(await dot(),false);
     assert.equal(f.requests.filter(x=>x.includes('kind=shown')&&x.includes('addon=header')).length,before);
     assert.equal(await title(),"Add-ons · 2 aren't showing");
@@ -300,7 +322,7 @@ test('break-check names: approved labels, visible pieces, anchors, copy and refr
     await seed({ids:['composer'],settings:{usageComposer:true}});
     await ev(`new Promise((resolve,reject)=>{const r=indexedDB.open('t3code:connection-runtime',1);r.onupgradeneeded=()=>r.result.createObjectStore('server-config');r.onsuccess=()=>{const db=r.result,tx=db.transaction('server-config','readwrite');tx.objectStore('server-config').put({schemaVersion:1,environmentId:'local01',config:{providers:[{driver:'codex',instanceId:'codex',enabled:true}]}},'local01');tx.oncomplete=()=>{db.close();resolve(true)};tx.onerror=reject};r.onerror=reject})`);
     await refresh(LOCAL);await open();
-    await until(`document.querySelector('.t3x-check > div')?.textContent==="On T3 build 4736, Tightest lab in composer isn't showing."`);
+    await until(`document.querySelector('.t3x-breakcheck > div')?.textContent==="On T3 build 4736, Tightest lab in composer isn't showing."`);
     assert.equal(await ev(`const f=window.__T3X_CHECK_TEST__.features.composer;f.node.querySelector('.t3x-meters').textContent.includes('Codex —')`),true);
     await ev(`new Promise(resolve=>{const r=indexedDB.deleteDatabase('t3code:connection-runtime');r.onsuccess=()=>resolve(true)})`);
   });

@@ -3665,7 +3665,7 @@
   let checkVersion = null, checkPair = null, checkEpoch = 0, checkIdentity = null;
   let checkResults = {};
   const checkShown = new Set(), checkViewed = new Set(), checkSending = new Set();
-  let checkInViewObserver = null;
+  let checkInViewObserver = null, checkObserved = null;
   cleanups.push(() => { checkCancel(); checkInViewObserver?.disconnect(); });
   // Capture bytes now, before the loader can replace either node on a later focus.
   const runningJs = D.getElementById("t3x-js")?.textContent;
@@ -3704,10 +3704,11 @@
     return features[id].on();
   }
   // Both readings and display-time naming require the same current on-screen anchor.
-  function checkAnchor(id) {
+  // Display keeps Older named through a drag; only its reading is skipped then.
+  function checkAnchor(id, display = false) {
     const el = id === "header" ? single(HEADER_ANCHOR).el : features[id].find().el;
     if (!checkVisible(el)) return null;
-    if (id === "older" && (olderDragging(el) || !pieceVisible.older(el))) return null;
+    if (id === "older" && ((!display && olderDragging(el)) || !pieceVisible.older(el))) return null;
     return el;
   }
   function checkRead() {
@@ -3808,16 +3809,26 @@
   function checkDisplay() {
     const build = checkBuild();
     if (!build || build.key !== checkIdentity || lastState?.compat?.trial?.alertsStopped) return { parts: [], names: [] };
+    if (!Object.values(checkResults).some(r => r?.result === "broken")) return { parts: [], names: [] };
     const now = Date.now(), vs = currentViews(now);
     const pieces = { header: ["glyphs", "chain", "burn"], composer: ["meter", "handover"] };
     const parts = Object.keys(CHECK_NAMES).filter(id => checkOn(id) && checkResults[id]?.result === "broken" && !(lastState?.compat?.outcomes ?? []).some(x => x.build === build.full && x.addon === CHECK_NAMES[id] && x.outcome === "false-alarm"))
       .map(id => {
-        if (id === "panel" || (features[id] && !checkAnchor(id))) return { id, names: [] };
+        const anchor = features[id] ? checkAnchor(id, true) : null;
+        if (id === "panel" || (features[id] && !anchor)) return { id, names: [] };
         const names = ADDON_NAMES.filter(n => (pieces[id] ?? [id]).includes(n.id) &&
-          (pieces[id] ? pieceVisible[n.id](vs, now) : true));
+          (pieces[id] ? pieceVisible[n.id](vs, now) && !(n.id === "meter" && composerNarrow(anchor)) : true));
         return { id, names };
       }).filter(p => p.names.length);
     return { parts, names: ADDON_NAMES.filter(n => parts.some(p => p.names.includes(n))) };
+  }
+  // extras.css hides the meter in a composer-surface container 500 px wide or less.
+  function composerNarrow(anchor) {
+    for (let p = anchor?.parentElement; p; p = p.parentElement) {
+      const c = getComputedStyle(p);
+      if (c.containerName.split(/\s+/).includes("composer-surface")) return p.clientWidth - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight) <= 500;
+    }
+    return false;
   }
   function checkBroken() { return checkDisplay().parts.map(p => p.id); }
   function checkCopy(build, parts) {
@@ -3845,10 +3856,10 @@
       catch { btn.textContent = "Couldn't copy"; hint.hidden = true; }
       later(2000, () => { btn.textContent = "Copy fix request"; hint.hidden = false; });
     }}, "Copy fix request");
-    return h("div", {class:"t3x-warn t3x-check", role:"status", "data-check-ids":parts.map(p => p.id).join(","), "data-check-names":names.map(n => n.id).join(",")}, h("div", {text}), h("div", {class:"t3x-check-actions"}, btn, hint));
+    return h("div", {class:"t3x-warn t3x-breakcheck", role:"status", "data-check-ids":parts.map(p => p.id).join(","), "data-check-names":names.map(n => n.id).join(",")}, h("div", {text}), h("div", {class:"t3x-check-actions"}, btn, hint));
   }
   function checkSeen() {
-    const box = pop?.kind === "panel" ? pop.el.querySelector(".t3x-check") : null;
+    const box = pop?.kind === "panel" ? pop.el.querySelector(".t3x-breakcheck") : null;
     if (D.visibilityState !== "visible" || !D.hasFocus() || !checkVisible(box)) return;
     const build = checkBuild();
     let viewed = false;
@@ -3875,8 +3886,9 @@
       if (!dot) star.querySelector(".t3x-check-dot")?.remove();
     }
     if (pop?.kind === "panel") {
-      const old = pop.el.querySelector(".t3x-check"), next = checkBox();
-      if (old?.dataset.checkNames !== next?.dataset.checkNames) {
+      const old = pop.el.querySelector(".t3x-breakcheck");
+      if ((old?.dataset.checkNames ?? "") !== names.map(n => n.id).join(",")) {
+        const next = checkBox();
         if (old) old.remove();
         if (next) pop.el.querySelector(".t3x-pop-head").after(next);
       }
@@ -3884,10 +3896,11 @@
     }
   }
   function checkObserveBox() {
+    const box = pop?.kind === "panel" ? pop.el.querySelector(".t3x-breakcheck") : null;
+    if (box && box === checkObserved && checkInViewObserver) return;
     checkInViewObserver?.disconnect();
     checkInViewObserver = null;
-    if (pop?.kind !== "panel") return;
-    const box = pop.el.querySelector(".t3x-check");
+    checkObserved = box;
     if (!box) return;
     checkInViewObserver = new IntersectionObserver(checkSeen, {root:pop.el});
     checkInViewObserver.observe(box);
