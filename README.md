@@ -46,6 +46,7 @@ Quit and reopen T3 after `--restore`. The keeper's uninstall only removes its ba
 
 - Older keeper builds failed to patch `minWidth` on T3 0.1.3 after the sidebar width clamp changed shape. The current keeper supports the shared width constant in nightly `0.1.8-nightly.20261106.4247`; committed tests cover all three clamps. A failed width patch leaves that build’s original width unchanged; update the keeper for supported builds.
 - `geminiQuota` retains the workaround for pingdotgg/t3code#22876 on older builds. Nightly `0.1.8-nightly.20261106.4247` already sends `2.24.0`, so this unit reports `already` without rewriting it. Nightly `0.1.10-nightly.20261113.4643` moved the probe to another server bundle, which keeper v14 could not find (`cannot patch: Antigravity probe User-Agent found 0 times`; harmless, since that build needs no patch); keeper v15 finds it in either bundle.
+- Nightly `0.1.10-nightly.20261115.4736` removed the sidebar title span's `aria-hidden` and `data-testid="thread-title-*"`, and puts the model icons in the title row when a thread has no branch or PR line. The Thread titles font, picking it on screen, the selected-title bold, tighter rows, compact and one-row titles, the inline model icon, the burn-chip anchor and the keeper's title wrapping all stopped applying; they match the new markup since 15 Nov (keeper v16), and the old selectors stay for older builds.
 - Apple silicon only.
 
 ## Tests
@@ -71,6 +72,7 @@ Quit and reopen T3 after `--restore`. The keeper's uninstall only removes its ba
 - [x] About this font: a card while the font menu is open, a panel under Preview, a card beside "Your fonts" and a closed About in the docked card; eight more fonts with a new Rounded print group (13 Nov 2026, branch `font-details`, not yet installed)
 - [x] Committed add-on tests cover usage, fonts and sidebar behavior (browser tests use the newest installed headless Chrome)
 - [x] `geminiQuota` recognizes the corrected probe version in the November 6 nightly; the workaround remains for older builds
+- [x] Sidebar hooks follow nightly 4736's title span and title-row model icons; keeper v16 wrap style 2 (15 Nov 2026)
 - [x] `geminiQuota` follows the probe into the server bundle (November 13 nightly) and accepts any version from `2.24.0` up (keeper v15)
 
 ## Docs
