@@ -128,3 +128,19 @@ cat ~/.local/share/t3-sidebar-keeper/reminder-diagnostic-overlap.json
 ```
 
 The overlap option only accepts 1..10 seconds in the fixed diagnostic namespace and matching `test-` generation. The marker disappears after the hold; matching diagnostic cleanup also removes a stale marker. Cold/warm Dismiss and an explicit busy failure remain separate real OS probes.
+
+## Break check trial (15–29 Nov 2026)
+
+Keeper v17 scans every renderer asset `.js` for the six existing wrap hooks; `index.html` never counts. All missing hooks map to Wrapped titles. The update notice uses the nightly number when present, gives failed units precedence over reapplication, and puts missing add-on names only in its subtitle. Details stay in the log and the separate `compat` section of `--status`; patch `units` and `results` remain separate. Every build/body/subtitle notice is deduplicated.
+
+`state.json` records the discovered main asset basename. Replacement saves carry it only within the same build; waiting/error paths clear it at a build change. `compat.json` is separate, atomically written by the keeper only, and survives apply/auto/restore state replacement. It initializes the trial once, ending at 23:59 local time on 29 Nov. `--trial-report` merges shown marker and screen events, reporting confirmed real, confirmed false alarm, and never sent to an agent. An unshown screen observation is not an event. The server's screen file defaults to `~/.local/share/t3-extras/screen.json`; `T3X_SCREEN_FILE` overrides it for isolated tests.
+
+From the repo folder, record the outcome for a shown add-on (the copied request includes these commands and the full build):
+
+```sh
+node t3-sidebar-keeper/keeper.mjs --false-alarm "Thread titles font" --build "0.1.10-nightly.20261115.4736"
+node t3-sidebar-keeper/keeper.mjs --confirm-real "Thread titles font" --build "0.1.10-nightly.20261115.4736"
+node t3-sidebar-keeper/keeper.mjs --trial-report
+```
+
+Omitting `--build` uses the current T3 build. Repeating an outcome is idempotent; a different outcome corrects the earlier one and is logged. Marker and screen events for one build/add-on pair count once. Two distinct pairs currently marked false alarm stop alerting, including after the trial end. Correcting the count below two resumes alerting. Normal patch notice bodies continue while subtitles and screen warnings are suppressed. Passing 29 Nov alone does not stop alerting.

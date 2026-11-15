@@ -20,11 +20,12 @@ function inspectFixture(titleClass) {
   const input = `const containers = ${JSON.stringify(containers)}; jsx("span", {className: ${JSON.stringify(titleClass)}, dir:"ltr", children:thread.title});`;
   const context = vm.createContext({
     UNITS: ['wrap', 'fit'].map(name => ({name, file:name === 'wrap' ? 'index' : 'binCli', run:text => ({state:'already', text})})),
+    ASSETS: "assets", listDir: () => ["main.js"],
     DESKTOP_MAIN: 'desktop', entryAt: () => false,
     loadDisabled: () => new Set(), readLoaderKey: () => null,
-    readEntry: (_fd, _layout, rel) => Buffer.from(rel === 'main' ? input : rel === 'runtime' ? 'function threadTitle(){}' : '<html>already wrapped</html>'),
+    readEntry: (_fd, _layout, rel) => Buffer.from(rel === 'main' || rel === 'assets/main.js' ? input : rel === 'runtime' ? 'function threadTitle(){}' : '<html>already wrapped</html>'),
   });
-  vm.runInContext(source.slice(hooks.start, hooks.end) + '\n' + source.slice(planner.start, planner.end), context);
+  vm.runInContext(source.slice(hooks.start, hooks.end) + '\n' + source.slice(planner.start, planner.end) + '\n' + source.slice(decl('scanWrapHooks').start, decl('scanWrapHooks').end), context);
   return vm.runInContext('plan(null, {header:{}}, {index:"index", mainJs:"main", binCli:"runtime"})', context);
 }
 
@@ -40,4 +41,14 @@ test('a future title-span change is reported even with all containers and an alr
   assert.equal(out.results.wrap.state, 'already');
   assert.deepEqual(Array.from(out.missingHooks), ['min-w-0 flex-1 text-start text-sm']);
   assert.deepEqual(Object.keys(out.files), [], 'reporting a missing hook does not rewrite the page');
+});
+
+function scan(chunks) {
+  const c = vm.createContext({ ASSETS:'assets', listDir:() => Object.keys(chunks), readEntry:(_f,_l,p) => Buffer.from(chunks[p.split('/').pop()]) });
+  vm.runInContext(source.slice(hooks.start,hooks.end) + '\n' + source.slice(decl('scanWrapHooks').start,decl('scanWrapHooks').end),c);
+  return Array.from(vm.runInContext('scanWrapHooks(null,{header:{}})',c));
+}
+test('all JS chunks count; unrelated thread-title occurrences satisfy nothing and index.html is ignored', () => {
+  assert.equal(scan({'main.js':'thread-title-instructions data-thread-title-chevron', 'index.html':containers+' '+TITLE}).length,6);
+  assert.deepEqual(scan({'main.js':'thread-title-instructions', 'other.js':containers+' '+TITLE}),[]);
 });

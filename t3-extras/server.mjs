@@ -14,6 +14,7 @@
  *   GET /state?thread=<id>[&fresh=1] usage snapshot + the thread's handover chain
  *   GET /history[?since=<ms>]       bounded usage history samples (usage-history.jsonl)
  *   GET /burn                       per-thread burn tiers (no titles, text or paths)
+ *   GET /screen?...                 fixed-token break observations and first-view events
  *   GET /diag?...                   opt-in debug counts (localStorage t3x:diag); no user content
  *
  * Usage numbers come only from `lab-usage --json --read-only` (no lock, no reset, nothing saved).
@@ -114,6 +115,60 @@ function currentFiles() {
     }
   }
   return files;
+}
+
+// ---------- break check: fixed tokens only; keeper files are read on every request ----------
+const KEEPER_STATE = process.env.T3X_KEEPER_STATE || path.join(os.homedir(), ".local/share/t3-sidebar-keeper/state.json");
+const KEEPER_COMPAT = process.env.T3X_KEEPER_COMPAT || path.join(os.homedir(), ".local/share/t3-sidebar-keeper/compat.json");
+const SCREEN_FILE = process.env.T3X_SCREEN_FILE || path.join(DIR, "screen.json");
+const CHECK_ADDONS = Object.freeze({ threadtitles: "Thread titles font", onerow: "One-row titles", compact: "Compact threads", marker: "Selected thread marker", panel: "panel", bars: "bars", header: "header", composer: "composer", older: "Older" });
+const validBuild = v => typeof v === "string" && /^[0-9][A-Za-z0-9.+-]{0,99}$/.test(v);
+function checkJson(file) {
+  try { const j = JSON.parse(fs.readFileSync(file, "utf8")); return j && typeof j === "object" && !Array.isArray(j) ? j : {}; } catch { return {}; }
+}
+function checkState() {
+  const k = checkJson(KEEPER_STATE), c = checkJson(KEEPER_COMPAT);
+  const outcomes = Array.isArray(c.outcomes) ? c.outcomes.filter(x => validBuild(x?.build) && Object.values({ wrap: "Wrapped titles", ...CHECK_ADDONS }).includes(x.addon) && ["real", "false-alarm"].includes(x.outcome)).map(({build, addon, outcome, recordedAt}) => ({build, addon, outcome, recordedAt})) : [];
+  const falseAlarms = new Set(outcomes.filter(x => x.outcome === "false-alarm").map(x => JSON.stringify([x.build, x.addon]))).size;
+  const full = validBuild(k.build) ? k.build : null;
+  return { t3Build: full ? { full, label: /-nightly\.\d+\.(\d+)$/.exec(full)?.[1] ?? full } : null,
+    t3MainJs: typeof k.mainJs === "string" && /^main-[\w-]+\.js$/.test(k.mainJs) ? k.mainJs : null,
+    compat: { outcomes, trial: c.trial?.startedAt && c.trial?.endsAt ? { startedAt: c.trial.startedAt, endsAt: c.trial.endsAt, ended: Date.now() > Date.parse(c.trial.endsAt), falseAlarms, alertsStopped: falseAlarms >= 2, status: falseAlarms >= 2 ? "alerts stopped after 2 false alarms" : null } : null } };
+}
+function screenResults() {
+  const j = checkJson(SCREEN_FILE);
+  return Array.isArray(j.results) ? j.results.filter(x => validBuild(x?.build) && Object.hasOwn(CHECK_ADDONS, x.id) && CHECK_ADDONS[x.id] === x.addon && /^[a-f0-9]{16}$/.test(x.version) && x.checker === "1" && ["ok", "broken"].includes(x.result) && Number.isInteger(x.seen) && x.seen >= 0 && x.seen <= 10000 && Number.isInteger(x.matched) && x.matched >= 0 && x.matched <= x.seen).map(x => ({ build:x.build, id:x.id, addon:x.addon, version:x.version, checker:x.checker, result:x.result, seen:x.seen, matched:x.matched, observedAt:x.observedAt, firstShownAt:x.firstShownAt })) : [];
+}
+function screenReport(params) {
+  const fields = ["kind", "build", "addon", "result", "version", "checker", "seen", "matched"];
+  if ([...params.keys()].some(k => !fields.includes(k) || params.getAll(k).length !== 1)) return 400;
+  const p = Object.fromEntries(params), shown = p.kind === "shown";
+  const expected = shown ? fields.filter(k => !["result", "seen", "matched"].includes(k)) : fields;
+  if (params.size !== expected.length || expected.some(k => !params.has(k)) || !["result", "shown"].includes(p.kind) || !Object.hasOwn(CHECK_ADDONS, p.addon) || p.checker !== "1" || !/^[a-f0-9]{16}$/.test(p.version)) return 400;
+  // Refresh the actual payload for reports; stale tabs can never replace a current result.
+  const served = readPublic();
+  files = served;
+  filesCheckedAt = Date.now();
+  if (p.version !== served.version) return 409;
+  const state = checkState();
+  if (!state.t3Build || p.build !== state.t3Build.label) return 409;
+  if (!shown && (!["ok", "broken"].includes(p.result) || !/^(0|[1-9][0-9]{0,4})$/.test(p.seen) || !/^(0|[1-9][0-9]{0,4})$/.test(p.matched) || +p.seen > 10000 || +p.matched > +p.seen)) return 400;
+  const results = screenResults();
+  const old = results.find(x => x.build === state.t3Build.full && x.id === p.addon && x.version === p.version);
+  if (shown) {
+    if (!old || old.result !== "broken") return 409;
+    old.firstShownAt ??= new Date().toISOString();
+  } else {
+    const line = { build: state.t3Build.full, id: p.addon, addon: CHECK_ADDONS[p.addon], version: p.version, checker: p.checker, result: p.result, seen: +p.seen, matched: +p.matched, observedAt: new Date().toISOString(), ...(old?.firstShownAt ? {firstShownAt:old.firstShownAt} : {}) };
+    if (old) results.splice(results.indexOf(old), 1, line); else results.push(line);
+  }
+  const tmp = `${SCREEN_FILE}.${process.pid}.tmp`;
+  try {
+    const fd = fs.openSync(tmp, "wx", 0o600);
+    try { fs.writeFileSync(fd, JSON.stringify({ results }, null, 2)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    fs.renameSync(tmp, SCREEN_FILE);
+  } finally { try { fs.unlinkSync(tmp); } catch {} }
+  return 204;
 }
 
 // ---------- usage (lab-usage --json --read-only), single-flight ----------
@@ -395,6 +450,8 @@ export function handler(req, res) {
       const st = tools.handover ? handoverState() : null;
       const thread = url.searchParams.get("thread");
       send(res, 200, JSON.stringify({
+        ...checkState(),
+        screen: screenResults().filter(x => x.version === currentFiles().version),
         now: Date.now(),
         localEnvironmentId: localEnvironmentId(),
         usage: u,
@@ -403,6 +460,7 @@ export function handler(req, res) {
       }), { ...cors, "Content-Type": "application/json" });
     }, () => send(res, 500, "error", cors));
   }
+  if (p === "/screen") return send(res, screenReport(url.searchParams), "", cors);
   if (p === "/diag") {
     writeDiag(diagEntry(url.searchParams));
     return send(res, 204, "", cors);

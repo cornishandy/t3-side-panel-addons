@@ -2363,6 +2363,8 @@
     }
   }
   function saveSettings() {
+    checkCancel();
+    checkVersionReady.then(() => checkWake(true));
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch {}
@@ -2564,7 +2566,10 @@
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`state ${r.status}`))))
       .then((st) => {
         if (!current()) return; // a response for the previous thread, or for a torn-down copy
+        const priorBuild = lastState?.t3Build?.full, priorMain = lastState?.t3MainJs;
         lastState = { ...st, receivedAt: Date.now() };
+        if (priorBuild !== st.t3Build?.full || priorMain !== st.t3MainJs) checkCancel();
+        checkVersionReady.then(() => checkWake());
         render();
         readT3Cache();
       })
@@ -2607,6 +2612,8 @@
     if (JSON.stringify(next) === JSON.stringify(route)) return false;
     route = next;
     routeToken++;
+    checkCancel();
+    checkVersionReady.then(() => checkWake(true));
     if (lastState) lastState = { ...lastState, handover: { ...(lastState.handover ?? {}), chain: null } }; // clear on navigation
     if (pop?.kind === "chain" || pop?.kind === "handover") closePopover();
     fetchState();
@@ -3032,6 +3039,7 @@
     pop.el.replaceChildren(...[pop.build()].flat(4).filter((n) => n !== null && n !== undefined && n !== false));
     if (settings.popMove) pop.el.querySelector(".t3x-pop-head")?.prepend(grip("this popup"));
     pop.el.scrollTop = keep;
+    checkObserveBox();
     if (pop.kind === "panel") { warmSelectedNames(); watchFsHide(pop.el.querySelector(".t3x-fs")); }
     if (focusKey) {
       const next = pop.el.querySelector(`[data-focus="${CSS.escape(focusKey)}"]`);
@@ -3279,10 +3287,11 @@
   const viewKey = (v) => `${v.id}|${v.hasData}|${v.noMeter}|${!v.hasData ? v.fetchedAt : ""}|${v.lp?.leftExact?.toFixed(1)}|${v.lp?.timeLeftExact?.toFixed(1)}|${v.sp?.leftExact?.toFixed(1)}|${v.sp?.pace}|${v.blocked}|${v.stale}|${v.barScoped?.model ?? ""}|${(v.scoped ?? []).map((e) => `${e.model}:${e.left}:${e.leftExact.toFixed(1)}:${e.resetsAt ?? ""}`).join(",")}|${v.stopLeft ?? ""}|${(v.scopedNoReading ?? []).map((e) => e.model).join(",")}`;
 
   // Header: the chain pill, and one compact B glyph per lab with data (no labels; tooltips).
+  const HEADER_ANCHOR = "[data-workspace-titlebar-controls]";
   features.header = {
     on: () => settings.usageHeader || settings.chainPill || settings.burnTells,
     node: null,
-    find: () => single("[data-workspace-titlebar-controls] > div:not([aria-hidden])"),
+    find: () => single(`${HEADER_ANCHOR} > div:not([aria-hidden])`),
     build() {
       const chain = h("button", { type: "button", class: "t3x-pill t3x-chain", [OWN]: "chain", "aria-haspopup": "dialog", "aria-expanded": "false", onclick: (e) => openChain(e.currentTarget) });
       const heat = h("span", { class: "t3x-pill t3x-burn-hdr", [OWN]: "burn-hdr", role: "img" });
@@ -3614,6 +3623,225 @@
   // handover chains stay apart. Screen readers keep T3's own label; the text is never edited.
   // 4736 removed the title attributes; data-thread-item is T3's stable row hook.
   const TITLE_SEL = '[data-thread-item] span.min-w-0.flex-1.text-start, :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) span[aria-hidden].min-w-0.flex-1';
+
+  // ---------- break check (checker 1) ----------
+  // No DOM text, ids, settings values or discovered font families enter a result.
+  const CHECKER_VERSION = "1";
+  const CHECK_NAMES = { threadtitles: "Thread titles font", onerow: "One-row titles", compact: "Compact threads", marker: "Selected thread marker", panel: "panel", bars: "bars", header: "header", composer: "composer", older: "Older" };
+  // Until Andy decides how the inserted parts are named (a design question, 15 Nov 2026), the box, dot and tooltip
+  // name only the four sidebar-row add-ons his approved look (S3) shows. Inserted parts are still checked and reported.
+  const CHECK_SHOWN = new Set(["threadtitles", "onerow", "compact", "marker"]);
+  const CHECK_CACHE = "t3x:break-check:v1";
+  let checkVersion = null, checkPair = null, checkEpoch = 0, checkIdentity = null;
+  let checkResults = {};
+  const checkShown = new Set(), checkViewed = new Set(), checkSending = new Set();
+  let checkInViewObserver = null;
+  cleanups.push(() => { checkCancel(); checkInViewObserver?.disconnect(); });
+  // Capture bytes now, before the loader can replace either node on a later focus.
+  const runningJs = D.getElementById("t3x-js")?.textContent;
+  const runningCss = D.getElementById("t3x-css")?.textContent;
+  const checkVersionReady = runningJs != null && runningCss != null && W.crypto?.subtle
+    ? W.crypto.subtle.digest("SHA-256", new TextEncoder().encode(runningJs + runningCss)).then(bytes => {
+      checkVersion = [...new Uint8Array(bytes)].map(x => x.toString(16).padStart(2, "0")).join("").slice(0, 16);
+    }).catch(() => {}) : Promise.resolve();
+  function checkVisible(el) {
+    if (!el || el.closest('[hidden], [inert]')) return false;
+    const r = el.getBoundingClientRect(), c = getComputedStyle(el);
+    if (r.height <= 0 || r.width <= 0 || r.bottom <= 0 || r.top >= W.innerHeight || r.right <= 0 || r.left >= W.innerWidth || c.visibility !== "visible" || c.display === "none") return false;
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      const style = getComputedStyle(p);
+      if (style.visibility !== "visible" || style.display === "none") return false;
+      if (/(auto|scroll|hidden|clip)/.test(style.overflow + style.overflowY)) {
+        const b = p.getBoundingClientRect();
+        if (r.bottom <= b.top || r.top >= b.bottom || r.right <= b.left || r.left >= b.right) return false;
+      }
+    }
+    return true;
+  }
+  function checkBuild() {
+    const build = lastState?.t3Build;
+    if (!checkVersion || !build?.full || !build?.label || !lastState?.t3MainJs) return null;
+    const loaded = performance.getEntriesByType("resource").some(e => {
+      try { return new URL(e.name).pathname.split("/").pop() === lastState.t3MainJs && /\/main-[\w-]+\.js$/.test(new URL(e.name).pathname); } catch { return false; }
+    });
+    return loaded ? { ...build, key: JSON.stringify([build.full, checkVersion, CHECKER_VERSION]) } : null;
+  }
+  function checkOn(id) {
+    if (id === "threadtitles") return activePick("threadtitles").family !== "off";
+    if (id === "onerow") return settings.oneRowTitles;
+    if (id === "compact") return settings.compactThreads;
+    if (id === "marker") return settings.marker !== "off";
+    return features[id].on();
+  }
+  function checkRead() {
+    const out = {};
+    // Eligibility is independent of TITLE_SEL. Grouping hides native rows, so it is unchecked.
+    const grouped = checkVisible(D.querySelector('div[data-t3x="grouping-root"]'));
+    const rows = grouped ? [] : [...D.querySelectorAll('li[data-thread-item]')].filter(row => !row.querySelector('input, [data-testid="sidebar-draft-row"]') && !row.closest('#sidebar-thread-search-results') && checkVisible(row));
+    const result = (id, seen, matched) => { out[id] = { result: matched === seen ? "ok" : "broken", seen, matched }; };
+    if (rows.length >= 2) {
+      for (const id of ["threadtitles", "onerow", "compact"]) {
+        if (!checkOn(id)) continue;
+        const matched = rows.filter(row => {
+          const title = row.querySelector(TITLE_SEL);
+          if (!title) return false;
+          const css = getComputedStyle(title);
+          if (id === "threadtitles") return css.fontFamily.split(",")[0].trim().replace(/^["']|["']$/g, "") === ROLE.threadtitles.alias;
+          if (id === "onerow") return css.whiteSpace === "nowrap" && css.textOverflow === "ellipsis";
+          // The shared compact row rule applies to cards and slim rows alike.
+          // Card-only clamps are superseded by one-row titles and do not apply to slim rows.
+          const rowCss = getComputedStyle(row);
+          return parseFloat(rowCss.paddingTop) === 2 && parseFloat(rowCss.paddingBottom) === 2;
+        }).length;
+        result(id, rows.length, matched);
+      }
+      if (checkOn("marker")) {
+        const selected = rows.map(r => r.querySelector('[aria-current="page"], [data-active="true"]')).filter(checkVisible);
+        if (selected.length) result("marker", selected.length, selected.filter(el => settings.marker === "outline" ? getComputedStyle(el).outlineStyle === "solid" && parseFloat(getComputedStyle(el).outlineWidth) >= 2 : getComputedStyle(el, "::after").content === '""' && parseFloat(getComputedStyle(el, "::after").width) === 3).length);
+      }
+    }
+    // Inserted features: eligible only with their existing, unique anchor on screen.
+    // Healthy = own connected node inside it; broken = that node missing. No anchor = unchecked.
+    // Older also requires a qualifying age according to its existing folding function.
+    for (const id of ORDER) {
+      if (!checkOn(id)) continue;
+      const f = features[id], found = f.find();
+      const el = id === "header" ? single(HEADER_ANCHOR).el : found.el;
+      if (!checkVisible(el)) continue;
+      if (id === "older" && !olderRows(activeRows(el).map(rowAge), settings.olderAfter).some(Boolean)) continue;
+      result(id, 1, f.node?.isConnected && el.contains(f.node) ? 1 : 0);
+    }
+    return out;
+  }
+  function checkCancel() {
+    checkEpoch++;
+    if (checkPair !== null) { clearTimeout(checkPair); timers.delete(checkPair); checkPair = null; }
+  }
+  function checkHydrate(build) {
+    if (checkIdentity === build.key) return;
+    checkCancel();
+    checkIdentity = build.key;
+    let cache = {};
+    try { cache = JSON.parse(safeGet(CHECK_CACHE) ?? "{}"); } catch {}
+    if (!cache || typeof cache !== "object" || Array.isArray(cache)) cache = {};
+    checkResults = {};
+    for (const [id, r] of Object.entries(cache[build.key] ?? {})) if (Object.hasOwn(CHECK_NAMES, id) && ["ok", "broken"].includes(r?.result) && Number.isInteger(r.seen) && Number.isInteger(r.matched) && r.seen >= 0 && r.seen <= 10000 && r.matched >= 0 && r.matched <= r.seen) checkResults[id] = {result:r.result, seen:r.seen, matched:r.matched};
+    for (const r of lastState?.screen ?? []) if (r.build === build.full && r.version === checkVersion && r.checker === CHECKER_VERSION && Object.hasOwn(CHECK_NAMES, r.id)) {
+      checkResults[r.id] = { result:r.result, seen:r.seen, matched:r.matched };
+      if (r.firstShownAt) checkShown.add(JSON.stringify([build.full, r.id]));
+    }
+  }
+  function checkStore(build) {
+    let cache = {};
+    try { cache = JSON.parse(safeGet(CHECK_CACHE) ?? "{}"); } catch {}
+    if (!cache || typeof cache !== "object" || Array.isArray(cache)) cache = {};
+    cache[build.key] = checkResults;
+    try { localStorage.setItem(CHECK_CACHE, JSON.stringify(cache)); } catch {}
+  }
+  async function checkSend(build, id, kind, reading) {
+    const p = new URLSearchParams({ kind, build:build.label, addon:id, version:checkVersion, checker:CHECKER_VERSION });
+    if (reading) for (const key of ["result", "seen", "matched"]) p.set(key, String(reading[key]));
+    const ctrl = new AbortController(); requests.add(ctrl);
+    try { return (await fetch(`${BASE}screen?${p}`, {cache:"no-store", signal:ctrl.signal})).ok; }
+    catch { return false; } finally { requests.delete(ctrl); }
+  }
+  function checkWake(force = false) {
+    if (disposed || paused || D.visibilityState !== "visible" || !D.hasFocus()) return;
+    const build = checkBuild();
+    if (!build) { checkCancel(); checkUI(); return; }
+    checkHydrate(build);
+    checkUI();
+    if (checkPair !== null) return;
+    const active = Object.keys(CHECK_NAMES).filter(checkOn), before = checkRead();
+    if (!force && active.every(id => before[id] && checkResults[id]?.result === "ok")) return;
+    const epoch = checkEpoch, hash = location.hash, options = JSON.stringify(settings);
+    const fontsLoaded = D.fonts.status === "loaded";
+    checkPair = later(5000, () => {
+      checkPair = null;
+      if (epoch !== checkEpoch || disposed || D.visibilityState !== "visible" || !D.hasFocus() || hash !== location.hash || options !== JSON.stringify(settings) || build.key !== checkBuild()?.key || !fontsLoaded || D.fonts.status !== "loaded") return;
+      const after = checkRead();
+      for (const id of active) {
+        if (!before[id] || JSON.stringify(before[id]) !== JSON.stringify(after[id])) continue;
+        const changed = JSON.stringify(checkResults[id]) !== JSON.stringify(after[id]);
+        checkResults[id] = after[id];
+        if (changed) checkSend(build, id, "result", after[id]).then(ok => { if (ok) checkUI(); });
+      }
+      checkStore(build);
+      checkUI();
+    });
+  }
+  function checkBroken() {
+    const build = checkBuild();
+    if (!build || build.key !== checkIdentity || lastState?.compat?.trial?.alertsStopped) return [];
+    return Object.keys(CHECK_NAMES).filter(id => CHECK_SHOWN.has(id) && checkOn(id) && checkResults[id]?.result === "broken" && !(lastState?.compat?.outcomes ?? []).some(x => x.build === build.full && x.addon === CHECK_NAMES[id] && x.outcome === "false-alarm"));
+  }
+  function checkCopy(build, ids) {
+    const checks = { threadtitles:`title hook with the add-on's font ("${ROLE.threadtitles.alias}"); failed check: title's font wasn't the add-on's font`, onerow:"title with one-row ellipsis", compact:"compact title layout", marker:"selected thread marker", panel:"panel node inside its anchor", bars:"bars node inside its anchor", header:"header node inside its anchor", composer:"composer node inside its anchor", older:"Older node for qualifying rows" };
+    return [`T3 version: ${build.full}`, `Add-ons version: ${checkVersion}`, `Checker version: ${CHECKER_VERSION}`,
+      ...ids.map(id => `${CHECK_NAMES[id]}: looked for ${checks[id]}; eligible rows seen: ${checkResults[id].seen}; rows matched: ${checkResults[id].matched}.`),
+      "Repo: ~/Documents/ChatGPT/t3-side-panel-addons", ...ids.flatMap(id => [
+        `node ~/.local/share/t3-sidebar-keeper/keeper.mjs --false-alarm "${CHECK_NAMES[id]}" --build "${build.full}"`,
+        `node ~/.local/share/t3-sidebar-keeper/keeper.mjs --confirm-real "${CHECK_NAMES[id]}" --build "${build.full}"`])].join("\n");
+  }
+  function checkBox() {
+    const ids = checkBroken(), build = checkBuild();
+    if (!ids.length) return null;
+    const names = ids.map(id => CHECK_NAMES[id]);
+    const list = names.length === 1 ? names[0] : names.slice(0, -1).join(", ") + " and " + names.at(-1);
+    const text = names.length === 1 ? `On T3 build ${build.label}, ${list} isn't showing.` : `On T3 build ${build.label}, ${names.length} add-ons aren't showing: ${list}.`;
+    const hint = h("span", {class:"t3x-muted", text:"Paste it into an agent thread"});
+    const btn = h("button", {type:"button", class:"t3x-btn t3x-check-copy", onclick:async () => {
+      try { await navigator.clipboard.writeText(checkCopy(build, ids)); btn.textContent = "Copied"; }
+      catch { btn.textContent = "Couldn't copy"; hint.hidden = true; }
+      later(2000, () => { btn.textContent = "Copy fix request"; hint.hidden = false; });
+    }}, "Copy fix request");
+    return h("div", {class:"t3x-warn t3x-check", role:"status", "data-check-ids":ids.join(",")}, h("div", {text}), h("div", {class:"t3x-check-actions"}, btn, hint));
+  }
+  function checkSeen() {
+    const box = pop?.kind === "panel" ? pop.el.querySelector(".t3x-check") : null;
+    if (D.visibilityState !== "visible" || !D.hasFocus() || !checkVisible(box)) return;
+    const build = checkBuild();
+    let viewed = false;
+    for (const id of checkBroken()) {
+      const key = JSON.stringify([build.full, id]);
+      if (!checkViewed.has(key)) { checkViewed.add(key); viewed = true; }
+      if (checkShown.has(key) || checkSending.has(key)) continue;
+      checkSending.add(key);
+      checkSend(build, id, "shown").then(ok => {
+        checkSending.delete(key);
+        if (ok) { checkShown.add(key); checkUI(); }
+      });
+    }
+    if (viewed) checkUI();
+  }
+  function checkUI() {
+    const ids = checkBroken(), build = checkBuild(), star = features.panel.node?.querySelector(".t3x-star");
+    if (star) {
+      const title = ids.length ? `Add-ons · ${ids.length} ${ids.length === 1 ? "isn't" : "aren't"} showing` : "Add-ons";
+      star.title = title;
+      star.setAttribute("aria-label", ids.length ? title : "Add-ons (switch each one on or off)");
+      const dot = ids.some(id => !checkShown.has(JSON.stringify([build.full, id])) && !checkViewed.has(JSON.stringify([build.full, id])));
+      if (dot && !star.querySelector(".t3x-check-dot")) star.append(h("i", {class:"t3x-check-dot", "aria-hidden":"true"}));
+      if (!dot) star.querySelector(".t3x-check-dot")?.remove();
+    }
+    if (pop?.kind === "panel") {
+      const old = pop.el.querySelector(".t3x-check"), next = checkBox();
+      if (old?.dataset.checkIds !== next?.dataset.checkIds) {
+        if (old) old.remove();
+        if (next) pop.el.querySelector(".t3x-pop-head").after(next);
+      }
+      checkObserveBox();
+    }
+  }
+  function checkObserveBox() {
+    checkInViewObserver?.disconnect();
+    checkInViewObserver = null;
+    if (pop?.kind !== "panel") return;
+    const box = pop.el.querySelector(".t3x-check");
+    if (!box) return;
+    checkInViewObserver = new IntersectionObserver(checkSeen, {root:pop.el});
+    checkInViewObserver.observe(box);
+  }
   // Dragging the sidebar wider or narrower changes no DOM, so a resize watcher re-checks the cuts.
   let titleBox = null, titleRO = null, titleRaf = 0;
   function watchTitleBox(t) {
@@ -5132,6 +5360,7 @@
     return [
       h("header", { class: "t3x-pop-head" }, h("strong", { text: "✦ Add-ons" }),
         h("span", { class: "t3x-muted", text: lastState && !lastState.transportFailedAt ? "This Mac · service running" : "service not answering" })),
+      checkBox(),
       h("button", {type:"button",class:"t3x-font-entry","data-focus":"open-fonts",onclick:e=>openFontWorkspace(e.currentTarget)},h("span",{text:"Fonts…"}),h("span",{class:"t3x-muted",text:fontsCustomized()?`${fontsCustomized()} customized`:"All T3 default"})),
       settings.fontPicker ? h("button", { type: "button", class: "t3x-btn t3x-font-pick-entry", "data-focus": "pick-font", onclick: () => startFontPick() }, "Pick a font from the screen") : null,
       fontPickList(),
@@ -5657,6 +5886,7 @@
     s.on("scroll", moved);
     s.on("resize", moved);
   }
+  if (W.__T3X_CHECK_TEST__) Object.assign(W.__T3X_CHECK_TEST__, { read:checkRead, wake:checkWake, cancel:checkCancel, ui:checkUI, seen:checkSeen, broken:checkBroken, features, change, openPanel, ready:checkVersionReady, snapshot:() => ({version:checkVersion, results:checkResults}) });
   if (W.__T3X_PICK_TEST__) Object.assign(W.__T3X_PICK_TEST__, { areaOwners, roleAttrs, roleOfFamily, startFontPick, showAreaOnScreen, endInspector, openFontsAt, openPanel, active: () => inspector, workspace: () => fontWorkspace });
   function stepAreaFont(id, dir) {
     const r = ROLE[id], cur = settings[r.key].family;
@@ -6198,7 +6428,9 @@
 
   listen(W, "storage", (e) => {
     if (e.key === SETTINGS_KEY) {
+      checkCancel();
       settings = readSettings(e.newValue);
+      checkVersionReady.then(() => checkWake(true));
       pruneSizeBack();
       applyRootAttrs();
       applyFonts();
@@ -6266,7 +6498,11 @@
   themeObserver.observe(D.documentElement, { attributes: true, attributeFilter: ["class", "data-theme-id", "data-theme-selected", "style"] });
   cleanups.push(() => themeObserver.disconnect());
 
-  const routeTick = () => checkRoute() && render();
+  let checkRouteHash = location.hash;
+  const routeTick = () => {
+    if (checkRouteHash !== location.hash) { checkRouteHash = location.hash; checkCancel(); checkVersionReady.then(() => checkWake(true)); }
+    if (checkRoute()) render();
+  };
   every(1000, routeTick); // TanStack's pushState doesn't fire hashchange
   listen(W, "hashchange", routeTick);
   every(POLL_MS, () => {
@@ -6275,7 +6511,9 @@
   every(30e3, () => {
     if (D.visibilityState === "visible") fetchBurn();
   });
-  listen(W, "focus", () => fetchBurn());
+  listen(W, "focus", () => { fetchBurn(); checkCancel(); fetchState().then(() => {checkWake(); checkSeen();}); });
+  listen(W, "blur", checkCancel);
+  listen(D, "visibilitychange", () => { checkCancel(); if (D.visibilityState === "visible") checkWake(); });
   every(30e3, () => render()); // ages and "stale" marks move on even without new data
   listen(D, "visibilitychange", () => {
     if (D.visibilityState === "visible") {
@@ -6298,7 +6536,8 @@
     p.set("cardH", cards.slice(0, 6).map((c) => c.offsetHeight).join("|"));
     const cur = D.querySelector('[data-testid^="sidebar-row-"][aria-current="page"]');
     p.set("marker", !cur ? "norow" : getComputedStyle(cur, "::after").content !== "none" ? "bar" : getComputedStyle(cur).outlineStyle !== "none" ? "outline" : "none");
-    p.set("curW", cur ? getComputedStyle(cur.querySelector("span.min-w-0.flex-1.text-start, span[aria-hidden].flex-1") ?? cur).fontWeight : "none");
+    const curTitle = cur?.querySelector(TITLE_SEL);
+    p.set("curW", curTitle ? getComputedStyle(curTitle).fontWeight : "none");
     p.set("editor", String(Boolean(composerEditor())));
     p.set("usageAgeS", lastState?.usage?.fetchedAt ? String(Math.round((Date.now() - lastState.usage.fetchedAt) / 1000)) : "none");
     p.set("t3cache", t3.state);

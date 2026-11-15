@@ -163,6 +163,7 @@ header[data-chat-header]:has([data-t3x="hdr"]) > div:not([data-workspace-titleba
 
 .t3x-star-li { position: relative; flex-shrink: 0; list-style: none; }
 .t3x-star {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -176,6 +177,10 @@ header[data-chat-header]:has([data-t3x="hdr"]) > div:not([data-workspace-titleba
   cursor: pointer;
 }
 .t3x-star:hover, .t3x-star[aria-expanded="true"] { background: var(--sidebar-row-hover, var(--accent)); color: var(--sidebar-foreground, var(--foreground)); }
+
+.t3x-check-dot { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--warning); box-shadow: 0 0 0 2px var(--sidebar, var(--background)); }
+.t3x-check-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.t3x-check-copy { min-width: 128px; flex-shrink: 0; }
 
 /* ---------- popovers (usage detail, chain history, add-ons panel) ---------- */
 

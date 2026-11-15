@@ -140,3 +140,24 @@ Child work is recorded at most two levels in this snapshot, not the Waiting shel
 `/grouping` reads this Mac's top-level v2 threads (not subagents; forks stay) from `statev2.sqlite`, opened read-only in its own worker and stopped after 2 seconds, returning the latest safe checkpoint instead of dropping the list. That checkpoint is published after each completed fact query (latest run, live run, limit run, pending request, plan, and child) before the next query, and again after the live approval seed and each finished history chunk, before the next statement. A live run is not called absent until both the latest-run and live-run reads have finished. A test delay only waits. The answer is metadata only: titles, project ids, recorded run and request states, and coverage counts. No message text, paths, prompts or secrets. The same host and origin rules as the other routes apply. The index stops at 1,000 threads and says when the list or the supporting facts are cut short. When `grouping.js` and `grouping.css` are installed, they are served on the end of `extras.js` and `extras.css`.
 
 The files are `grouping.mjs`, `grouping-core.mjs`, `grouping-sql-worker.mjs`, `public/grouping.js` and `public/grouping.css`. `node --test test/` includes this index's activity rules, its read-only snapshot caps and origin guard, and a headless browser check of the grouped list.
+
+## The break check (15 Nov 2026)
+
+The checker reads the real screen after the first focus for a new T3 build/payload/checker key, when an add-on is enabled, and on later focus or route changes while a result is broken or unchecked. Two agreeing readings five seconds apart are required. Settings, route, build, focus, visibility and teardown changes cancel the pair; fonts must be loaded. No unchecked observation is cached or sent.
+
+The build must have a keeper-recorded `mainJs` matching a `main-*.js` resource entry in this page. The payload version is the SHA-256 digest of the running `#t3x-js` and `#t3x-css` texts, in that order, truncated to 16 hex characters. Missing identity means unchecked. The keeper's loader is unchanged.
+
+| Add-on | Eligible | Healthy evidence | Broken evidence / unchecked |
+| --- | --- | --- | --- |
+| Thread titles font | Enabled effective font; two visible native rows without rename inputs | Each title matching `TITLE_SEL` has the alias `T3X Thread titles` first in computed family | Missing title hook or alias is broken; font off or fewer rows is unchecked |
+| One-row titles | Enabled; same two-row rule | Each matching title has nowrap and ellipsis | Missing hook or either style is broken |
+| Compact threads | Enabled; same two-row rule | Each row has a matching title hook and the shared 2 px compact padding on both sides | Missing title hook or row padding is broken |
+| Selected thread marker | Enabled; same two-row rule, with a selected row in view | The selected node has the bar pseudo-element or the selected outline | Missing marker is broken; no selected row in view is unchecked |
+| panel, bars, header, composer | Own feature gate and unique anchor on screen | Own connected node remains inside that anchor | Missing node is broken; absent/offscreen/ambiguous anchor is unchecked |
+| Older | Enabled, visible list anchor and rows qualifying under the existing age rule | Own connected node inside the anchor | Missing node is broken; nothing qualifying is unchecked |
+
+Only the four sidebar-row add-ons appear in the ✦ box, dot and tooltip for now: how the inserted parts (panel, bars, header, composer, Older) are named there is Andy's design question (15 Nov 2026), so their results are checked and reported to the server but shown nowhere yet. Drafts, search results, zero-height rows and offscreen rows are not eligible. Grouping's visible root makes native-row checks unchecked; breaks in grouping titles are outside this checker. Counts and booleans leave the page; discovered font families, titles, row IDs and settings do not. Copy fix request names only the add-on's font alias.
+
+The approved warning box goes under the panel header. The dot clears when the focused, visible panel actually shows the box, even if the event request has not finished. Healthy readings clear all warning surfaces within the same build. False-alarm outcomes hide their lines; two distinct current false-alarm pairs suppress all alert surfaces while checks continue.
+
+The GET-only `/screen` endpoint accepts fixed tokens and bounded counts, rejects stale payload versions and unchecked reports, and atomically replaces `screen.json` with mode 0600. A `shown` token records first view once. Old build/version lines remain on disk. `/state` reads the keeper's files on every request. Test overrides: `T3X_KEEPER_STATE`, `T3X_KEEPER_COMPAT`, `T3X_SCREEN_FILE`; keeper files are read-only to this service.

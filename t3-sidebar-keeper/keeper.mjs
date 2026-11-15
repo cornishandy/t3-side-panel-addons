@@ -89,7 +89,7 @@ const USER_DATA = process.env.T3_USER_DATA_DIR || path.join(os.homedir(), "Libra
 const FRAMEWORK = path.join(APP, "Contents/Frameworks/Electron Framework.framework/Electron Framework");
 const STYLE_ID = "t3-keeper-sidebar-2"; // bump the number when WRAP_CSS changes
 const KEEP_BACKUPS = 3;
-const KEEPER_VERSION = 16; // bump when units change so --auto re-checks an already-handled build
+const KEEPER_VERSION = 17; // bump when units change so --auto re-checks an already-handled build
 const MIN_FREE_BYTES = 1024 ** 3;
 const TMP_PREFIX = ".app.asar.t3-keeper-";
 const PARSE = { ecmaVersion: "latest", allowHashBang: true };
@@ -294,9 +294,9 @@ function log(message) {
   console.log(`${new Date().toISOString()} ${message}`);
 }
 
-function notify(message) {
+function notify(message, subtitle = "") {
   if (process.env.T3_KEEPER_QUIET) return;
-  spawnSync("/usr/bin/osascript", ["-e", `display notification ${JSON.stringify(message)} with title "T3 sidebar fix"`]);
+  return spawnSync("/usr/bin/osascript", ["-e", `display notification ${JSON.stringify(message)} with title "T3 sidebar fix"${subtitle ? ` subtitle ${JSON.stringify(subtitle)}` : ""}`]).status === 0;
 }
 
 function writeFileDurable(file, data) {
@@ -322,6 +322,10 @@ function loadState() {
 }
 
 function saveState(state) {
+  const previous = loadState();
+  // Spreading previous state at an error/wait path must not carry a build A asset to B.
+  const mainJs = state.mainJs ?? (state.build === previous.build ? previous.mainJs ?? null : null);
+  state = { ...state, mainJs };
   fs.mkdirSync(HOME, { recursive: true });
   writeFileDurable(STATE, JSON.stringify({ ...state, updatedAt: new Date().toISOString() }, null, 2));
 }
@@ -1202,8 +1206,95 @@ function plan(fd, layout, targets) {
     }
   }
   if (results.fit.state === "failed") delete files.delegatedTitles;
-  const mainJs = targets.mainJs ? readEntry(fd, layout, targets.mainJs).toString("utf8") : "";
-  return { results, files, missingHooks: WRAP_HOOKS.filter((h) => !mainJs.includes(h)) };
+  return { results, files, missingHooks: scanWrapHooks(fd, layout) };
+}
+
+function scanWrapHooks(fd, layout) {
+  const missing = new Set(WRAP_HOOKS);
+  for (const name of listDir(layout.header, ASSETS).filter(n => n.endsWith(".js"))) {
+    const text = readEntry(fd, layout, `${ASSETS}/${name}`).toString("utf8");
+    for (const hook of missing) if (text.includes(hook)) missing.delete(hook);
+  }
+  return [...missing];
+}
+
+// Compatibility state is deliberately outside state.json's replace-on-save lifecycle.
+const COMPAT = path.join(HOME, "compat.json");
+const SCREEN = process.env.T3X_SCREEN_FILE || path.join(os.homedir(), ".local/share/t3-extras/screen.json");
+const ADDON_NAMES = ["Wrapped titles", "Thread titles font", "One-row titles", "Compact threads", "Selected thread marker", "panel", "bars", "header", "composer", "Older"];
+function readJson(file, fallback = {}) {
+  try { const value = JSON.parse(fs.readFileSync(file, "utf8")); return value && typeof value === "object" && !Array.isArray(value) ? value : fallback; } catch { return fallback; }
+}
+function initCompat() {
+  const old = readJson(COMPAT);
+  if (typeof old.trial?.startedAt === "string" && Number.isFinite(Date.parse(old.trial.startedAt))) return { ...old, events: Array.isArray(old.events) ? old.events.filter(x => x && typeof x === "object") : [], outcomes: Array.isArray(old.outcomes) ? old.outcomes.filter(x => x && typeof x === "object") : [], notices: Array.isArray(old.notices) ? old.notices : [] };
+  const value = { trial: { startedAt: new Date().toISOString(), endsAt: new Date(2026, 10, 29, 23, 59).toISOString() }, events: [], outcomes: [], notices: [] };
+  fs.mkdirSync(HOME, { recursive: true, mode: 0o700 });
+  writeFileDurable(COMPAT, JSON.stringify(value, null, 2));
+  return value;
+}
+function trialState(c) {
+  const falseAlarms = new Set((Array.isArray(c.outcomes) ? c.outcomes : []).filter(x => x?.outcome === "false-alarm").map(x => JSON.stringify([x.build, x.addon]))).size;
+  return { ...c.trial, ended: Boolean(c.trial?.endsAt && Date.now() > Date.parse(c.trial.endsAt)), falseAlarms, alertsStopped: falseAlarms >= 2, status: falseAlarms >= 2 ? "alerts stopped after 2 false alarms" : null };
+}
+function compatStatus(missingHooks = []) {
+  const c = readJson(COMPAT), screen = readJson(SCREEN);
+  const events = Array.isArray(c.events) ? c.events.filter(x => x && typeof x === "object").map(x => ({...x})) : [];
+  for (const r of Array.isArray(screen.results) ? screen.results : []) {
+    if (!r || typeof r.firstShownAt !== "string" || !Number.isFinite(Date.parse(r.firstShownAt))) continue;
+    const event = { build: r.build, addon: r.addon, layer: "screen", firstShownAt: r.firstShownAt };
+    const old = events.find(x => x.build === event.build && x.addon === event.addon && x.layer === event.layer);
+    if (!old) events.push(event);
+    else if (event.firstShownAt < old.firstShownAt) old.firstShownAt = event.firstShownAt;
+  }
+  return { missingHooks, screen: Array.isArray(screen.results) ? screen.results : [], outcomes: Array.isArray(c.outcomes) ? c.outcomes.filter(x => x && typeof x === "object") : [], trial: trialState(c), events };
+}
+function buildLabel(version) { return /-nightly\.\d+\.(\d+)$/.exec(version ?? "")?.[1] ?? version; }
+function noticeFor(out, names = out.missingHooks?.length ? ["Wrapped titles"] : [], stopped = false) {
+  const label = buildLabel(out.version);
+  const body = out.failed.length ? `Couldn't fully apply the sidebar fix to build ${label}. Ask an agent to update it.`
+    : out.wrote ? `Re-applied to build ${label}. Press Shift-Cmd-R in T3 to reload.`
+    : names.length ? `Your T3 sidebar changes are on build ${label}.` : null;
+  const subtitle = stopped || !names.length ? "" : names.length === 1 ? `${names[0]} may need an update` : `${names.length} add-ons may need an update`;
+  return { body, subtitle };
+}
+function notifyApply(out) {
+  const c = initCompat();
+  const { body, subtitle } = noticeFor(out, undefined, trialState(c).alertsStopped);
+  const key = JSON.stringify([out.version, body, subtitle]);
+  if (!body || (c.notices ?? []).includes(key)) return;
+  // A refused notification and quiet mode are observations, never shown events.
+  if (!notify(body, subtitle)) return;
+  c.notices = [...(c.notices ?? []), key];
+  if (subtitle && !(c.events ?? []).some(e => e.build === out.version && e.addon === "Wrapped titles" && e.layer === "marker")) {
+    c.events = [...(c.events ?? []), { build: out.version, addon: "Wrapped titles", layer: "marker", firstShownAt: new Date().toISOString() }];
+  }
+  writeFileDurable(COMPAT, JSON.stringify(c, null, 2));
+}
+function cmdOutcome(outcome) {
+  return withLock(() => {
+    const addon = process.argv[3], extra = process.argv.slice(4);
+    if (!ADDON_NAMES.includes(addon) || (extra.length && (extra.length !== 2 || extra[0] !== "--build"))) throw new Error("invalid outcome arguments");
+    const build = extra[1] ?? bundleVersion();
+    const c = initCompat();
+    if (!compatStatus().events.some(e => e.build === build && e.addon === addon)) throw new Error("no shown event for this build and add-on");
+    c.outcomes ??= [];
+    const old = c.outcomes.find(x => x.build === build && x.addon === addon);
+    if (old?.outcome === outcome) return;
+    log(`compat outcome: ${build} ${addon}: ${old?.outcome ?? "unrecorded"} -> ${outcome}`);
+    c.outcomes = c.outcomes.filter(x => x !== old);
+    c.outcomes.push({ build, addon, outcome, recordedAt: new Date().toISOString() });
+    writeFileDurable(COMPAT, JSON.stringify(c, null, 2));
+  });
+}
+function cmdTrialReport() {
+  const c = compatStatus();
+  const groups = { "confirmed real": [], "confirmed false alarm": [], "never sent to an agent": [] };
+  for (const event of c.events.filter(e => e.firstShownAt >= (c.trial.startedAt ?? ""))) {
+    const outcome = c.outcomes.find(x => x.build === event.build && x.addon === event.addon);
+    groups[outcome?.outcome === "real" ? "confirmed real" : outcome?.outcome === "false-alarm" ? "confirmed false alarm" : "never sent to an agent"].push({ ...event, outcomeAt: outcome?.recordedAt ?? null });
+  }
+  console.log(JSON.stringify({ trial: c.trial, ...groups }, null, 2));
 }
 
 function inspect(asarPath = ASAR, checked = null) {
@@ -1309,7 +1400,7 @@ function apply({ reason, checked = asarIdentity(), version = bundleVersion(), gu
   }
   const failed = Object.entries(planned.results).filter(([, v]) => v.state === "failed").map(([k]) => k);
   log(`${reason}: build ${version}: ${summary(planned.results)}${planned.missingHooks.length ? `; missing hooks ${planned.missingHooks.join(", ")}` : ""}`);
-  return { version, wrote: items.length > 0, live, produced, checked, failed, results: planned.results, missingHooks: planned.missingHooks };
+  return { version, wrote: items.length > 0, live, produced, checked, failed, results: planned.results, missingHooks: planned.missingHooks, mainJs: planned.targets.mainJs ? path.basename(planned.targets.mainJs) : null };
 }
 
 function cmdRestore() {
@@ -1375,7 +1466,8 @@ function cmdStatus() {
     launchedByT3: launchedByT3(asarIdentity()),
     asarIntegrityFuse: integrityFuse(),
     units,
-    missingHooks,
+    results,
+    compat: compatStatus(missingHooks),
     targets,
     switchedOff: [...loadDisabled()],
     state: loadState(),
@@ -1415,7 +1507,7 @@ function cmdDryRun() {
 
 function recordApply(out) {
   const prev = loadState();
-  saveState({ keeperVersion: KEEPER_VERSION, loaderKey: loaderKeyId(), key: asarKey(out.produced ?? out.checked), build: out.version, status: out.failed.length ? "partial" : "patched", results: out.results, produced: out.produced ? { build: out.version, identity: out.produced } : prev.produced ?? null, lastPatchedAt: out.wrote ? new Date().toISOString() : prev.lastPatchedAt ?? null });
+  saveState({ keeperVersion: KEEPER_VERSION, loaderKey: loaderKeyId(), key: asarKey(out.produced ?? out.checked), build: out.version, mainJs: out.mainJs, status: out.failed.length ? "partial" : "patched", results: out.results, produced: out.produced ? { build: out.version, identity: out.produced } : prev.produced ?? null, lastPatchedAt: out.wrote ? new Date().toISOString() : prev.lastPatchedAt ?? null });
   return out.failed.length ? 2 : 0;
 }
 
@@ -1464,7 +1556,7 @@ function cmdAuto() {
     if (!launchedByT3(identity)) {
       if (state.status !== "waiting-first-launch" || state.waitingFor !== version) {
         log(`build ${version}: waiting for its first launch so Gatekeeper scans it unpatched`);
-        saveState({ ...state, key: null, build: version, status: "waiting-first-launch", waitingFor: version });
+        saveState({ ...state, mainJs: state.build === version ? state.mainJs : null, key: null, build: version, status: "waiting-first-launch", waitingFor: version });
       }
       return 0;
     }
@@ -1482,27 +1574,20 @@ function cmdAuto() {
           ? "Can't re-apply the T3 sidebar fix: switch on node in System Settings > Privacy & Security > App Management (a Homebrew node update can switch it off)."
           : `T3 sidebar fix failed on build ${version}: ${error.message}`);
       }
-      saveState({ ...state, key: null, build: version, status: "error", errorBuild: version, error: error.message, errorKey: asarKey(identity), errorAt: Date.now() });
+      saveState({ ...state, mainJs: state.build === version ? state.mainJs : null, key: null, build: version, status: "error", errorBuild: version, error: error.message, errorKey: asarKey(identity), errorAt: Date.now() });
       return 1;
     }
     const status = out.failed.length === 0 ? "patched" : out.failed.length === UNITS.length ? "failed" : "partial";
-    const hooks = out.missingHooks.length ? ` Sidebar markup changed (${out.missingHooks.join(", ")}), so wrapping may not show.` : "";
-    if (out.wrote) {
-      const note = out.failed.length ? ` Couldn't apply: ${out.failed.join(", ")}.` : "";
-      log(`re-applied to build ${version} (${out.live}).${note}${hooks}`);
-      notify(`Re-applied your T3 sidebar changes to build ${version}.${note}${hooks} Press Shift-Cmd-R in T3 to reload the interface.`);
-    } else if ((out.failed.length || hooks) && state.notifiedBuild !== version) {
-      notify(`Couldn't fully apply the sidebar fix to T3 build ${version}: ${out.failed.join(", ") || "markup changed"}.${hooks} Ask an agent to update the sidebar keeper.`);
-    }
+    notifyApply(out);
     saveState({
       keeperVersion: KEEPER_VERSION,
       loaderKey: loaderKeyId(),
       key: asarKey(out.produced ?? identity),
       produced: out.produced ? { build: version, identity: out.produced } : state.produced ?? null,
       build: version,
+      mainJs: out.mainJs,
       status,
       results: out.results,
-      notifiedBuild: out.failed.length || hooks ? version : null,
       lastPatchedAt: out.wrote ? new Date().toISOString() : (state.lastPatchedAt ?? null),
     });
     reminderTick();
@@ -1543,6 +1628,9 @@ function rotateLog() {
 
 function mainBody() {
   const arg = process.argv[2] ?? "--status";
+  // Only commands that write take the lock to start the trial file; --status, --trial-report and the reminder
+  // commands read it as it is, so a running --auto never puts a lock message in front of their output.
+  if (["--auto", "--apply", "--restore", "--false-alarm", "--confirm-real"].includes(arg)) withLock(initCompat);
   if (reminders.isKeeperArg(arg)) {
     process.exitCode = reminders.runFromKeeperArgv(process.argv);
     return;
@@ -1550,6 +1638,7 @@ function mainBody() {
   if (arg === "--auto") rotateLog();
   const commands = {
     "--status": cmdStatus, "--apply": cmdApply, "--auto": cmdAuto, "--restore": cmdRestore, "--dry-run": cmdDryRun, "--probe": cmdProbe,
+    "--false-alarm": () => cmdOutcome("false-alarm"), "--confirm-real": () => cmdOutcome("real"), "--trial-report": cmdTrialReport,
     "--disable": () => cmdSwitch(false), "--enable": () => cmdSwitch(true),
   };
   const run = commands[arg];
