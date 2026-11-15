@@ -3612,7 +3612,8 @@
   // T3's title span already ends in "…" on one line once the wrap is undone (CSS). When a title
   // ending in "(2)" or "(Opus)" is cut, an owned aria-hidden copy of that ending sits beside it, so
   // handover chains stay apart. Screen readers keep T3's own label; the text is never edited.
-  const TITLE_SEL = ':is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) span[aria-hidden].min-w-0.flex-1';
+  // 4736 removed the title attributes; data-thread-item is T3's stable row hook.
+  const TITLE_SEL = '[data-thread-item] span.min-w-0.flex-1.text-start, :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) span[aria-hidden].min-w-0.flex-1';
   // Dragging the sidebar wider or narrower changes no DOM, so a resize watcher re-checks the cuts.
   let titleBox = null, titleRO = null, titleRaf = 0;
   function watchTitleBox(t) {
@@ -3735,7 +3736,7 @@
     const L = li.getBoundingClientRect();
     if (!L.width) return;
     const slot = kind === "card" ? li.querySelector('[class*="group/sidebar-status-slot"]') : kind === "slim" ? li.querySelector('[data-testid="sidebar-row-slim"] > span.relative[class*="ml-auto"]') : null;
-    const icon = kind === "card" ? li.querySelector('[data-testid="sidebar-row-card"] div.relative > div:nth-child(3) > span.ml-auto') : null;
+    const icon = kind === "card" ? li.querySelector('[data-testid="sidebar-row-card"] div.relative > div:nth-child(3) > span.ml-auto, [data-testid="sidebar-row-card"] div.relative > div:nth-child(2):last-child > span.min-w-0.flex-1.text-start ~ span[aria-hidden].inline-flex') : null;
     const S = slot?.getBoundingClientRect();
     const I = icon?.getBoundingClientRect();
     const px = (v) => `${Math.round(v)}px`;
@@ -6297,7 +6298,7 @@
     p.set("cardH", cards.slice(0, 6).map((c) => c.offsetHeight).join("|"));
     const cur = D.querySelector('[data-testid^="sidebar-row-"][aria-current="page"]');
     p.set("marker", !cur ? "norow" : getComputedStyle(cur, "::after").content !== "none" ? "bar" : getComputedStyle(cur).outlineStyle !== "none" ? "outline" : "none");
-    p.set("curW", cur ? getComputedStyle(cur.querySelector("span[aria-hidden].flex-1") ?? cur).fontWeight : "none");
+    p.set("curW", cur ? getComputedStyle(cur.querySelector("span.min-w-0.flex-1.text-start, span[aria-hidden].flex-1") ?? cur).fontWeight : "none");
     p.set("editor", String(Boolean(composerEditor())));
     p.set("usageAgeS", lastState?.usage?.fetchedAt ? String(Math.round((Date.now() - lastState.usage.fetchedAt) / 1000)) : "none");
     p.set("t3cache", t3.state);

@@ -87,15 +87,16 @@ const BACKUPS = path.join(HOME, "backups");
 const LOCK = path.join(HOME, "keeper.lock");
 const USER_DATA = process.env.T3_USER_DATA_DIR || path.join(os.homedir(), "Library/Application Support/t3code-v2");
 const FRAMEWORK = path.join(APP, "Contents/Frameworks/Electron Framework.framework/Electron Framework");
-const STYLE_ID = "t3-keeper-sidebar-1"; // bump the number when WRAP_CSS changes
+const STYLE_ID = "t3-keeper-sidebar-2"; // bump the number when WRAP_CSS changes
 const KEEP_BACKUPS = 3;
-const KEEPER_VERSION = 15; // bump when units change so --auto re-checks an already-handled build
+const KEEPER_VERSION = 16; // bump when units change so --auto re-checks an already-handled build
 const MIN_FREE_BYTES = 1024 ** 3;
 const TMP_PREFIX = ".app.asar.t3-keeper-";
 const PARSE = { ecmaVersion: "latest", allowHashBang: true };
 
 // Unlayered, so it beats Tailwind's @layer utilities (.truncate, .h-9) without !important.
 const WRAP_CSS = [
+  "[data-thread-item] span.min-w-0.flex-1.text-start,",
   ":is([data-testid=sidebar-row-card],[data-testid=sidebar-row-slim]) span[aria-hidden].flex-1.truncate,",
   "[data-testid=sidebar-draft-row] .mt-0\\.5.truncate,",
   "[data-testid^=thread-title-],",
@@ -113,6 +114,7 @@ const WRAP_HOOKS = [
   "sidebar-draft-row",
   "sidebar-thread-search-results",
   "h-[4.875rem]",
+  "min-w-0 flex-1 text-start text-sm", // the title span itself (4736 and older rows)
 ];
 const INLINE_STYLE_CSP = "style-src 'self' 'unsafe-inline'";
 

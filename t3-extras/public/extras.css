@@ -344,6 +344,7 @@ html[data-t3x-marker="bar"] [data-slot="sidebar-menu-sub-button"][data-active="t
   background: var(--t3x-mark, var(--sidebar-foreground, currentColor));
   pointer-events: none;
 }
+html[data-t3x-marker="bar"] [data-thread-item] [aria-current="page"] span.min-w-0.flex-1.text-start,
 html[data-t3x-marker="bar"] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"])[aria-current="page"] span[aria-hidden].flex-1,
 html[data-t3x-marker="bar"] [data-testid="sidebar-draft-row"][aria-current="page"] .mt-0\.5.truncate,
 html[data-t3x-marker="bar"] [data-slot="sidebar-menu-sub-button"][data-active="true"] [data-testid^="thread-title-"] {
@@ -365,6 +366,7 @@ html[data-t3x-tight] :is([data-testid="sidebar-row-card"], [data-testid="sidebar
   padding-block: .375rem;
 }
 html[data-t3x-tight] [data-testid="sidebar-row-slim"] { height: auto; min-height: 2rem; padding-block: .25rem; }
+html[data-t3x-tight] [data-thread-item] span.min-w-0.flex-1.text-start,
 html[data-t3x-tight] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) span[aria-hidden].flex-1 { line-height: 1.25; }
 
 /* ---------- sidebar polish: model icon beside the title ----------
@@ -391,6 +393,13 @@ html[data-t3x-inline-icon]:not([data-t3x-compact]) [data-testid="sidebar-row-car
     height: calc(.875rem * 1.3);
     margin: .25rem 0 0;
   }
+}
+
+/* 4736 omits the empty metadata row and puts its model icons in the title row instead. */
+html[data-t3x-inline-icon]:not([data-t3x-compact]) [data-testid="sidebar-row-card"] > div.relative > div:nth-child(2):last-child:has(> span.min-w-0.flex-1.text-start) > span[aria-hidden].inline-flex {
+  order: -1;
+  align-self: start;
+  height: calc(.875rem * 1.3);
 }
 
 /* ---------- sidebar polish: project name in full ----------
@@ -461,7 +470,7 @@ html[data-t3x-compact] [data-testid="sidebar-row-card"] {
   & > div.relative.z-10 > div:first-child > .size-4 { grid-column: 1; margin-top: .125rem; }
   & > div.relative.z-10 > div:first-child > span.flex-1 { display: none; } /* the project name */
   & > div.relative.z-10 > div:nth-child(2) { grid-column: 2; grid-row: 1; margin-top: 0; }
-  & > div.relative.z-10 > div:nth-child(2) > span[aria-hidden] {
+  & > div.relative.z-10 > div:nth-child(2) > span:is([aria-hidden], .min-w-0.flex-1.text-start) {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: var(--t3x-title-lines, 2);
@@ -472,6 +481,7 @@ html[data-t3x-compact] [data-testid="sidebar-row-card"] {
     line-height: 1.25rem;
   }
   & > div.relative.z-10 > div:nth-child(3) { display: none; } /* branch, machine, diff, model icons */
+  & > div.relative.z-10 > div:nth-child(2):last-child > span.min-w-0.flex-1.text-start ~ span[aria-hidden].inline-flex { display: none; } /* 4736 puts model icons in the title row */
   & .group\/sidebar-status-slot > span:first-child { position: static; }
   & .group\/sidebar-status-slot > span:nth-child(2) {
     position: absolute;
@@ -557,8 +567,9 @@ html[data-t3x-gaps] li[data-thread-item][data-t3x-gap] { margin-top: .625rem; }
  * Undo the wrap (the keeper's and compact threads' 2- or 3-line clamp): one line ending in "…".
  * A trailing "(2)" or "(Opus)" is repeated beside a cut title by an owned aria-hidden span. */
 
+html[data-t3x-onerow] [data-thread-item] span.min-w-0.flex-1.text-start,
 html[data-t3x-onerow] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) span[aria-hidden].min-w-0.flex-1,
-html[data-t3x-onerow] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) > div.relative.z-10 > div:nth-child(2) > span[aria-hidden].min-w-0.flex-1,
+html[data-t3x-onerow] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) > div.relative.z-10 > div:nth-child(2) > span:is([aria-hidden], .text-start).min-w-0.flex-1,
 html[data-t3x-onerow] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) > div.relative.z-10 > div:nth-child(2) > span[aria-hidden][data-t3x="sfx"] {
   display: block;
   -webkit-line-clamp: none;
@@ -912,6 +923,8 @@ html[data-t3x-fpaths] :is([data-message-role="assistant"] .chat-markdown .chat-m
   font-family: "T3X Paths", var(--t3x-base-fpaths, var(--font-sans));
 }
 /* thread titles */
+/* 4736 drops aria-hidden and thread-title-*; the row hook is stable. */
+html[data-t3x-fthreadtitles] [data-thread-item] span.min-w-0.flex-1.text-start,
 html[data-t3x-fthreadtitles] [data-testid="sidebar-row-card"] span[data-testid^="thread-title-"],
 html[data-t3x-fthreadtitles] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"]) span[aria-hidden].min-w-0.flex-1.text-start,
 html[data-t3x-fthreadtitles] [data-t3x="sfx"],
