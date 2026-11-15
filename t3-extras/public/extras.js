@@ -4489,6 +4489,9 @@
   function closeFontWorkspace(restore=true) {
     const ui=fontWorkspace;if(!ui)return;
     ui.hover?.end();
+    // Dock spacing S5 (15 Nov 2026): these watch the card only, and leave with it.
+    ui.dockFootRO?.disconnect();
+    ui.dockSizeRO?.disconnect();
     rememberFontScroll();fontWorkspace=null;
     ui.el.close();ui.el.remove();closeFontPreviews();
     if(!restore||disposed)return;
@@ -4498,9 +4501,8 @@
   function preserveFontWorkspaceOnResize() {
     const ui=fontWorkspace;if(!ui)return;
     if(ui.el.dataset.mode==="dock"){
-      // A card the user dragged (or one placed clear of text) stays put, inside the window; else it re-docks.
-      if(settings.popMove){keepCardIn(ui.el);return;}
-      positionDock(ui.el,ui.dockAnchor?.isConnected?ui.dockAnchor.getBoundingClientRect():null);return;
+      // Dock spacing S5 (Andy, 15 Nov 2026): a shorter window keeps the 12 px gap, and a pin from it clears when the space comes back.
+      fitDock(ui);return;
     }
     if(ui.el.hasAttribute("data-t3x-moved"))placeBigSaved(ui.el);
     const previous=ui.lastFocus;
@@ -4562,10 +4564,17 @@
     const sample=h("div",{class:"t3x-font-preview t3x-workspace-sample"});
     const pickNote=h("p",{class:"t3x-font-picknote",role:"note",hidden:true});
     const showBtn=h("button",{type:"button",class:"t3x-btn t3x-font-show",onclick:()=>showAreaOnScreen(fontNav.role)},"Show on screen");
+    // Dock spacing S5 (Andy, 15 Nov 2026): the ⌄ tab. The button is the clear gap; the span is the 28×9 tab.
+    const dockCue=h("button",{type:"button",class:"t3x-dock-cue",tabindex:"-1","aria-label":"Show more below",hidden:true,onclick:()=>{
+      const b=fontWorkspace?.el.querySelector(".t3x-font-workspace-body");
+      if(b)b.scrollTop=b.scrollHeight;
+      if(fontWorkspace)syncDockCue(fontWorkspace);
+    }},h("span",{class:"t3x-dock-cue-tab","aria-hidden":"true"}));
     const dockbar=h("div",{class:"t3x-font-dockbar"},
       h("button",{type:"button",class:"t3x-btn",onclick:()=>startFontPick()},"Pick other text"),
       h("button",{type:"button",class:"t3x-btn",onclick:()=>undockFonts()},"All fonts…"),
-      h("button",{type:"button",class:"t3x-btn t3x-font-done",onclick:()=>closeFontWorkspace(false)},"Done"));
+      h("button",{type:"button",class:"t3x-btn t3x-font-done",onclick:()=>closeFontWorkspace(false)},"Done"),
+      dockCue);
     // About this font: the panel after Preview's note (full window); the sentence and a closed About in the docked card.
     const aboutPanel=h("section",{class:"t3x-fabout","aria-label":FONT_TEXT.panelTitle,hidden:true});
     const dockSentence=h("p",{class:"t3x-font-docksentence"}),dockBody=h("div",{class:"t3x-fabout t3x-fabout-docked"});
@@ -4574,14 +4583,45 @@
     const dockAbout=h("div",{class:"t3x-font-dockabout",hidden:true},dockSentence,dockFoot,dockDetails);
     editor.append(back,returnButton,editorTitle,pickNote,h("div",{class:"t3x-font-tools"},showBtn),h("strong",{class:"t3x-font-scope-label",text:"Applies to"}),scope,targets,h("label",{for:"t3x-font-source",text:"Font source"}),source,resolved,editSource,similar,own,fontNote,dockAbout,h("div",{class:"t3x-font-preview-label",text:"Preview"}),sample,h("p",{class:"t3x-note t3x-font-preview-note",text:"Changes apply immediately. A preview illustrates the face; native surfaces may have different text sizes and layout."}),aboutPanel,dockbar);
     el.append(h("div",{class:"t3x-font-dockgrip"},grip("the Fonts card")),h("header",{class:"t3x-font-workspace-head"},grip("Fonts"),h("div",{},title,h("p",{text:"Choose an area, then its font"})),h("div",{class:"t3x-font-head-actions"},h("button",{type:"button",class:"t3x-btn t3x-font-small",title:"Shrink to a small card for this area, placed clear of its text",onclick:()=>shrinkFonts()},"Small card"),settings.fontPicker?h("button",{type:"button",class:"t3x-btn",onclick:()=>startFontPick()},"Pick from screen"):null,h("button",{type:"button",class:"t3x-btn","aria-label":"Close Fonts",onclick:()=>closeFontWorkspace()},"Close"))),h("div",{class:"t3x-font-workspace-body"},h("nav",{class:"t3x-font-navigation","aria-label":"Font areas"},h("label",{for:"t3x-font-search",text:"Find an area"}),search,index),editor));
-    fontWorkspace={el,trigger:anchor,search,index,editor,navigation:el.querySelector(".t3x-font-navigation"),lastFocus:null,switchingArea:true,rows,empty,guidance,title:editorTitle,scope,targets,source,resolved,editSource,similar,similarNote,similarApply,similarBack,own,family,prev,next,minus,plus,size,reset,sample,fontNote,returnButton,pickNote,showBtn,role:null,optionsKey:null,aboutPanel,dockAbout,dockSentence,dockFoot,dockDetails,dockBody,dockbar,aboutKey:null};
+    fontWorkspace={el,trigger:anchor,search,index,editor,navigation:el.querySelector(".t3x-font-navigation"),lastFocus:null,switchingArea:true,rows,empty,guidance,title:editorTitle,scope,targets,source,resolved,editSource,similar,similarNote,similarApply,similarBack,own,family,prev,next,minus,plus,size,reset,sample,fontNote,returnButton,pickNote,showBtn,role:null,optionsKey:null,aboutPanel,dockAbout,dockSentence,dockFoot,dockDetails,dockBody,dockbar,dockCue,aboutKey:null};
     fontWorkspace.hover=fontMenuHover(fontWorkspace);
     // Docked: opening About keeps the card's outer box as it was (its text scrolls inside), and the scroll keeps
     // clear of the foot bar's actual height (Pick other text, All fonts…, Done), which stays put.
-    dockSummary.addEventListener("click",()=>{if(el.dataset.mode==="dock"&&!dockDetails.open)el.style.height=`${el.offsetHeight}px`;});
-    dockDetails.addEventListener("toggle",()=>{if(!dockDetails.open)el.style.removeProperty("height");padDockScroll(fontWorkspace);});
-    new ResizeObserver(guarded("dock-foot",()=>padDockScroll(fontWorkspace))).observe(dockbar);
-    new ResizeObserver(guarded("card-size",()=>{if(el.open&&el.dataset.mode==="dock"&&settings.popMove)keepCardIn(el);})).observe(el); // content that grows stays inside the window
+    dockSummary.addEventListener("click",()=>{
+      if(el.dataset.mode==="dock"&&!dockDetails.open&&fontWorkspace?.el===el){
+        fontWorkspace.dockFrozen=el.offsetHeight;
+        el.style.height=`${el.offsetHeight}px`;
+      }
+    });
+    dockDetails.addEventListener("toggle",()=>{
+      if(fontWorkspace?.el!==el)return;
+      if(!dockDetails.open){fontWorkspace.dockFrozen=0;el.style.removeProperty("height");}
+      if(el.dataset.mode==="dock")fitDock(fontWorkspace);else padDockScroll(fontWorkspace);
+    });
+    fontWorkspace.dockFootRO=new ResizeObserver(guarded("dock-foot",()=>{if(fontWorkspace?.el!==el)return;padDockScroll(fontWorkspace);syncDockCue(fontWorkspace);}));
+    fontWorkspace.dockFootRO.observe(dockbar);
+    // Dock spacing S5: growth that leaves the window or lands on the picked text refits. A card already clear stays put.
+    fontWorkspace.dockSizeRO=new ResizeObserver(guarded("card-size",()=>{
+      if(!el.open||el.dataset.mode!=="dock"||fontWorkspace?.el!==el||fontWorkspace.dockFitting)return;
+      const b=el.getBoundingClientRect();
+      const outside=b.top<-0.5||b.left<-0.5||b.bottom>innerHeight+0.5||b.right>innerWidth+0.5;
+      if(outside||cardHits(el,dockKeep(fontWorkspace)))fitDock(fontWorkspace);
+    }));
+    fontWorkspace.dockSizeRO.observe(el);
+    // Dock spacing S5: latch a touch before the details arrive, so a pointer, key, press or scroll during the wait counts.
+    const markDockTouch=()=>{if(fontWorkspace?.el===el)fontWorkspace.dockTouched=true;};
+    el.addEventListener("pointerenter",markDockTouch,true);
+    el.addEventListener("pointerdown",markDockTouch,true);
+    el.addEventListener("keydown",markDockTouch,true);
+    el.addEventListener("wheel",markDockTouch,true);
+    el.querySelector(".t3x-font-workspace-body").addEventListener("scroll",(e)=>{
+      if(fontWorkspace?.el!==el)return;
+      // The one scroll sets this, so its own trusted scroll event is not a touch.
+      const own=fontWorkspace.dockOwnScroll||0;
+      if(own>0)fontWorkspace.dockOwnScroll=own-1;
+      else if(e.isTrusted)fontWorkspace.dockTouched=true;
+      if(el.dataset.mode==="dock"&&!fontWorkspace.dockFitting)syncDockCue(fontWorkspace);
+    });
     movable(el,()=>el.dataset.mode==="dock"?{kind:"card",m:12,reset:()=>placeCard(el)}:{kind:"fonts",keep:BIG_KEEP,reset:()=>{el.removeAttribute("data-t3x-moved");el.style.removeProperty("left");el.style.removeProperty("top");}},".t3x-font-workspace-head, .t3x-font-dockgrip");
     el.addEventListener("focusin",e=>{if(fontWorkspace?.el===el){rememberFontScroll();fontWorkspace.lastFocus=e.target;}});
     for(const pane of [index,editor])pane.addEventListener("scroll",()=>{if(fontWorkspace?.el===el)rememberFontScroll();});
@@ -4595,7 +4635,7 @@
       if(e.shiftKey&&D.activeElement===first){e.preventDefault();last?.focus();}
       else if(!e.shiftKey&&D.activeElement===last){e.preventDefault();first?.focus();}
     });
-    if(dock){el.dataset.mode="dock";el.setAttribute("aria-labelledby","t3x-font-editor-title");}
+    if(dock){el.dataset.mode="dock";el.setAttribute("aria-labelledby","t3x-font-editor-title");beginDock(fontWorkspace);}
     D.body.append(el);loadAbout();syncFontWorkspace(true);
     pickNote.textContent=note;pickNote.hidden=!note;
     if(dock){fontWorkspace.dockAnchor=dockAnchor;fontWorkspace.dockPicked=dock;el.show();placeCard(el,dock);}
@@ -4816,6 +4856,10 @@
     const m = family && family !== "off" ? aboutModelFor(family) : null, failed = m?.kind === "failed" || m?.kind === "norecord";
     const note = m?.kind === "norecord" ? FONT_TEXT.detailsNone : FONT_TEXT.detailsFailed;
     const show = !!m && (failed || aboutFace(m) === "loaded");
+    const docked = ui.el.dataset.mode === "dock";
+    // Dock spacing S5 (Andy, 15 Nov 2026): hold the outer box while the next font's details are still on the way.
+    if (docked && !show && !ui.dockAbout.hidden && !ui.dockLoadHold) ui.dockLoadHold = ui.el.offsetHeight;
+    if (show && ui.dockLoadHold) ui.dockLoadHold = 0;
     const key = show ? JSON.stringify(m) : "";
     if (ui.aboutKey !== key) {
       ui.aboutKey = key;
@@ -4826,9 +4870,6 @@
       ui.dockBody.replaceChildren(...(show && m.kind === "font" ? aboutPanelBody(m, { title: false, desc: false }) : []).filter(Boolean));
       // Gate gap Q4 (Andy, 15 Nov 2026): the same foot directly under the docked card's failed sentence.
       ui.dockFoot.replaceChildren(...[show && failed ? aboutFoot(m) : null].filter(Boolean));
-      // Gate gap Q4: once the failed sentence and foot arrive, keep the docked card clear of the picked text.
-      // The loaded state's placement is unchanged.
-      if (show && failed && ui.el.dataset.mode === "dock") requestAnimationFrame(guarded("dock-failed-place", () => fitFailedDock(ui)));
     }
     ui.dockFoot.hidden = !ui.dockFoot.childElementCount;
     ui.aboutPanel.hidden = !show;
@@ -4836,14 +4877,12 @@
     ui.dockSentence.classList.toggle("t3x-font-docksentence-failed", show && failed);
     ui.dockAbout.hidden = !show;
     ui.dockDetails.hidden = !show || m.kind !== "font";
-    // fitFailedDock pins a height when the failed card fits nowhere clear of the text. Dropping it here
-    // would undo that pin. Opening About on a loaded font still keeps the height its own click sets.
-    const failedDock = show && failed && ui.el.dataset.mode === "dock";
-    if (!failedDock && (ui.el.dataset.mode !== "dock" || !ui.dockDetails.open || ui.dockDetails.hidden)) {
+    if (!docked) {
       ui.el.style.removeProperty("height");
       ui.el.style.removeProperty("max-height");
-    }
-    padDockScroll(ui);
+      padDockScroll(ui);
+    } else if (ui.el.open && ui.dockPlaced) fitDock(ui);
+    else padDockScroll(ui);
   }
   /** The picked text a docked card must stay clear of: the anchor's box and its text, so a short line
    *  still counts the whole element (the popup test) and a line that sticks out still counts (the late pick). */
@@ -4867,50 +4906,216 @@
   }
   const boxHits = (x, y, w, h, r) => !!r && x < r.right && r.left < x + w && y < r.bottom && r.top < y + h;
   const cardHits = (el, keep) => { if (!keep) return false; const b = el.getBoundingClientRect(); return boxHits(b.left, b.top, b.width, b.height, keep); };
-  /** A spot at the card's current size leaves the picked text uncovered (a saved spot counts). */
-  function dockSpotClear(el, keep) {
-    const m = 12, w = el.offsetWidth, h = el.offsetHeight, vw = innerWidth, vh = innerHeight;
-    if (!keep) return true;
-    if (!(w > 0) || !(h > 0)) return false;
-    if (!settings.popMove) {
-      const beside = keep.right + m + w <= vw - m || keep.left - m - w >= m;
-      return beside || keep.bottom + m + h <= vh - m || keep.top - m - h >= m;
-    }
-    const spot = settings.popSpots.card;
-    if (spot) {
-      const [x, y] = spotXY(el, spot);
-      const left = clamp(x, m, Math.max(m, vw - w - m)), top = clamp(y, m, Math.max(m, vh - h - m));
-      if (!boxHits(left, top, w, h, keep)) return true;
-    }
-    const avoid = areaRects(fontNav.role).slice(0, 120).map((c) => c.rect);
-    const at = clearSpot(w, h, avoid, { vw, vh, m, keep });
-    return !boxHits(at.left, at.top, w, h, keep);
+  /** Gap between the card and the picked text: 0 when they overlap, else the separated-axis gap. */
+  function dockClearance(el, keep) {
+    if (!keep) return Infinity;
+    const b = el.getBoundingClientRect();
+    const sepX = Math.max(0, keep.left - b.right, b.left - keep.right);
+    const sepY = Math.max(0, keep.top - b.bottom, b.top - keep.bottom);
+    if (sepX === 0 && sepY === 0) return 0;
+    if (sepX === 0) return sepY;
+    if (sepY === 0) return sepX;
+    return Math.hypot(sepX, sepY);
   }
-  /** Pin the docked card to the larger gap above or below the picked text, inside the window margins. */
+  const dockOffWindow = (el) => { const b = el.getBoundingClientRect(); return b.top < -0.5 || b.left < -0.5 || b.bottom > innerHeight + 0.5 || b.right > innerWidth + 0.5; };
+  const dockInsideMargins = (el) => { const b = el.getBoundingClientRect(), m = 12; return b.top >= m - 0.5 && b.left >= m - 0.5 && b.bottom <= innerHeight - m + 0.5 && b.right <= innerWidth - m + 0.5; };
+  /** A new dock (open or Small card). Next and Previous do not call this, so they cannot re-arm the one scroll. */
+  function beginDock(ui) {
+    ui.dockTouched = false;
+    ui.dockScrolledOnce = false;
+    ui.dockLoadHold = 0;
+    ui.dockFrozen = 0;
+    ui.dockPlaced = false;
+    ui.dockFitting = 0;
+  }
+  /** Grip (when it is on screen) plus the family row plus the foot bar, measured, not a fixed number. */
+  function dockMinChrome(ui) {
+    const grip = ui.el.querySelector(".t3x-font-dockgrip");
+    const gs = grip ? getComputedStyle(grip) : null;
+    const gripH = gs && gs.display !== "none" ? grip.getBoundingClientRect().height : 0;
+    const family = ui.el.querySelector(".t3x-workspace-browse");
+    const famH = family ? family.getBoundingClientRect().height : 0;
+    const barH = ui.dockbar.getBoundingClientRect().height;
+    return Math.ceil(gripH + famH + barH);
+  }
+  /** Room on his side: above the text when his top is above it, else below it. Zero when his top sits in the text. */
+  function roomAt(el, keep) {
+    const m = 12, top = el.getBoundingClientRect().top;
+    if (!keep) return Math.max(0, innerHeight - m - top);
+    if (top <= keep.top) return Math.max(0, keep.top - m - top);
+    if (top >= keep.bottom) return Math.max(0, innerHeight - m - top);
+    return 0;
+  }
+  /** His saved left and top. The top is not pulled down to fit the card's full height; a cap does that. */
+  function applySavedSpot(el) {
+    const spot = settings.popSpots.card;
+    if (!spot) return;
+    const m = 12, [x, y] = spotXY(el, spot);
+    const left = clamp(x, m, Math.max(m, innerWidth - el.offsetWidth - m));
+    const top = spot.ay === "t" ? Math.max(m, y) : y;
+    Object.assign(el.style, { left: `${left}px`, top: `${top}px`, right: "", bottom: "" });
+  }
+  /** Pin to the larger gap, 12 px clear of the text and of the window. Does not write his saved spot. */
   function pinDockGap(el, keep) {
     const m = 12;
-    const above = keep ? Math.max(0, keep.top - m) : 0;
-    const below = keep ? Math.max(0, innerHeight - m - keep.bottom) : 0;
+    // Dock spacing S5 (Andy, 15 Nov 2026): the gap is 12 px, so the card's edge stops m short of the text.
+    const above = keep ? Math.max(0, keep.top - 2 * m) : 0;
+    const below = keep ? Math.max(0, innerHeight - 2 * m - keep.bottom) : 0;
     const useAbove = !keep || above >= below;
     const cap = Math.min(600, Math.max(0, innerHeight - 2 * m));
     const gap = Math.floor(Math.min(cap, useAbove ? above : below));
-    if (gap > 0 && gap < el.offsetHeight - 0.5) {
-      el.style.height = `${gap}px`;
-    }
-    const top = useAbove ? m : Math.max(m, keep ? keep.bottom : m);
+    if (gap > 0 && gap < el.offsetHeight - 0.5) el.style.height = `${gap}px`;
+    const top = useAbove ? m : Math.max(m, keep ? keep.bottom + m : m);
     moveBox(el, Math.max(m, innerWidth - el.offsetWidth - m), top, null, m);
   }
-  /** Failed / no-details dock only. Re-place when the grown card has a spot clear of the picked text.
-   *  When it does not, keep the outer box at the clear gap and let the body scroll, as opening About does. */
-  function fitFailedDock(ui) {
-    if (fontWorkspace !== ui || !ui.el.open || ui.el.dataset.mode !== "dock") return;
-    if (ui.dockAbout.hidden || !ui.dockSentence.classList.contains("t3x-font-docksentence-failed")) return;
-    const keep = dockKeep(ui);
-    ui.el.style.removeProperty("height");
-    ui.el.style.removeProperty("max-height");
-    if (!dockSpotClear(ui.el, keep)) pinDockGap(ui.el, keep);
-    placeCard(ui.el, keep);
-    if (cardHits(ui.el, keep)) pinDockGap(ui.el, keep);
+  function fitAutoDock(ui, keep) {
+    const el = ui.el;
+    if (dockClearance(el, keep) >= 12 && dockInsideMargins(el)) return;
+    if (!settings.popMove) positionDock(el, keep);
+    else {
+      const avoid = areaRects(fontNav.role).slice(0, 120).map((c) => c.rect);
+      const at = clearSpot(el.offsetWidth, el.offsetHeight, avoid, { vw: innerWidth, vh: innerHeight, m: 12, keep });
+      moveBox(el, at.left, at.top, null, 12);
+    }
+    if (dockClearance(el, keep) >= 12 && dockInsideMargins(el)) return;
+    pinDockGap(el, keep);
+  }
+  function fitSavedDock(ui, keep) {
+    const el = ui.el;
+    applySavedSpot(el);
+    if (!(keep && cardHits(el, keep))) {
+      if (!dockOffWindow(el)) return; // his spot stays, even inside 12 px of the text, while it misses the text
+      const b = el.getBoundingClientRect();
+      const left2 = clamp(b.left, 12, Math.max(12, innerWidth - b.width - 12));
+      const top2 = clamp(b.top, 12, Math.max(12, innerHeight - b.height - 12));
+      if (!keep || !boxHits(left2, top2, b.width, b.height, keep)) {
+        Object.assign(el.style, { left: `${left2}px`, top: `${top2}px` });
+        return;
+      }
+      applySavedSpot(el);
+    }
+    const room = roomAt(el, keep);
+    if (room + 0.5 >= dockMinChrome(ui) && room >= 48) {
+      const capH = Math.floor(room);
+      if (capH < el.offsetHeight - 0.5) el.style.height = `${capH}px`;
+      if (!keep || !cardHits(el, keep)) return;
+    }
+    pinDockGap(el, keep);
+  }
+  /** How short the frozen About box must go so the window, or the text under it, still has its 12 px. */
+  function dockForcedHeight(ui, keep) {
+    const m = 12, b = ui.el.getBoundingClientRect();
+    let limit = innerHeight - m;
+    if (keep && b.left < keep.right - 0.5 && keep.left < b.right - 0.5 && b.top < keep.top) limit = Math.min(limit, keep.top - m);
+    const cap = Math.floor(limit - Math.max(b.top, m));
+    if (cap < ui.dockFrozen - 0.5) return Math.max(48, cap);
+    return null;
+  }
+  /** One 12 px keep-clear for the whole time the card is docked. Never writes settings.popSpots. */
+  function fitDock(ui) {
+    if (!ui || ui !== fontWorkspace || !ui.el?.open || ui.el.dataset.mode !== "dock" || !ui.dockPlaced) return;
+    if (!(ui.el.offsetWidth > 0) || ui.dockFitting) return;
+    ui.dockFitting = 1;
+    try {
+      const el = ui.el, keep = dockKeep(ui);
+      if (ui.dockLoadHold) {
+        el.style.height = `${ui.dockLoadHold}px`;
+        padDockScroll(ui);
+        syncDockCue(ui);
+        return;
+      }
+      if (ui.dockFrozen) {
+        // Dock spacing S5 (15 Nov 2026): keep About's box unless the window forces it shorter, and still stay 12 px clear.
+        el.style.height = `${ui.dockFrozen}px`;
+        const maxH = Math.max(48, Math.floor(innerHeight - 24));
+        if (el.offsetHeight > maxH) el.style.height = `${maxH}px`;
+        const saved = !!(settings.popMove && settings.popSpots.card);
+        if (!saved) {
+          const forced = dockForcedHeight(ui, keep);
+          if (forced != null) el.style.height = `${forced}px`;
+          // Keep an in-place shorten only when it stays 12 px clear and inside the window. A sliver that still covers the text, or sits off the window, is not a placement.
+          const held = forced != null && (!keep || dockClearance(el, keep) >= 12) && dockInsideMargins(el);
+          if (!held) el.style.height = `${Math.min(ui.dockFrozen, maxH)}px`;
+          if (!held && dockOffWindow(el)) { const b = el.getBoundingClientRect(); moveBox(el, b.left, b.top, null, 12); }
+          if (!held && (!keep || dockClearance(el, keep) < 12 || !dockInsideMargins(el))) fitAutoDock(ui, keep);
+        } else fitSavedDock(ui, keep);
+      } else {
+        el.style.removeProperty("height");
+        el.style.removeProperty("max-height");
+        if (settings.popMove && settings.popSpots.card) fitSavedDock(ui, keep);
+        else fitAutoDock(ui, keep);
+      }
+      padDockScroll(ui);
+      scrollFailedOnce(ui);
+      syncDockCue(ui);
+    } finally { ui.dockFitting = 0; }
+  }
+  /** The failed sentence's one scroll: the Hide foot sits just above the bar. Once per dock, and only before a touch. */
+  function scrollFailedOnce(ui) {
+    if (!ui.dockSentence.classList.contains("t3x-font-docksentence-failed") || ui.dockScrolledOnce) return;
+    ui.dockScrolledOnce = true;
+    if (ui.dockTouched) return;
+    const body = ui.el.querySelector(".t3x-font-workspace-body"), foot = ui.dockFoot;
+    if (!body || !foot || foot.hidden || !foot.getClientRects().length) return;
+    const own = () => { ui.dockOwnScroll = (ui.dockOwnScroll || 0) + 1; };
+    if (getComputedStyle(ui.dockbar).position === "sticky") {
+      const over = foot.getBoundingClientRect().bottom - ui.dockbar.getBoundingClientRect().top;
+      if (over > 1) { own(); body.scrollTop += over; }
+    } else if (foot.getBoundingClientRect().bottom > body.getBoundingClientRect().bottom + 1) { own(); body.scrollTop = body.scrollHeight; }
+  }
+  /** The ⌄ tab between the button before Done and Done. A wrapped bar keeps it off the buttons. */
+  function placeDockCue(ui) {
+    const bar = ui.dockbar, cue = ui.dockCue, tab = cue?.querySelector(".t3x-dock-cue-tab");
+    const done = bar.querySelector(".t3x-font-done");
+    const buttons = [...bar.querySelectorAll(":scope > .t3x-btn")].filter((b) => b.getClientRects().length);
+    const before = buttons.filter((b) => b !== done).at(-1);
+    if (!done || !before || !tab) { if (cue) cue.hidden = true; return; }
+    const br = bar.getBoundingClientRect(), a = before.getBoundingClientRect(), d = done.getBoundingClientRect();
+    const hits = (l, t, w, h) => buttons.some((b) => { const r = b.getBoundingClientRect(); return l < r.right - 0.4 && r.left < l + w - 0.4 && t < r.bottom - 0.4 && r.top < t + h - 0.4; });
+    const sameRow = Math.abs((a.top + a.bottom) / 2 - (d.top + d.bottom) / 2) < Math.min(a.height, d.height) * 0.6;
+    if (sameRow && d.left - a.right >= 8) {
+      const left = a.right - br.left, width = d.left - a.right;
+      Object.assign(cue.style, { left: `${left}px`, top: "0px", width: `${width}px`, height: `${br.height}px` });
+      let centre = width / 2;
+      if (hits(br.left + left + centre - 14, br.top - 1, 28, 9)) {
+        const lo = 14, hi = width - 14;
+        for (let c = lo; c <= hi; c += 1) if (!hits(br.left + left + c - 14, br.top - 1, 28, 9)) { centre = c; break; }
+      }
+      tab.style.setProperty("--tab-x", `${centre}px`);
+      return;
+    }
+    const band = 12;
+    const occ = buttons.map((b) => b.getBoundingClientRect()).filter((r) => r.top < br.top + band && r.bottom > br.top).map((r) => [r.left, r.right]).sort((p, q) => p[0] - q[0]);
+    const gaps = [];
+    let x = br.left;
+    for (const [l, r] of occ) { if (l > x + 0.5) gaps.push([x, l]); x = Math.max(x, r); }
+    if (br.right > x + 0.5) gaps.push([x, br.right]);
+    const centre = (br.left + br.right) / 2;
+    const fits = gaps.filter((g) => g[1] - g[0] >= 28);
+    const pool = (fits.length ? fits : gaps).slice().sort((g, h) => Math.abs((g[0] + g[1]) / 2 - centre) - Math.abs((h[0] + h[1]) / 2 - centre));
+    const gap = pool[0];
+    if (!gap || gap[1] - gap[0] < 4) { cue.hidden = true; return; }
+    Object.assign(cue.style, { left: `${gap[0] - br.left}px`, top: "0px", width: `${gap[1] - gap[0]}px`, height: `${band}px` });
+    let tabLeft = (gap[0] + gap[1]) / 2 - 14;
+    if (gap[1] - gap[0] >= 28) tabLeft = Math.min(Math.max(tabLeft, gap[0]), gap[1] - 28);
+    else {
+      let best = null;
+      for (let x0 = br.left; x0 <= br.right - 28; x0 += 2) {
+        if (hits(x0, br.top - 1, 28, 9)) continue;
+        const dist = Math.abs(x0 + 14 - (gap[0] + gap[1]) / 2);
+        if (!best || dist < best.dist) best = { x0, dist };
+      }
+      if (!best) { cue.hidden = true; return; }
+      tabLeft = best.x0;
+    }
+    tab.style.setProperty("--tab-x", `${tabLeft + 14 - gap[0]}px`);
+  }
+  function syncDockCue(ui) {
+    const cue = ui?.dockCue, body = ui?.el?.querySelector(".t3x-font-workspace-body");
+    if (!cue || !body || ui.el.dataset.mode !== "dock" || !ui.el.open) return;
+    if (body.scrollHeight - body.scrollTop - body.clientHeight <= 1) { cue.hidden = true; return; }
+    cue.hidden = false;
+    placeDockCue(ui);
   }
   /** The docked card's scroll keeps the foot bar's height clear (scroll-padding), recomputed as it changes. */
   function padDockScroll(ui) {
@@ -5398,6 +5603,7 @@
     ui.el.removeAttribute("data-t3x-moved");
     ui.el.setAttribute("aria-labelledby", "t3x-font-editor-title");
     ui.dockAnchor = null; ui.dockPicked = null;
+    beginDock(ui);
     ui.el.show();
     syncFontWorkspace();
     placeCard(ui.el);
@@ -5411,15 +5617,17 @@
   /** The Fonts card: at the spot the user dragged it to; else (or when that spot would cover text just picked)
    *  where it covers none of the area's text, or the least of it, beside the picked text when there is some. */
   function placeCard(el, picked = null) {
-    if (!settings.popMove) return positionDock(el, picked);
+    const docked = fontWorkspace?.el === el && el.dataset.mode === "dock";
+    const finish = () => { if (docked) { fontWorkspace.dockPlaced = true; fitDock(fontWorkspace); } };
+    if (!settings.popMove) { positionDock(el, picked); finish(); return; }
     const m = 12, spot = settings.popSpots.card;
-    if (spot) {
-      moveBox(el, ...spotXY(el, spot), null, m);
-      if (!picked || !near(el.getBoundingClientRect(), picked, 0)) return;
-    }
+    // Dock spacing S5: a saved spot stays his. Fitting may cap this dock; it does not write the spot back.
+    if (spot && docked) { finish(); return; }
+    if (spot) { moveBox(el, ...spotXY(el, spot), null, m); return; }
     const avoid = areaRects(fontNav.role).slice(0, 120).map((c) => c.rect);
     const at = clearSpot(el.offsetWidth, el.offsetHeight, avoid, { vw: innerWidth, vh: innerHeight, m, keep: picked && { left: picked.left, top: picked.top, right: picked.right, bottom: picked.bottom } });
     moveBox(el, at.left, at.top, null, m);
+    finish();
   }
   /** Outline every visible place an area applies (or would, once it has a font). */
   function showAreaOnScreen(id) {

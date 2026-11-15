@@ -1027,8 +1027,13 @@ html[data-t3x-fsidebar] [data-t3x="grouping-root"] :is(.t3x-g-meta, .t3x-g-badge
 .t3x-font-workspace[data-mode="dock"] .t3x-font-scope { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font-size:12.5px; }
 .t3x-font-workspace[data-mode="dock"] .t3x-font-own { margin-top:12px; }
 .t3x-font-workspace[data-mode="dock"] .t3x-font-tools { margin:0 0 8px; }
-.t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); }
+.t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; position:relative; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
 .t3x-font-dockbar .t3x-font-done { margin-left:auto; }
+/* Dock spacing S5 (Andy, 15 Nov 2026): the ⌄ tab hangs in the bar's top padding. The padding stays 12 px
+   whether or not the tab is showing, so the bar keeps its height. The button covers the clear gap; the span is the 28×9 tab. */
+.t3x-font-dockbar .t3x-dock-cue { position:absolute; z-index:2; box-sizing:border-box; padding:0; margin:0; border:0; background:transparent; cursor:pointer; min-height:0; }
+.t3x-font-dockbar .t3x-dock-cue-tab { position:absolute; top:-1px; left:var(--tab-x, 50%); transform:translateX(-50%); width:28px; height:9px; padding:0; margin:0; background:var(--popover); border:1px solid var(--muted-foreground); border-top:1px solid var(--popover); border-radius:0 0 9px 9px; pointer-events:none; }
+.t3x-font-dockbar .t3x-dock-cue-tab::after { content:""; position:absolute; left:50%; top:0px; width:5px; height:5px; border-right:1.5px solid var(--muted-foreground); border-bottom:1.5px solid var(--muted-foreground); transform:translateX(-50%) rotate(45deg); }
 html[data-t3x-probing] *, html[data-t3x-probing] *::before, html[data-t3x-probing] *::after { transition:none!important; }
 html[data-t3x-picking], html[data-t3x-picking] * { cursor:crosshair!important; }
 .t3x-pick { position:fixed; inset:0; z-index:2147483002; pointer-events:none; font:500 12px/1.35 var(--font-sans); color:var(--foreground); }
@@ -1060,7 +1065,7 @@ html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockgrip
 html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockgrip .t3x-grip { margin-left:-4px; }
 html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-editor { padding-top:4px; padding-bottom:0; }
 /* The card's Pick other text / All fonts… / Done stay in view while the rest scrolls. */
-html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar { position:sticky; bottom:0; z-index:1; margin-left:-16px; margin-right:-16px; padding:10px 16px 12px; background:var(--popover,var(--background)); }
+html[data-t3x-pop-move] .t3x-font-workspace[data-mode="dock"] .t3x-font-dockbar { position:sticky; bottom:0; z-index:1; margin-left:-16px; margin-right:-16px; padding:12px 16px 12px; background:var(--popover,var(--background)); }
 .t3x-pick-bar[data-t3x-moved] { transform:none; bottom:auto; }
 .t3x-pick-bar .t3x-grip { margin:0 -6px 0 -8px; }
 .t3x-pick .t3x-pick-label { position:fixed; height:18px; padding:0 6px; border:0; border-radius:4px; background:var(--primary,#7aa2ff); color:var(--primary-foreground,#0b1020); font:600 11px/18px var(--font-sans); white-space:nowrap; cursor:pointer!important; box-shadow:0 2px 6px #0005; }
