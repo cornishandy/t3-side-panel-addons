@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {fixture,BUILD} from './break-check-fixture.mjs';
+import {diagEntry} from '../lib.mjs';
 const row=(id,selected=false)=>`<li data-thread-item="private-${id}"><div data-testid="sidebar-row-card" ${selected?'aria-current="page"':''}><div class="relative z-10"><div><i class="size-4"></i><span class="flex-1">Project</span></div><div><span class="min-w-0 flex-1 text-start text-sm">PRIVATE_TITLE_${id}</span></div></div></div></li>`;
 const page=({js,css})=>`<!doctype html><html><head><meta charset="utf-8"><style>
 @layer native { :root{--font-sans:'PRIVATE_FONT_CANARY',Arial,sans-serif,'PRIVATE_FONT_CANARY';--warning:#fa0;--background:#111;--foreground:#eee;--border:#555;--popover:#222;--muted-foreground:#aaa;}
@@ -109,8 +110,10 @@ test('break check on real 4736 rows, eligibility, agreement, recovery, warnings 
   await t.test('main asset mismatch, missing build and no resource entry are unchecked',async()=>{
     f.write(f.keeper,{build:'0.1.10-nightly.20261116.4800',mainJs:'main-other.js'});await ev(`window.dispatchEvent(new Event('focus'));1`);await wait(200);await wake();assert.deepEqual(await ev('window.__T3X_CHECK_TEST__.broken()'),[]);
     f.write(f.keeper,{});await ev(`window.dispatchEvent(new Event('focus'));1`);await wait(200);await wake();assert.deepEqual(await ev('window.__T3X_CHECK_TEST__.broken()'),[]);
+    // Cleared before the state names main-fixture again: a page that has seen its main script keeps it.
+    await ev(`performance.clearResourceTimings();1`);
     f.write(f.keeper,{build:BUILD,mainJs:'main-fixture.js'});await ev(`window.dispatchEvent(new Event('focus'));1`);await wait(200);
-    await ev(`performance.clearResourceTimings();1`);await breakTitles();const prior=f.requests.filter(x=>x.startsWith('/screen?')).length;await wake();await wait(5100);assert.equal(f.requests.filter(x=>x.startsWith('/screen?')).length,prior);
+    await breakTitles();const prior=f.requests.filter(x=>x.startsWith('/screen?')).length;await wake();await wait(5100);assert.equal(f.requests.filter(x=>x.startsWith('/screen?')).length,prior);
     await ev(`fetch('/assets/main-fixture.js').then(r=>r.text());`);await wake();await until(`window.__T3X_CHECK_TEST__.broken().length===1`);
   });
   await t.test('one and four names, private copy, clipboard outcomes and shown only while in view',async()=>{
@@ -139,6 +142,51 @@ test('break check on real 4736 rows, eligibility, agreement, recovery, warnings 
     f.write(f.compat,{outcomes:[{build:BUILD,addon:'Thread titles font',outcome:'false-alarm'}],trial:{startedAt:'2026-11-01',endsAt:'2026-11-29'}});await ev(`window.dispatchEvent(new Event('focus'));1`);await wait(300);assert.equal(await ev('window.__T3X_CHECK_TEST__.broken().length'),3);
     f.write(f.compat,{outcomes:[{build:BUILD,addon:'Thread titles font',outcome:'false-alarm'},{build:BUILD,addon:'One-row titles',outcome:'false-alarm'}],trial:{startedAt:'2026-11-01',endsAt:'2026-11-29'}});await ev(`window.dispatchEvent(new Event('focus'));1`);await until(`!document.querySelector('.t3x-breakcheck,.t3x-check-dot')`);
     assert.equal(await ev(`document.querySelector('.t3x-star').title`),'Add-ons');
+  });
+  await t.test('no resource entry: a same-origin modulepreload link for the recorded main counts; other names and origins do not',async()=>{
+    const why=()=>ev('window.__T3X_CHECK_TEST__.buildWhy()'), seen=()=>ev('window.__T3X_CHECK_TEST__.mainSeen()');
+    const focus=async()=>{await ev(`window.dispatchEvent(new Event('focus'));1`);await wait(300);};
+    const link=href=>ev(`(()=>{const l=document.createElement('link');l.rel='modulepreload';l.href=${JSON.stringify(href)};document.head.append(l);return 1})()`);
+    // Each link's own preload may leave a resource entry; clear it while the state names another main, so only the DOM can answer.
+    const linkOnly=async href=>{await link(href);await wait(300);await ev(`performance.clearResourceTimings();1`);};
+    const other=async()=>{f.write(f.keeper,{build:'0.1.10-nightly.20261116.4800',mainJs:'main-other.js'});await focus();};
+    const fixtureMain=async()=>{f.write(f.keeper,{build:BUILD,mainJs:'main-fixture.js'});await focus();};
+    assert.equal(await ev(`document.querySelector('script[src*="main-"]')`),null);
+    await ev(`performance.clearResourceTimings();1`);
+    await other();assert.equal(await why(),'nomain');
+    await link('/assets/main-stale.js');assert.equal(await why(),'nomain');
+    await linkOnly(f.base.replace('127.0.0.1','localhost')+'/assets/main-fixture.js');
+    await fixtureMain();assert.deepEqual(await seen(),{rt:false,dom:false});assert.equal(await why(),'nomain');
+    await other();await linkOnly('/assets/main-fixture.js');
+    await fixtureMain();assert.deepEqual(await seen(),{rt:false,dom:true});assert.equal(await why(),'ok');
+  });
+  await t.test('pairs, cancels, the fonts retry and a failed send are counted, and a failed send is sent again',async()=>{
+    const diag=()=>ev('window.__T3X_CHECK_TEST__.diag()');
+    await breakTitles();
+    let d0=await diag();await wake();await wait(5200);let d=await diag();
+    assert.equal(d.started,d0.started+1);assert.equal(d.pairs,d0.pairs+1);assert.ok(d.read>=1);assert.equal(d.agree,d.read);
+    // A blur cancels a waiting pair and names why.
+    await wake();assert.equal((await diag()).pending,true);d0=await diag();
+    await ev(`window.dispatchEvent(new Event('blur'));1`);d=await diag();
+    assert.equal(d.pending,false);assert.equal(d.cancelled,d0.cancelled+1);assert.equal(d.stop,'focus');
+    // A pair begun while fonts load is never read; fonts finishing cancels it and starts another.
+    await ev(`Object.defineProperty(document.fonts,'status',{configurable:true,get:()=> 'loading'});1`);await wake();d0=await diag();assert.equal(d0.pending,true);
+    await ev(`delete document.fonts.status;document.fonts.dispatchEvent(new Event('loadingdone'));1`);await wait(100);d=await diag();
+    assert.equal(d.cancelled,d0.cancelled+1);assert.equal(d.stop,'fonts');assert.equal(d.started,d0.started+1);assert.equal(d.pending,true);
+    await wait(5200);assert.equal((await diag()).pairs,d0.pairs+1);
+    // The service refuses the changed reading (a newer payload is installed); the next pair sends it again unchanged.
+    const pub=path.join(f.dir,'public/extras.js'), original=fs.readFileSync(pub,'utf8');
+    fs.appendFileSync(pub,'\n// a newer installed payload\n');
+    await restore();await wake();await wait(5200);d=await diag();
+    assert.equal(d.send,'409');assert.ok(d.unsent>=1);const refused=d.unsent;
+    fs.writeFileSync(pub,original);
+    const sentBefore=d.sent;await wake();await wait(5200);d=await diag();
+    assert.equal(d.sent,sentBefore+refused);assert.equal(d.send,'204');assert.equal(d.unsent,0);
+    assert.equal(JSON.parse(fs.readFileSync(f.screen)).results.find(x=>x.id==='threadtitles').result,'ok');
+    // The once-per-version check-in (8 s after load) carried only allowlisted break-check flags.
+    const sent=f.requests.find(x=>x.startsWith('/diag?'));assert.ok(sent,'no check-in');
+    const params=new URLSearchParams(sent.slice(6)), kept=diagEntry(params);
+    for(const k of ['bc','bcRT','bcDom','bcRTn','bcRTapp','bcFocus','bcPending','bcStarted','bcPairs','bcCancelled','bcStop','bcRead','bcAgree','bcSent','bcSend']) assert.equal(kept[k],params.get(k),k);
   });
   assert.deepEqual(c.errors,[]);
   await ev('window.t3xTeardown();1');

@@ -38,6 +38,22 @@ test('screen GET: strict tokens, stale versions, shown, atomic private persisten
   assert.doesNotMatch(fs.readFileSync(f.screen,'utf8'),/PRIVATE/);
 });
 
+test('a rejected screen report logs one fixed reason word, never a request value',async t=>{
+  const f=await fixture(t);
+  const lines=[],real=console.log;console.log=(...a)=>lines.push(a.join(' '));t.after(()=>{console.log=real;});
+  const version=await (await f.get('/version')).text();
+  const p=new URLSearchParams({kind:'result',build:'4736',addon:'threadtitles',result:'broken',version,checker:'1',seen:'2',matched:'0'});
+  const status=async q=>(await f.get('/screen?'+q)).status;
+  assert.equal(await status(p+'&title=PRIVATE_TITLE'),400);
+  assert.equal(await status(new URLSearchParams({...Object.fromEntries(p),seen:'1',matched:'2'})),400);
+  assert.equal(await status(new URLSearchParams({...Object.fromEntries(p),version:'0123456789abcdef'})),409);
+  assert.equal(await status(new URLSearchParams({...Object.fromEntries(p),build:'9876'})),409);
+  assert.equal(await status(new URLSearchParams({kind:'shown',build:'4736',addon:'onerow',version,checker:'1'})),409);
+  assert.equal(await status(p),204);
+  assert.deepEqual(lines.filter(l=>/^\S+ screen /.test(l)).map(l=>l.replace(/^\S+ /,'')),['screen 400 params','screen 400 result','screen 409 version','screen 409 build','screen 409 notbroken']);
+  assert.doesNotMatch(lines.join('\n'),/PRIVATE_TITLE|0123456789abcdef|9876|onerow/);
+});
+
 test('a running old payload cannot overwrite a current healthy result after a code update',async t=>{
   const f=await fixture(t);
   const old=await(await f.get('/version')).text();

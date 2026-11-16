@@ -139,24 +139,27 @@ function screenResults() {
   const j = checkJson(SCREEN_FILE);
   return Array.isArray(j.results) ? j.results.filter(x => validBuild(x?.build) && Object.hasOwn(CHECK_ADDONS, x.id) && CHECK_ADDONS[x.id] === x.addon && /^[a-f0-9]{16}$/.test(x.version) && x.checker === "1" && ["ok", "broken"].includes(x.result) && Number.isInteger(x.seen) && x.seen >= 0 && x.seen <= 10000 && Number.isInteger(x.matched) && x.matched >= 0 && x.matched <= x.seen).map(x => ({ build:x.build, id:x.id, addon:x.addon, version:x.version, checker:x.checker, result:x.result, seen:x.seen, matched:x.matched, observedAt:x.observedAt, firstShownAt:x.firstShownAt })) : [];
 }
+// A rejected report's reason, as a fixed word for server.log (never a request value).
+let screenWhy = "";
+const screenNo = (code, why) => ((screenWhy = why), code);
 function screenReport(params) {
   const fields = ["kind", "build", "addon", "result", "version", "checker", "seen", "matched"];
-  if ([...params.keys()].some(k => !fields.includes(k) || params.getAll(k).length !== 1)) return 400;
+  if ([...params.keys()].some(k => !fields.includes(k) || params.getAll(k).length !== 1)) return screenNo(400, "params");
   const p = Object.fromEntries(params), shown = p.kind === "shown";
   const expected = shown ? fields.filter(k => !["result", "seen", "matched"].includes(k)) : fields;
-  if (params.size !== expected.length || expected.some(k => !params.has(k)) || !["result", "shown"].includes(p.kind) || !Object.hasOwn(CHECK_ADDONS, p.addon) || p.checker !== "1" || !/^[a-f0-9]{16}$/.test(p.version)) return 400;
+  if (params.size !== expected.length || expected.some(k => !params.has(k)) || !["result", "shown"].includes(p.kind) || !Object.hasOwn(CHECK_ADDONS, p.addon) || p.checker !== "1" || !/^[a-f0-9]{16}$/.test(p.version)) return screenNo(400, "params");
   // Refresh the actual payload for reports; stale tabs can never replace a current result.
   const served = readPublic();
   files = served;
   filesCheckedAt = Date.now();
-  if (p.version !== served.version) return 409;
+  if (p.version !== served.version) return screenNo(409, "version");
   const state = checkState();
-  if (!state.t3Build || p.build !== state.t3Build.label) return 409;
-  if (!shown && (!["ok", "broken"].includes(p.result) || !/^(0|[1-9][0-9]{0,4})$/.test(p.seen) || !/^(0|[1-9][0-9]{0,4})$/.test(p.matched) || +p.seen > 10000 || +p.matched > +p.seen)) return 400;
+  if (!state.t3Build || p.build !== state.t3Build.label) return screenNo(409, "build");
+  if (!shown && (!["ok", "broken"].includes(p.result) || !/^(0|[1-9][0-9]{0,4})$/.test(p.seen) || !/^(0|[1-9][0-9]{0,4})$/.test(p.matched) || +p.seen > 10000 || +p.matched > +p.seen)) return screenNo(400, "result");
   const results = screenResults();
   const old = results.find(x => x.build === state.t3Build.full && x.id === p.addon && x.version === p.version);
   if (shown) {
-    if (!old || old.result !== "broken") return 409;
+    if (!old || old.result !== "broken") return screenNo(409, "notbroken");
     old.firstShownAt ??= new Date().toISOString();
   } else {
     const line = { build: state.t3Build.full, id: p.addon, addon: CHECK_ADDONS[p.addon], version: p.version, checker: p.checker, result: p.result, seen: +p.seen, matched: +p.matched, observedAt: new Date().toISOString(), ...(old?.firstShownAt ? {firstShownAt:old.firstShownAt} : {}) };
@@ -460,7 +463,11 @@ export function handler(req, res) {
       }), { ...cors, "Content-Type": "application/json" });
     }, () => send(res, 500, "error", cors));
   }
-  if (p === "/screen") return send(res, screenReport(url.searchParams), "", cors);
+  if (p === "/screen") {
+    const code = screenReport(url.searchParams);
+    if (code !== 204) log(`screen ${code} ${screenWhy}`);
+    return send(res, code, "", cors);
+  }
   if (p === "/diag") {
     writeDiag(diagEntry(url.searchParams));
     return send(res, 204, "", cors);

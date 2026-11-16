@@ -2363,7 +2363,7 @@
     }
   }
   function saveSettings() {
-    checkCancel();
+    checkCancel("options");
     checkVersionReady.then(() => checkWake(true));
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -2568,7 +2568,7 @@
         if (!current()) return; // a response for the previous thread, or for a torn-down copy
         const priorBuild = lastState?.t3Build?.full, priorMain = lastState?.t3MainJs;
         lastState = { ...st, receivedAt: Date.now() };
-        if (priorBuild !== st.t3Build?.full || priorMain !== st.t3MainJs) checkCancel();
+        if (priorBuild !== st.t3Build?.full || priorMain !== st.t3MainJs) checkCancel("build");
         checkVersionReady.then(() => checkWake());
         render();
         readT3Cache();
@@ -2612,7 +2612,7 @@
     if (JSON.stringify(next) === JSON.stringify(route)) return false;
     route = next;
     routeToken++;
-    checkCancel();
+    checkCancel("hash");
     checkVersionReady.then(() => checkWake(true));
     if (lastState) lastState = { ...lastState, handover: { ...(lastState.handover ?? {}), chain: null } }; // clear on navigation
     if (pop?.kind === "chain" || pop?.kind === "handover") closePopover();
@@ -3665,6 +3665,12 @@
   let checkVersion = null, checkPair = null, checkEpoch = 0, checkIdentity = null;
   let checkResults = {};
   const checkShown = new Set(), checkViewed = new Set(), checkSending = new Set();
+  // Flags only, for the once-per-version check-in: pairs started and read, why the last one stopped, the last /screen status.
+  // stop: why the last pair ended unread (its callback or a cancel); read/agree: readings in the last completed pair.
+  const checkDiag = { started: 0, pairs: 0, cancelled: 0, stop: "none", read: 0, agree: 0, sent: 0, send: "none" };
+  // Readings whose send failed; sent again on the next completed pair even when unchanged.
+  const checkUnsent = new Set();
+  let checkPairFonts = true;
   let checkInViewObserver = null, checkObserved = null;
   cleanups.push(() => { checkCancel(); checkInViewObserver?.disconnect(); });
   // Capture bytes now, before the loader can replace either node on a later focus.
@@ -3688,13 +3694,28 @@
     }
     return true;
   }
+  // The page's own record of the main script it loaded: a resource entry, or (T3's t3code://
+  // scheme may leave none) the modulepreload link Vite's import helper adds, or a script src.
+  // A page that loaded a name keeps it, so a positive answer is remembered until the recorded
+  // name changes (a new build); a negative one is asked again on the next call.
+  let checkMainLoaded = null;
+  function checkIsMain(url, name, own = false) {
+    try {
+      const u = new URL(url, location.href), p = u.pathname;
+      return (!own || (u.protocol === location.protocol && u.host === location.host)) && p.split("/").pop() === name && /\/main-[\w-]+\.js$/.test(p);
+    } catch { return false; }
+  }
+  const checkMainRT = (name) => Boolean(name) && performance.getEntriesByType("resource").some(e => checkIsMain(e.name, name));
+  const checkMainDom = (name) => Boolean(name) && [...D.querySelectorAll('link[rel="modulepreload"][href], script[src]')].some(el => checkIsMain(el.href || el.src, name, true));
+  function checkBuildWhy() {
+    const build = lastState?.t3Build, name = lastState?.t3MainJs;
+    if (!checkVersion) return "nover";
+    if (!build?.full || !build?.label || !name) return "nostate";
+    if (checkMainLoaded !== name) checkMainLoaded = checkMainRT(name) || checkMainDom(name) ? name : null;
+    return checkMainLoaded === name ? "ok" : "nomain";
+  }
   function checkBuild() {
-    const build = lastState?.t3Build;
-    if (!checkVersion || !build?.full || !build?.label || !lastState?.t3MainJs) return null;
-    const loaded = performance.getEntriesByType("resource").some(e => {
-      try { return new URL(e.name).pathname.split("/").pop() === lastState.t3MainJs && /\/main-[\w-]+\.js$/.test(new URL(e.name).pathname); } catch { return false; }
-    });
-    return loaded ? { ...build, key: JSON.stringify([build.full, checkVersion, CHECKER_VERSION]) } : null;
+    return checkBuildWhy() === "ok" ? { ...lastState.t3Build, key: JSON.stringify([lastState.t3Build.full, checkVersion, CHECKER_VERSION]) } : null;
   }
   function checkOn(id) {
     if (id === "threadtitles") return activePick("threadtitles").family !== "off";
@@ -3749,14 +3770,15 @@
     }
     return out;
   }
-  function checkCancel() {
+  function checkCancel(why = "other") {
     checkEpoch++;
-    if (checkPair !== null) { clearTimeout(checkPair); timers.delete(checkPair); checkPair = null; }
+    if (checkPair !== null) { clearTimeout(checkPair); timers.delete(checkPair); checkPair = null; checkDiag.cancelled++; checkDiag.stop = why; }
   }
   function checkHydrate(build) {
     if (checkIdentity === build.key) return;
-    checkCancel();
+    checkCancel("build");
     checkIdentity = build.key;
+    checkUnsent.clear();
     let cache = {};
     try { cache = JSON.parse(safeGet(CHECK_CACHE) ?? "{}"); } catch {}
     if (!cache || typeof cache !== "object" || Array.isArray(cache)) cache = {};
@@ -3778,29 +3800,43 @@
     const p = new URLSearchParams({ kind, build:build.label, addon:id, version:checkVersion, checker:CHECKER_VERSION });
     if (reading) for (const key of ["result", "seen", "matched"]) p.set(key, String(reading[key]));
     const ctrl = new AbortController(); requests.add(ctrl);
-    try { return (await fetch(`${BASE}screen?${p}`, {cache:"no-store", signal:ctrl.signal})).ok; }
-    catch { return false; } finally { requests.delete(ctrl); }
+    checkDiag.sent++;
+    try { const r = await fetch(`${BASE}screen?${p}`, {cache:"no-store", signal:ctrl.signal}); checkDiag.send = String(r.status); return r.ok; }
+    catch { checkDiag.send = "err"; return false; } finally { requests.delete(ctrl); }
   }
   function checkWake(force = false) {
     if (disposed || paused || D.visibilityState !== "visible" || !D.hasFocus()) return;
     const build = checkBuild();
-    if (!build) { checkCancel(); checkUI(); return; }
+    if (!build) { checkCancel("build"); checkUI(); return; }
     checkHydrate(build);
     checkUI();
     if (checkPair !== null) return;
     const active = Object.keys(CHECK_NAMES).filter(checkOn), before = checkRead();
-    if (!force && active.every(id => before[id] && checkResults[id]?.result === "ok")) return;
+    if (!force && !checkUnsent.size && active.every(id => before[id] && checkResults[id]?.result === "ok")) return;
     const epoch = checkEpoch, hash = location.hash, options = JSON.stringify(settings);
     const fontsLoaded = D.fonts.status === "loaded";
+    checkPairFonts = fontsLoaded;
+    checkDiag.started++;
     checkPair = later(5000, () => {
       checkPair = null;
-      if (epoch !== checkEpoch || disposed || D.visibilityState !== "visible" || !D.hasFocus() || hash !== location.hash || options !== JSON.stringify(settings) || build.key !== checkBuild()?.key || !fontsLoaded || D.fonts.status !== "loaded") return;
+      if (epoch !== checkEpoch || disposed) return;
+      const stop = D.visibilityState !== "visible" || !D.hasFocus() ? "focus" : hash !== location.hash ? "hash" : options !== JSON.stringify(settings) ? "options"
+        : build.key !== checkBuild()?.key ? "build" : !fontsLoaded || D.fonts.status !== "loaded" ? "fonts" : null;
+      if (stop) { checkDiag.stop = stop; return; }
+      checkDiag.pairs++;
       const after = checkRead();
+      checkDiag.read = active.filter(id => after[id]).length;
+      checkDiag.agree = 0;
       for (const id of active) {
         if (!before[id] || JSON.stringify(before[id]) !== JSON.stringify(after[id])) continue;
+        checkDiag.agree++;
         const changed = JSON.stringify(checkResults[id]) !== JSON.stringify(after[id]);
         checkResults[id] = after[id];
-        if (changed) checkSend(build, id, "result", after[id]).then(ok => { if (ok) checkUI(); });
+        if (changed || checkUnsent.has(id)) {
+          checkUnsent.delete(id);
+          const key = build.key;
+          checkSend(build, id, "result", after[id]).then(ok => { if (ok) checkUI(); else if (checkIdentity === key) checkUnsent.add(id); });
+        }
       }
       checkStore(build);
       checkUI();
@@ -5950,7 +5986,7 @@
     s.on("scroll", moved);
     s.on("resize", moved);
   }
-  if (W.__T3X_CHECK_TEST__) Object.assign(W.__T3X_CHECK_TEST__, { read:checkRead, wake:checkWake, cancel:checkCancel, ui:checkUI, seen:checkSeen, broken:checkBroken, features, change, openPanel, ready:checkVersionReady, snapshot:() => ({version:checkVersion, results:checkResults}) });
+  if (W.__T3X_CHECK_TEST__) Object.assign(W.__T3X_CHECK_TEST__, { read:checkRead, wake:checkWake, cancel:checkCancel, ui:checkUI, seen:checkSeen, broken:checkBroken, features, change, openPanel, ready:checkVersionReady, buildWhy:checkBuildWhy, mainSeen:() => ({rt:checkMainRT(lastState?.t3MainJs), dom:checkMainDom(lastState?.t3MainJs)}), diag:() => ({...checkDiag, pending: checkPair !== null, unsent: checkUnsent.size}), snapshot:() => ({version:checkVersion, results:checkResults}) });
   if (W.__T3X_PICK_TEST__) Object.assign(W.__T3X_PICK_TEST__, { areaOwners, roleAttrs, roleOfFamily, startFontPick, showAreaOnScreen, endInspector, openFontsAt, openPanel, active: () => inspector, workspace: () => fontWorkspace });
   function stepAreaFont(id, dir) {
     const r = ROLE[id], cur = settings[r.key].family;
@@ -6492,7 +6528,7 @@
 
   listen(W, "storage", (e) => {
     if (e.key === SETTINGS_KEY) {
-      checkCancel();
+      checkCancel("options");
       settings = readSettings(e.newValue);
       checkVersionReady.then(() => checkWake(true));
       pruneSizeBack();
@@ -6565,7 +6601,7 @@
 
   let checkRouteHash = location.hash;
   const routeTick = () => {
-    if (checkRouteHash !== location.hash) { checkRouteHash = location.hash; checkCancel(); checkVersionReady.then(() => checkWake(true)); }
+    if (checkRouteHash !== location.hash) { checkRouteHash = location.hash; checkCancel("hash"); checkVersionReady.then(() => checkWake(true)); }
     if (checkRoute()) render();
   };
   every(1000, routeTick); // TanStack's pushState doesn't fire hashchange
@@ -6576,9 +6612,11 @@
   every(30e3, () => {
     if (D.visibilityState === "visible") fetchBurn();
   });
-  listen(W, "focus", () => { fetchBurn(); checkCancel(); fetchState().then(() => {checkWake(); checkSeen();}); });
-  listen(W, "blur", checkCancel);
-  listen(D, "visibilitychange", () => { checkCancel(); if (D.visibilityState === "visible") checkWake(); });
+  listen(W, "focus", () => { fetchBurn(); checkCancel("focus"); fetchState().then(() => {checkWake(); checkSeen();}); });
+  listen(W, "blur", () => checkCancel("focus"));
+  listen(D, "visibilitychange", () => { checkCancel("focus"); if (D.visibilityState === "visible") checkWake(); });
+  // A pair begun while fonts were loading can never be read; start again once they finish.
+  listen(D.fonts, "loadingdone", () => { if (checkPair !== null && !checkPairFonts) checkCancel("fonts"); checkVersionReady.then(() => checkWake()); });
   every(30e3, () => render()); // ages and "stale" marks move on even without new data
   listen(D, "visibilitychange", () => {
     if (D.visibilityState === "visible") {
@@ -6641,6 +6679,20 @@
     p.set("owned", String(D.querySelectorAll(`[${OWN}]`).length));
     p.set("errors", String(errors.length));
     p.set("paused", String(paused));
+    // Break check, flags only: the first failing build condition, where the main script was seen,
+    // how many resource entries exist (all, and on the page's own scheme and host), the pairs and the last /screen status.
+    const mainName = lastState?.t3MainJs, entries = performance.getEntriesByType("resource");
+    const own = (e) => { try { const u = new URL(e.name); return u.protocol === location.protocol && u.host === location.host; } catch { return false; } };
+    p.set("bc", checkBuildWhy());
+    p.set("bcRT", String(checkMainRT(mainName)));
+    p.set("bcDom", String(checkMainDom(mainName)));
+    p.set("bcRTn", String(Math.min(entries.length, 999999)));
+    p.set("bcRTapp", String(Math.min(entries.filter(own).length, 999999)));
+    p.set("bcFocus", String(D.hasFocus()));
+    p.set("bcPending", String(checkPair !== null));
+    for (const [k, v] of [["bcStarted", checkDiag.started], ["bcPairs", checkDiag.pairs], ["bcCancelled", checkDiag.cancelled], ["bcRead", checkDiag.read], ["bcAgree", checkDiag.agree], ["bcSent", checkDiag.sent]]) p.set(k, String(Math.min(v, 999999)));
+    p.set("bcStop", checkDiag.stop);
+    p.set("bcSend", checkDiag.send);
     fetch(`${BASE}diag?${p}`, { cache: "no-store" }).catch(() => {});
   };
   if (safeGet("t3x:diag") === "1") {

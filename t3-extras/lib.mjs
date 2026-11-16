@@ -312,6 +312,22 @@ const DIAG_KEYS = {
   burnHot: COUNT, // of those: warm, hot or blazing
   burnEmber: COUNT, // of those: bursts (embers)
   burnRows: COUNT, // sidebar rows decorated
+  // Break check, flags only (DECISIONS.md, 15 Nov 2026 evening)
+  bc: oneOf("ok", "nover", "nostate", "nomain"), // checkBuild's first failing condition
+  bcRT: BOOL, // the loaded main script has a resource-timing entry
+  bcDom: BOOL, // ... or a modulepreload link / script src in the page
+  bcRTn: COUNT, // resource entries in the buffer
+  bcRTapp: COUNT, // of those: on the page's own scheme and host
+  bcFocus: BOOL, // the window had focus at the check-in
+  bcPending: BOOL, // a pair was waiting for its second reading
+  bcStarted: COUNT, // 5-second pairs started since this copy loaded
+  bcPairs: COUNT, // of those: read to the end
+  bcCancelled: COUNT, // of those: cancelled while waiting
+  bcStop: oneOf("none", "focus", "hash", "options", "build", "fonts", "other"), // why the last pair ended unread
+  bcRead: COUNT, // add-ons with a reading in the last completed pair
+  bcAgree: COUNT, // of those: both readings agreed
+  bcSent: COUNT, // /screen requests sent
+  bcSend: (s) => s === "none" || s === "err" || /^[1-5]\d\d$/.test(s), // the last /screen status
 };
 
 /** /diag stores counts, flags and a few fixed words only: never titles, paths or other text. */

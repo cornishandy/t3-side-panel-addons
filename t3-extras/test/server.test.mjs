@@ -144,6 +144,17 @@ test("diag keeps only allowlisted keys with valid values: counts, flags, fixed w
   assert.deepEqual(diagEntry(new URLSearchParams("fh=false&fb=true&fm=true&fm=yes")), { fh: "false", fb: "true", fm: "true" });
 });
 
+test("diag keeps the break-check flags only as fixed words, flags, counts and status codes", () => {
+  const good = { bc: "nomain", bcRT: "false", bcDom: "true", bcRTn: "250", bcRTapp: "0", bcFocus: "true", bcPending: "false", bcStarted: "3", bcPairs: "1", bcCancelled: "2", bcStop: "other", bcRead: "4", bcAgree: "3", bcSent: "1", bcSend: "409" };
+  assert.deepEqual(diagEntry(new URLSearchParams(good)), good);
+  assert.deepEqual(diagEntry(new URLSearchParams("bc=ok&bcStop=none&bcSend=none")), { bc: "ok", bcStop: "none", bcSend: "none" });
+  assert.deepEqual(diagEntry(new URLSearchParams("bcSend=err")), { bcSend: "err" });
+  assert.deepEqual(diagEntry(new URLSearchParams({
+    bc: "main-CI7C-w-8.js", bcRT: "yes", bcDom: "1", bcRTn: "-1", bcRTapp: "t3code://app", bcStarted: "1.5", bcPairs: "1234567",
+    bcStop: "PRIVATE", bcSend: "20", bcMain: "main-CI7C-w-8.js", bcFocus: "1", bcPending: "maybe", bcCancelled: "x", bcRead: "-2", bcAgree: "3.0", bcSent: "1e3",
+  })), {});
+});
+
 // ---------- the running service ----------
 
 let child;
