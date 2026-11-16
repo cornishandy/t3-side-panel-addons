@@ -362,6 +362,15 @@ html[data-t3x-marker="outline"] [data-slot="sidebar-menu-sub-button"][data-activ
   outline-offset: -2px;
 }
 
+/* ---------- narrow windows: keep the docked sidebar (Auto-hide in narrow windows, off) ----------
+   T3 hides the docked sidebar under 768 px with Tailwind's "hidden md:block" / "md:flex". extras.js
+   makes T3 draw the docked sidebar there instead of its pop-over; these show it. The pop-over
+   (data-mobile) is never touched. */
+@media (max-width: 767px) {
+  html[data-t3x-keep-sidebar] [data-slot="sidebar"][data-collapsible-mode]:not([data-mobile]) { display: block; }
+  html[data-t3x-keep-sidebar] [data-slot="sidebar"][data-collapsible-mode]:not([data-mobile]) > [data-slot="sidebar-container"] { display: flex; }
+}
+
 /* ---------- sidebar polish: tighter rows (works on top of the keeper's wrap CSS) ---------- */
 
 html[data-t3x-tight] li[data-thread-item] { padding-block: 1px; contain-intrinsic-size: auto 60px; }

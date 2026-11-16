@@ -25,6 +25,7 @@
   const T3_STALE_MS = 15 * MIN; // T3's own readings, by usageLimits.checkedAt
   const POLL_MS = 60e3;
   const SETTINGS_KEY = "t3x:settings:v1";
+  const NARROW_SIDEBAR_QUERY = "(max-width: 767px)"; // T3's sidebar: narrower than this, it hides (see wrapMatchMedia)
   const HIST = Object.freeze({ everyMs: 10 * MIN, keepMs: 15 * DAY, gapMs: 25 * MIN, maxRecords: 20_000, maxRecordBytes: 200, maxBytes: 4_000_000, maxPerSeries: 2_500 });
 
   // ===================================================================== core (pure, unit-tested)
@@ -69,6 +70,7 @@
     oneRowTitles: true, // one line per title; a trailing (N) or (Model) stays visible
     titleLines: 2, // TITLE_LINES: with one-row titles off (compact threads), lines at most, used only as needed
     timeGaps: true, // a gap between active threads last active 25+ min apart, instead of lines
+    narrowAutoHide: false, // T3's own auto-hide below NARROW_SIDEBAR_QUERY; off keeps the sidebar docked
     marker: "bar", // bar | outline | off
     fontHead: Object.freeze({ family: "off", size: null }), // size null = the font's own default
     fontBody: Object.freeze({ family: "off", size: null }), // retained only as the migration source
@@ -107,7 +109,7 @@
     footerMade: "open-short", // the reply footer's Made so far list: start-folded | open-short | always-open | hide
     fontTargets: Object.freeze({ composer: true, quotes: true, projects: true, pills: true, headings: true, replies: true, mine: true, ...Object.fromEntries(INTERFACE_TARGETS.map(([key]) => [key, false])) }),
   });
-  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "printOnly", "showPartly", "showHidden", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen", "popMove"];
+  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "narrowAutoHide", "printOnly", "showPartly", "showHidden", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen", "popMove"];
   const MARKERS = ["bar", "outline", "off"];
   const TITLE_LINES = Object.freeze([2, 3, "unlimited"]);
   // The Older section's choices: value, hours (null = by gaps, olderCutoff), panel label, header words.
@@ -2237,6 +2239,7 @@
       "data-t3x-inline-icon": st.inlineIcon ? "" : null,
       "data-t3x-project-full": st.projectFull ? "" : null,
       "data-t3x-working": st.workingHeader ? "" : null,
+      "data-t3x-keep-sidebar": st.narrowAutoHide ? null : "",
       "data-t3x-marker": st.marker !== "off" ? st.marker : null,
       "data-t3x-footer-team": st.footerTeam,
       "data-t3x-footer-made": st.footerMade,
@@ -2332,7 +2335,7 @@
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, FONT_SIMILAR_GROUPS, similarFontAreas, usagePageHash, usageContainerMatches,
     FOOTER_TEAM, FOOTER_MADE_MODES, FOOTER_CARD, FOOTER_MADE, FOOTER_DETAILS, footerPass, madePass, madeCount, newestAssistantId, timelineFromFiber, readHostTimeline, hostNewestId, laneIsWide, macAppOn, readMacPlatform, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
     forecast, seriesSegments, mergeSeries, dGeometry, fmtClock, lowRefills, compactParts, composerLabel, labUsageFailedSince, toolGates, labsForMerge, labFailure, handoverGate, HANDOVER_REQUEST, chainLabel, contrast, STALE_MS, T3_STALE_MS,
-    sidebarCands, lineCands, lineGroups, lineLayout, fitParts, plain, forecastBlocks, fableForecast, fableLegend, scopedRowText, spokenUsage, shortBarText, scopedModelOf, resetsTogether, stopLeftOf, lowScoped,
+    wrapMatchMedia, refreshNarrowSidebar, sidebarCands, lineCands, lineGroups, lineLayout, fitParts, plain, forecastBlocks, fableForecast, fableLegend, scopedRowText, spokenUsage, shortBarText, scopedModelOf, resetsTogether, stopLeftOf, lowScoped,
   };
   if (W.__T3X_TEST__) {
     W.__T3X_TEST__.core = core;
@@ -2448,11 +2451,64 @@
 
   // ---------- <html> switches for the CSS-only parts ----------
 
-  const ROOT_ATTRS = ["data-t3x-selecting", "data-t3x-tight", "data-t3x-compact", "data-t3x-pinned-label", "data-t3x-fold", "data-t3x-older-open", "data-t3x-onerow", "data-t3x-gaps", "data-t3x-inline-icon", "data-t3x-project-full", "data-t3x-working", "data-t3x-marker", "data-t3x-footer-team", "data-t3x-footer-made", "data-t3x-mac-app", "data-t3x-fh", "data-t3x-fb", "data-t3x-fm", ...TARGETS.map((t) => `data-t3x-ft-${t}`)];
+  const ROOT_ATTRS = ["data-t3x-selecting", "data-t3x-tight", "data-t3x-compact", "data-t3x-pinned-label", "data-t3x-fold", "data-t3x-older-open", "data-t3x-onerow", "data-t3x-gaps", "data-t3x-inline-icon", "data-t3x-project-full", "data-t3x-working", "data-t3x-keep-sidebar", "data-t3x-marker", "data-t3x-footer-team", "data-t3x-footer-made", "data-t3x-mac-app", "data-t3x-fh", "data-t3x-fb", "data-t3x-fm", ...TARGETS.map((t) => `data-t3x-ft-${t}`)];
   function applyRootAttrs() {
     const r = D.documentElement;
     for (const [name, value] of Object.entries(rootAttrs(settings))) (value === null ? r.removeAttribute(name) : r.setAttribute(name, value));
     if (!settings.compactThreads) hideProjectTip();
+  }
+
+  // ---------- T3's narrow-window sidebar ----------
+  // Under 768 px wide, T3 swaps the docked sidebar for a pop-over that starts hidden. Its sidebar
+  // asks matchMedia(NARROW_SIDEBAR_QUERY) on every render, so with auto-hide off that one query
+  // answers "not narrow"; extras.css then shows the docked sidebar, and T3's own width rule
+  // (at least 640 px left for the chat) narrows it. Every other query passes through untouched.
+  function narrowQueryList(real, keep) {
+    return {
+      get matches() { return keep() ? false : real.matches; },
+      get media() { return real.media; },
+      get onchange() { return real.onchange; },
+      set onchange(fn) { real.onchange = fn; },
+      addEventListener: (...a) => real.addEventListener(...a),
+      removeEventListener: (...a) => real.removeEventListener(...a),
+      addListener: (fn) => real.addListener(fn),
+      removeListener: (fn) => real.removeListener(fn),
+      dispatchEvent: (e) => real.dispatchEvent(e),
+    };
+  }
+  /** Wraps window.matchMedia once; returns the undo. keep() is read on every call. */
+  function wrapMatchMedia(win, keep) {
+    const current = win.matchMedia;
+    if (typeof current !== "function") return () => {};
+    const native = current.t3xNative || current; // never wrap a copy left by an older load
+    const wrapped = function matchMedia(query) {
+      const real = native.call(win, query);
+      return String(query).trim() === NARROW_SIDEBAR_QUERY ? narrowQueryList(real, keep) : real;
+    };
+    wrapped.t3xNative = native;
+    win.matchMedia = wrapped;
+    return () => {
+      if (win.matchMedia === wrapped) win.matchMedia = native;
+    };
+  }
+  /** T3 only re-reads the query when its sidebar renders, so nudge each sidebar store: open the
+   *  pop-over and close it again in one task (React renders once, closed). Uses the sidebar
+   *  context's own setOpenMobile, found from the wrapper's React fiber. Returns how many it reached. */
+  function refreshNarrowSidebar(doc, fiberOf) {
+    let reached = 0;
+    for (const el of doc.querySelectorAll('[data-slot="sidebar-wrapper"]')) {
+      for (let f = fiberOf(el), i = 0; f && i < 6; f = f.return, i++) {
+        const v = f.memoizedProps?.value;
+        if (!v || typeof v.setOpenMobile !== "function" || typeof v.openMobile !== "boolean") continue;
+        try {
+          if (!v.openMobile) v.setOpenMobile(true);
+          v.setOpenMobile(false);
+          reached++;
+        } catch {}
+        break;
+      }
+    }
+    return reached;
   }
   const footerSeen = new WeakSet(); // footer team lists already handled in start-folded mode
 
@@ -5499,6 +5555,7 @@
           sw("Project name in full", "projectFull", "Wraps instead of ending in \u2026; the status stays on the right."),
         ],
         sw("Stronger Working divider", "workingHeader", "The Working header in T3's working colour, bold, with a thicker line."),
+        sw("Auto-hide in narrow windows", "narrowAutoHide", "T3's own behaviour: under 768 px wide, the sidebar hides and opens over the chat. Off: it stays beside the chat, narrowed to keep 640 px for the chat."),
         h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: addonSettingLabel("marker") }),
           h("div", { class: "t3x-radios", role: "radiogroup", "aria-label": addonSettingLabel("marker") },
             radio("marker", "bar", settings.marker, "Bar + bold", (v) => change({ marker: v })),
@@ -5550,6 +5607,7 @@
     // menu's blur applies the rebuild once it has closed.
     if (pop?.kind === "panel" && !fontSelectOpen()) fillPopover();
     if (pop && patch && Object.prototype.hasOwnProperty.call(patch, "popMove")) place();
+    if (patch && Object.prototype.hasOwnProperty.call(patch, "narrowAutoHide")) refreshNarrowSidebar(D, reactFiber);
     syncFontWorkspace();
   }
   // One row per font you picked (areas that follow it listed beside it). Clicking a name opens Fonts there.
@@ -6750,6 +6808,13 @@
     delete W.t3xTeardown;
   };
 
+  const unwrapMatchMedia = wrapMatchMedia(W, () => !disposed && !settings.narrowAutoHide);
+  cleanups.push(() => {
+    unwrapMatchMedia();
+    refreshNarrowSidebar(D, reactFiber); // back to T3's own layout
+  });
+  // T3 may already have drawn the pop-over layout before this file arrived.
+  if (!settings.narrowAutoHide && W.matchMedia?.t3xNative?.call(W, NARROW_SIDEBAR_QUERY).matches) refreshNarrowSidebar(D, reactFiber);
   applyRootAttrs();
   syncMacApp();
   applyFonts();
