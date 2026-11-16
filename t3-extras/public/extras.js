@@ -3812,6 +3812,7 @@
     checkUI();
     if (checkPair !== null) return;
     const active = Object.keys(CHECK_NAMES).filter(checkOn), before = checkRead();
+    for (const id of checkUnsent) if (!active.includes(id)) checkUnsent.delete(id); // switched off since: nothing to resend
     if (!force && !checkUnsent.size && active.every(id => before[id] && checkResults[id]?.result === "ok")) return;
     const epoch = checkEpoch, hash = location.hash, options = JSON.stringify(settings);
     const fontsLoaded = D.fonts.status === "loaded";

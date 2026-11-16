@@ -187,6 +187,12 @@ test('break check on real 4736 rows, eligibility, agreement, recovery, warnings 
     const sent=f.requests.find(x=>x.startsWith('/diag?'));assert.ok(sent,'no check-in');
     const params=new URLSearchParams(sent.slice(6)), kept=diagEntry(params);
     for(const k of ['bc','bcRT','bcDom','bcRTn','bcRTapp','bcFocus','bcPending','bcStarted','bcPairs','bcCancelled','bcStop','bcRead','bcAgree','bcSent','bcSend']) assert.equal(kept[k],params.get(k),k);
+    // A refused reading whose add-on is then switched off is dropped, so an idle page stays idle.
+    fs.appendFileSync(pub,'\n// a newer installed payload\n');
+    await breakTitles();await wake();await wait(5200);assert.ok((await diag()).unsent>=1);
+    await change({fontThreadtitles:{family:'off'},oneRowTitles:false,compactThreads:false,marker:'off'});await wake();
+    assert.equal((await diag()).unsent,0);
+    fs.writeFileSync(pub,original);
   });
   assert.deepEqual(c.errors,[]);
   await ev('window.t3xTeardown();1');
