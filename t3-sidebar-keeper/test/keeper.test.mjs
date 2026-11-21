@@ -105,7 +105,7 @@ function legacyFit(text) {
 }
 
 const statesOf = (out) => Object.fromEntries(Object.entries(out.results).map(([name, r]) => [name, r.state]));
-const freshStates = { wrap: "patched", minWidth: "patched", rule: "patched", fit: "patched", titleGuide: "patched", geminiQuota: bundleOf(probeTarget(pristine)[0], pristine).includes(`${UA_MARK}1.0.0 `) ? "patched" : "already", antigravityQuestions: "patched", extras: "patched", firstClick: "patched" };
+const freshStates = { wrap: "patched", minWidth: "patched", rule: "patched", fit: "patched", titleGuide: "patched", geminiQuota: bundleOf(probeTarget(pristine)[0], pristine).includes(`${UA_MARK}1.0.0 `) ? "patched" : "already", antigravityQuestions: "patched", antigravitySteer: "patched", antigravityQuotaOutcome: "patched", extras: "patched", firstClick: "patched" };
 
 // ---------- parser-based room making (Astra round 1 fixtures) ----------
 
@@ -231,7 +231,8 @@ test("an already-patched v9 archive upgrades fit and titleGuide in place and is 
   for (const name of ["reminders.json", "reminder-journal.json"]) fs.rmSync(path.join(process.env.T3_KEEPER_HOME, name), { force: true });
   const archiveBytes = fs.statSync(asar).size;
   const result = K.apply({ reason: "v9 upgrade" });
-  assert.deepEqual(statesOf(result), { wrap: "already", minWidth: "already", rule: "already", fit: "patched", titleGuide: "patched", geminiQuota: "already", antigravityQuestions: "already", extras: "already", firstClick: "already" });
+  const steerOnBinCli = K.inspect(pristine).targets.acpSteer === K.inspect(pristine).targets.binCli;
+  assert.deepEqual(statesOf(result), { wrap: "already", minWidth: "already", rule: "already", fit: "patched", titleGuide: "patched", geminiQuota: "already", antigravityQuestions: "already", antigravitySteer: steerOnBinCli ? "patched" : "already", antigravityQuotaOutcome: "already", extras: "already", firstClick: "already" });
   const after = binCliOf();
   assert.equal(Buffer.byteLength(after), Buffer.byteLength(legacy));
   assert.equal(fs.statSync(asar).size, archiveBytes);
@@ -244,7 +245,7 @@ test("an already-patched v9 archive upgrades fit and titleGuide in place and is 
   assert.equal(titleFunctionsFromAsar(asar).subagentThreadTitle({ title: "/root/reminders_warm_final_gate", ordinal: 1, parentTitle: "Parent" }), "Reminders warm final gate");
   const R = await import("../reminders.mjs");
   const pending = R.readStateFile(path.join(process.env.T3_KEEPER_HOME, "reminders.json")).state.pending;
-  assert.deepEqual(pending.reasons, ["fit", "titleGuide"]);
+  assert.deepEqual(pending.reasons, steerOnBinCli ? ["fit", "titleGuide", "antigravitySteer"] : ["fit", "titleGuide"]);
   assert.deepEqual(K.unitTitleGuide(after), { state: "already", text: after });
   const again = K.apply({ reason: "v9 upgrade repeated" });
   assert.equal(again.wrote, false);

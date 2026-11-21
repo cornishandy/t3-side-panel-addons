@@ -752,6 +752,8 @@ function startupReasonsFromKeeper(keeper) {
   if (results.rule?.state === "patched") reasons.push("rule");
   if (results.fit?.state === "patched") reasons.push("fit");
   if (results.antigravityQuestions?.state === "patched") reasons.push("antigravityQuestions");
+  if (results.antigravitySteer?.state === "patched") reasons.push("antigravitySteer");
+  if (results.antigravityQuotaOutcome?.state === "patched") reasons.push("antigravityQuotaOutcome");
   if (results.firstClick?.state === "patched") reasons.push("firstClick");
   return reasons;
 }

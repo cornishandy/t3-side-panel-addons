@@ -17,6 +17,16 @@
  *                                 ask_question folds qN + qN_other, unlocks custom answers, and
  *                                 splits Claude-style headers/option descriptions (server: next
  *                                 T3 launch); yields cleanly if upstream adds its own extractor
+ *   antigravitySteer server dist *.mjs
+ *                                 prevents steering (user message, delegated completion, or
+ *                                 queued-message promotion) from hitting Antigravity while a
+ *                                 question/approval waits (upstream #39799 / #35703; server: next
+ *                                 T3 launch); yields cleanly once upstream adds each guard
+ *   antigravityQuotaOutcome server dist *.mjs
+ *                                 parses Antigravity 1.5 JSON quota errors and future/delay reset
+ *                                 times in AntigravityTurnOutcome so quota hits arm auto-resume
+ *                                 instead of generic Provider error (upstream #40244; server: next
+ *                                 T3 launch); yields cleanly once upstream fixes all 6 components
  *   extras    client/index.html   tiny inline loader for the t3-extras add-ons (127.0.0.1:8793);
  *                                 its bytes come out of wrap's <style> padding
  *   firstClick desktop main.cjs   acceptFirstMouse on the Mac window, so the first click on an
@@ -94,7 +104,7 @@ const USER_DATA = process.env.T3_USER_DATA_DIR || path.join(os.homedir(), "Libra
 const FRAMEWORK = path.join(APP, "Contents/Frameworks/Electron Framework.framework/Electron Framework");
 const STYLE_ID = "t3-keeper-sidebar-2"; // bump the number when WRAP_CSS changes
 const KEEP_BACKUPS = 3;
-const KEEPER_VERSION = 19; // bump when units change so --auto re-checks an already-handled build
+const KEEPER_VERSION = 20; // bump when units change so --auto re-checks an already-handled build
 const MIN_FREE_BYTES = 1024 ** 3;
 const TMP_PREFIX = ".app.asar.t3-keeper-";
 const PARSE = { ecmaVersion: "latest", allowHashBang: true };
@@ -1601,6 +1611,1209 @@ function hasTopLevelArrayVar(text, name, getAst = null) {
     .some((d) => d.id.type === "Identifier" && d.id.name === name && d.init?.type === "ArrayExpression");
 }
 
+function walkAst(node, visit) {
+  if (!node || typeof node !== "object") return;
+  if (visit(node) === false) return;
+  for (const [k, v] of Object.entries(node)) {
+    if (k === "start" || k === "end" || k === "loc" || k === "type") continue;
+    if (Array.isArray(v)) {
+      for (const item of v) walkAst(item, visit);
+    } else if (v && typeof v === "object" && typeof v.type === "string") {
+      walkAst(v, visit);
+    }
+  }
+}
+
+function hasTopLevelBinding(ast, name) {
+  for (const n of ast?.body ?? []) {
+    const decl = (n.type === "ExportNamedDeclaration" || n.type === "ExportDefaultDeclaration") ? n.declaration : n;
+    if (!decl) continue;
+    if ((decl.type === "FunctionDeclaration" || decl.type === "ClassDeclaration") && decl.id?.name === name) return true;
+    if (decl.type === "VariableDeclaration" && decl.declarations.some((d) => d.id?.type === "Identifier" && d.id.name === name)) return true;
+    if (n.type === "ImportDeclaration" && n.specifiers.some((s) => s.local?.name === name)) return true;
+  }
+  return false;
+}
+
+function applyTextEdits(text, edits) {
+  if (edits.length === 0) return text;
+  const sorted = [...edits].sort((a, b) => b.start - a.start || b.end - a.end);
+  let lastStart = Infinity;
+  let out = text;
+  for (const e of sorted) {
+    if (e.end > lastStart) throw new Error("overlapping patch edits");
+    out = out.slice(0, e.start) + e.replacement + out.slice(e.end);
+    lastStart = e.start;
+  }
+  return out;
+}
+
+function collectAndTerms(node, out = []) {
+  if (!node) return out;
+  if (node.type === "LogicalExpression" && node.operator === "&&") {
+    collectAndTerms(node.left, out);
+    collectAndTerms(node.right, out);
+  } else {
+    out.push(node);
+  }
+  return out;
+}
+
+function isUndefinedNode(node) {
+  if (!node) return false;
+  if (node.type === "Identifier" && node.name === "undefined") return true;
+  if (node.type === "UnaryExpression" && node.operator === "void") return true;
+  return false;
+}
+
+function isVoidZeroOrNull(node) {
+  return (node?.type === "Literal" && node.value === null) || isUndefinedNode(node);
+}
+
+function unwrapChain(node) {
+  return node?.type === "ChainExpression" ? node.expression : node;
+}
+
+function isMemberIdent(node, objName, propName) {
+  const expr = unwrapChain(node);
+  return !!expr && expr.type === "MemberExpression" && !expr.computed &&
+    expr.object.type === "Identifier" && expr.object.name === objName &&
+    expr.property.type === "Identifier" && expr.property.name === propName;
+}
+
+function isMemberPath(node, parts) {
+  let cur = unwrapChain(node);
+  for (let i = parts.length - 1; i >= 1; i--) {
+    if (!cur || cur.type !== "MemberExpression" || cur.computed ||
+        cur.property.type !== "Identifier" || cur.property.name !== parts[i]) {
+      return false;
+    }
+    cur = unwrapChain(cur.object);
+  }
+  return cur?.type === "Identifier" && cur.name === parts[0];
+}
+
+function extractSingleReturnExpr(fnNode) {
+  if (!fnNode || (fnNode.type !== "ArrowFunctionExpression" && fnNode.type !== "FunctionExpression" && fnNode.type !== "FunctionDeclaration")) {
+    return null;
+  }
+  if (fnNode.body.type !== "BlockStatement") return fnNode.body;
+  if (fnNode.body.body.length === 1 && fnNode.body.body[0].type === "ReturnStatement") {
+    return fnNode.body.body[0].argument;
+  }
+  return null;
+}
+
+function findTopLevelFnLike(ast, name) {
+  const hits = [];
+  for (const n of topLevelDecls(ast)) {
+    if (n.type === "FunctionDeclaration" && n.id?.name === name) hits.push(n);
+    else if (n.type === "VariableDeclaration") {
+      for (const d of n.declarations) {
+        if (d.id?.type === "Identifier" && d.id.name === name &&
+            (d.init?.type === "ArrowFunctionExpression" || d.init?.type === "FunctionExpression")) {
+          hits.push(d.init);
+        }
+      }
+    }
+  }
+  if (hits.length !== 1) return null;
+  let reassigned = false;
+  walkAst(ast, (n) => {
+    if (n.type === "AssignmentExpression" && n.left?.type === "Identifier" && n.left.name === name) {
+      reassigned = true;
+      return false;
+    }
+  });
+  return reassigned ? null : hits[0];
+}
+
+function isPositivePendingCallback(cbNode) {
+  if (!cbNode || (cbNode.type !== "ArrowFunctionExpression" && cbNode.type !== "FunctionExpression")) return false;
+  if (cbNode.params.length !== 1 || cbNode.params[0].type !== "Identifier") return false;
+  const param = cbNode.params[0].name;
+  const expr = extractSingleReturnExpr(cbNode);
+  if (!expr) return false;
+  const terms = collectAndTerms(expr);
+  let hasStatus = false;
+  let hasLiveCap = false;
+  for (const t of terms) {
+    if (t.type === "BinaryExpression" && t.operator === "===" &&
+        ((isMemberPath(t.left, [param, "status"]) && t.right.type === "Literal" && t.right.value === "pending") ||
+         (isMemberPath(t.right, [param, "status"]) && t.left.type === "Literal" && t.left.value === "pending"))) {
+      hasStatus = true;
+      continue;
+    }
+    if (t.type === "BinaryExpression" && t.operator === "!==" &&
+        ((isMemberPath(t.left, [param, "responseCapability", "type"]) && t.right.type === "Literal" && t.right.value === "message") ||
+         (isMemberPath(t.right, [param, "responseCapability", "type"]) && t.left.type === "Literal" && t.left.value === "message"))) {
+      hasLiveCap = true;
+      continue;
+    }
+    if (t.type === "BinaryExpression" && t.operator === "===" &&
+        ((isMemberPath(t.left, [param, "responseCapability", "type"]) && t.right.type === "Literal" && t.right.value === "live") ||
+         (isMemberPath(t.right, [param, "responseCapability", "type"]) && t.left.type === "Literal" && t.left.value === "live"))) {
+      hasLiveCap = true;
+      continue;
+    }
+    if (t.type === "BinaryExpression" && (t.operator === "!==" || t.operator === "!=") &&
+        ((isMemberPath(t.left, [param, "responseCapability"]) && isVoidZeroOrNull(t.right)) ||
+         (isMemberPath(t.right, [param, "responseCapability"]) && isVoidZeroOrNull(t.left)))) {
+      continue;
+    }
+    return false;
+  }
+  return hasStatus && hasLiveCap;
+}
+
+function isPositivePendingSomeCall(node, projName) {
+  const expr = unwrapChain(node);
+  if (!expr || expr.type !== "CallExpression" || expr.arguments.length !== 1) return false;
+  if (!isMemberPath(expr.callee, [projName, "runtimeRequests", "some"])) return false;
+  return isPositivePendingCallback(expr.arguments[0]);
+}
+
+function isPositivePendingRequestExpr(node, ast, projName) {
+  if (!node) return false;
+  if (isPositivePendingSomeCall(node, projName)) return true;
+  if (node.type === "CallExpression" && node.callee.type === "Identifier" &&
+      node.callee.name === "waitsOnPendingRequest" &&
+      node.arguments.length === 1 && node.arguments[0].type === "Identifier" &&
+      node.arguments[0].name === projName) {
+    const helper = findTopLevelFnLike(ast, node.callee.name);
+    if (!helper || helper.params.length !== 1 || helper.params[0].type !== "Identifier") return false;
+    return isPositivePendingSomeCall(extractSingleReturnExpr(helper), helper.params[0].name);
+  }
+  return false;
+}
+
+function hasNegatedPendingGuard(node, ast, projName) {
+  return collectAndTerms(node).some((term) =>
+    term.type === "UnaryExpression" && term.operator === "!" &&
+    isPositivePendingRequestExpr(term.argument, ast, projName)
+  );
+}
+
+function isYieldGetPending(node, getFn) {
+  return node?.type === "YieldExpression" && node.delegate &&
+    node.argument?.type === "CallExpression" &&
+    node.argument.callee.type === "Identifier" && node.argument.callee.name === getFn &&
+    node.argument.arguments.length === 1 &&
+    node.argument.arguments[0].type === "Identifier" &&
+    node.argument.arguments[0].name === "pendingRuntimeRequests";
+}
+
+function isPositivePendingSizeCheck(test, pendingVarNames, getFn) {
+  if (!test || test.type !== "BinaryExpression") return false;
+  const isPendingSize = (expr) => {
+    const e = unwrapChain(expr);
+    if (!e || e.type !== "MemberExpression" || e.computed ||
+        e.property.type !== "Identifier" || e.property.name !== "size") return false;
+    return isYieldGetPending(e.object, getFn) ||
+      (e.object.type === "Identifier" && pendingVarNames.has(e.object.name));
+  };
+  const isLitNum = (expr, n) => expr?.type === "Literal" && expr.value === n;
+  if (isPendingSize(test.left)) {
+    return (test.operator === ">" && isLitNum(test.right, 0)) ||
+      (test.operator === ">=" && isLitNum(test.right, 1)) ||
+      (test.operator === "!==" && isLitNum(test.right, 0));
+  }
+  if (isPendingSize(test.right)) {
+    return (test.operator === "<" && isLitNum(test.left, 0)) ||
+      (test.operator === "<=" && isLitNum(test.left, 1)) ||
+      (test.operator === "!==" && isLitNum(test.left, 0));
+  }
+  return false;
+}
+
+function returnsSteerDeclinedError(node) {
+  let ret = node;
+  if (ret?.type === "BlockStatement" && ret.body.length === 1) ret = ret.body[0];
+  if (ret?.type !== "ReturnStatement" || !ret.argument) return false;
+  let expr = ret.argument;
+  if (expr.type === "YieldExpression" && expr.delegate) expr = expr.argument;
+  if (expr?.type === "CallExpression" && expr.arguments.length === 1) {
+    if (calleeBaseName(expr.callee) !== "fail") return false;
+    expr = expr.arguments[0];
+  }
+  return expr?.type === "NewExpression" &&
+    ((expr.callee.type === "Identifier" && expr.callee.name === "ProviderAdapterSteerDeclinedError") ||
+     (expr.callee.type === "MemberExpression" && !expr.callee.computed && expr.callee.property.name === "ProviderAdapterSteerDeclinedError"));
+}
+
+function isFollowUpGuardTerm(node) {
+  if (!node || node.type !== "BinaryExpression") return false;
+  if (node.operator !== "===" && node.operator !== "==") return false;
+  return (isMemberIdent(node.left, "command", "steerFollowUpOfRunId") && isVoidZeroOrNull(node.right)) ||
+    (isMemberIdent(node.right, "command", "steerFollowUpOfRunId") && isVoidZeroOrNull(node.left));
+}
+
+function findEffectFnCalls(ast, label) {
+  const hits = [];
+  walkAst(ast, (n) => {
+    if (n.type === "CallExpression" &&
+        n.callee.type === "CallExpression" &&
+        n.callee.arguments.length === 1 &&
+        n.callee.arguments[0].type === "Literal" &&
+        n.callee.arguments[0].value === label) {
+      hits.push(n);
+    }
+  });
+  return hits;
+}
+
+function extractTagOrList(node, causeIdent) {
+  if (!node) return null;
+  if (node.type === "LogicalExpression" && node.operator === "||") {
+    const l = extractTagOrList(node.left, causeIdent);
+    const r = extractTagOrList(node.right, causeIdent);
+    return l && r ? [...l, ...r] : null;
+  }
+  if (node.type === "BinaryExpression" && node.operator === "===") {
+    if (isMemberIdent(node.left, causeIdent, "_tag") && node.right.type === "Literal" && typeof node.right.value === "string") {
+      return [node.right.value];
+    }
+    if (isMemberIdent(node.right, causeIdent, "_tag") && node.left.type === "Literal" && typeof node.left.value === "string") {
+      return [node.left.value];
+    }
+  }
+  return null;
+}
+
+function isReturnsQueueAfterActive(node) {
+  let ret = node;
+  if (ret?.type === "BlockStatement" && ret.body.length === 1) ret = ret.body[0];
+  if (ret?.type !== "ReturnStatement" || ret.argument?.type !== "ObjectExpression") return false;
+  return ret.argument.properties.length === 1 &&
+    staticPropKey(ret.argument.properties[0]) === "type" &&
+    ret.argument.properties[0].value?.type === "Literal" &&
+    ret.argument.properties[0].value.value === "queue_after_active";
+}
+
+function isUnconditionalReturnNoSteer(node) {
+  if (!node) return false;
+  if (countIdentifiers(node, "steerWhenReadyRunId") > 0 ||
+      countIdentifiers(node, "dispatchSteerIntoRun") > 0 ||
+      countIdentifiers(node, "emitEvent") > 0 ||
+      countIdentifiers(node, "stopRunForQueuedCommand") > 0) return false;
+  let hasMutation = false;
+  walkAst(node, (n) => {
+    if (n.type === "AssignmentExpression" || n.type === "UpdateExpression") {
+      hasMutation = true;
+      return false;
+    }
+  });
+  if (hasMutation) return false;
+  if (node.type === "ReturnStatement") return true;
+  if (node.type === "BlockStatement" && node.body.length > 0 && node.body.at(-1).type === "ReturnStatement") return true;
+  return false;
+}
+
+const AG_STEER_MARK = "/*t3-keeper-ag-steer-v1*/";
+const AG_STEER_TARGETS = ["acpSteer", "dispatchPolicy", "orchestratorSteer"];
+
+/**
+ * antigravitySteer: prevents steers (user message, delegated completion, or queued-message
+ * promotion) from hitting Antigravity while a question or approval waits (upstream #39799 / #35703).
+ * Supports both single-chunk and split-chunk server bundles and yields cleanly once upstream adds each guard.
+ */
+function unitAntigravitySteer(text, opts = {}) {
+  const targets = opts.targets ?? AG_STEER_TARGETS;
+  const ast = acorn.parse(text, { ...PARSE, sourceType: "module" });
+  const edits = [];
+
+  if (targets.includes("acpSteer")) {
+    // 1a. AcpAdapterV2.steerWithPrompt: decline before mutating turn state when a request is pending.
+    const steerCalls = findEffectFnCalls(ast, "AcpAdapterV2.steerWithPrompt");
+    if (steerCalls.length !== 1) throw new Error(`AcpAdapterV2.steerWithPrompt found ${steerCalls.length} times`);
+    const steerFn = steerCalls[0].arguments[0];
+    if (steerFn?.type !== "FunctionExpression" || !steerFn.generator || steerFn.params[0]?.type !== "Identifier") {
+      throw new Error("AcpAdapterV2.steerWithPrompt signature changed shape");
+    }
+    const turnInputParam = steerFn.params[0].name;
+    const getFnMatches = [];
+    walkAst(steerFn.body, (n) => {
+      if (n.type === "VariableDeclarator" &&
+          n.id?.type === "Identifier" && n.id.name === "context" &&
+          n.init?.type === "YieldExpression" && n.init.delegate &&
+          n.init.argument?.type === "CallExpression" &&
+          n.init.argument.callee.type === "Identifier" &&
+          n.init.argument.arguments.length === 1 &&
+          n.init.argument.arguments[0].type === "Identifier" &&
+          n.init.argument.arguments[0].name === "activeTurn") {
+        getFnMatches.push(n.init.argument.callee.name);
+      }
+    });
+    if (getFnMatches.length !== 1) throw new Error("AcpAdapterV2.steerWithPrompt Ref.get(activeTurn) binding changed shape");
+    const getFn = getFnMatches[0];
+    const cbCalls = [];
+    walkAst(steerFn.body, (n) => {
+      if (n.type === "CallExpression" && n.callee.type === "Identifier" && n.callee.name === "runRuntimeCallbackAtGeneration" && n.arguments.length === 2) {
+        cbCalls.push(n);
+      }
+    });
+    if (cbCalls.length !== 1) throw new Error(`runRuntimeCallbackAtGeneration inside steerWithPrompt found ${cbCalls.length} times`);
+    const genArg = cbCalls[0].arguments[1];
+    const cbFn = genArg?.type === "CallExpression" ? genArg.arguments[0] : null;
+    if (cbFn?.type !== "FunctionExpression" || !cbFn.generator || cbFn.body?.type !== "BlockStatement" || cbFn.body.body.length < 1) {
+      throw new Error("steerWithPrompt callback generator changed shape");
+    }
+    const firstStmt = cbFn.body.body[0];
+    const isFinalizedGuard = firstStmt.type === "IfStatement" &&
+      firstStmt.test.type === "LogicalExpression" && firstStmt.test.operator === "||" &&
+      isMemberIdent(firstStmt.test.left, "context", "finalized") &&
+      isMemberIdent(firstStmt.test.right, "context", "interrupted") &&
+      firstStmt.consequent.type === "ReturnStatement" &&
+      firstStmt.consequent.argument?.type === "Literal" && firstStmt.consequent.argument.value === false;
+    if (!isFinalizedGuard) throw new Error("steerWithPrompt callback finalized/interrupted guard changed shape");
+    if (countIdentifiers(ast, "pendingRuntimeRequests") < 1 || !hasTopLevelBinding(ast, "ProviderAdapterSteerDeclinedError")) {
+      throw new Error("pendingRuntimeRequests or ProviderAdapterSteerDeclinedError missing in acpSteer bundle");
+    }
+    let hasEarlyDecline = false;
+    let sawContextMutation = false;
+    const pendingVarNames = new Set();
+    for (const stmt of cbFn.body.body.slice(1)) {
+      if (!sawContextMutation) {
+        const mutatesContext = (() => {
+          let mut = false;
+          walkAst(stmt, (n) => {
+            if ((n.type === "AssignmentExpression" && n.left.type === "MemberExpression" && n.left.object.type === "Identifier" && n.left.object.name === "context") ||
+                (n.type === "UpdateExpression" && n.argument.type === "MemberExpression" && n.argument.object.type === "Identifier" && n.argument.object.name === "context")) {
+              mut = true;
+              return false;
+            }
+          });
+          return mut;
+        })();
+        if (mutatesContext) {
+          sawContextMutation = true;
+        } else if (stmt.type === "VariableDeclaration" && stmt.declarations.length === 1 &&
+            stmt.declarations[0].id?.type === "Identifier" && isYieldGetPending(stmt.declarations[0].init, getFn)) {
+          pendingVarNames.add(stmt.declarations[0].id.name);
+        } else if (stmt.type === "IfStatement" && !stmt.alternate &&
+            isPositivePendingSizeCheck(stmt.test, pendingVarNames, getFn) &&
+            returnsSteerDeclinedError(stmt.consequent)) {
+          hasEarlyDecline = true;
+          break;
+        }
+      }
+    }
+    if (!hasEarlyDecline) {
+      if (countIdentifiers(cbFn.body, "pendingRuntimeRequests") > 0 || countIdentifiers(cbFn.body, "ProviderAdapterSteerDeclinedError") > 0) {
+        throw new Error("steerWithPrompt has unexpected pendingRuntimeRequests or ProviderAdapterSteerDeclinedError reference");
+      }
+      edits.push({
+        start: firstStmt.end,
+        end: firstStmt.end,
+        replacement: `\n\t\t\t\t\t\tif (${AG_STEER_MARK} (yield* ${getFn}(pendingRuntimeRequests)).size > 0) return yield* new ProviderAdapterSteerDeclinedError({ driver, providerThreadId: ${turnInputParam}.providerThread.id, providerTurnId: ${turnInputParam}.providerTurnId });`,
+      });
+    }
+
+    // 1b. AcpAdapterV2.steerTurn error mapper: pass ProviderAdapterSteerDeclinedError through unchanged.
+    const steerTurnCalls = findEffectFnCalls(ast, "AcpAdapterV2.steerTurn");
+    if (steerTurnCalls.length !== 1) throw new Error(`AcpAdapterV2.steerTurn found ${steerTurnCalls.length} times`);
+    const mapWrapper = steerTurnCalls[0].arguments[1];
+    if (!mapWrapper) throw new Error("AcpAdapterV2.steerTurn error mapper missing");
+    const conds = [];
+    walkAst(mapWrapper, (n) => {
+      if (n.type === "ConditionalExpression" &&
+          n.consequent.type === "Identifier" &&
+          n.alternate.type === "NewExpression" &&
+          ((n.alternate.callee.type === "Identifier" && n.alternate.callee.name === "ProviderAdapterSteerRunError") ||
+           (n.alternate.callee.type === "MemberExpression" && !n.alternate.callee.computed && n.alternate.callee.property.name === "ProviderAdapterSteerRunError"))) {
+        conds.push(n);
+      }
+    });
+    if (conds.length !== 1) throw new Error(`AcpAdapterV2.steerTurn mapError conditional found ${conds.length} times`);
+    const cond = conds[0];
+    const causeIdent = cond.consequent.name;
+    const tags = extractTagOrList(cond.test, causeIdent);
+    if (!tags) throw new Error("AcpAdapterV2.steerTurn mapError tag check changed shape");
+    const hasUnsupported = tags.includes("ProviderAdapterSteerRunUnsupportedError");
+    const hasDeclined = tags.includes("ProviderAdapterSteerDeclinedError");
+    if (hasUnsupported && hasDeclined) {
+      // already ready
+    } else if (tags.length === 1 && hasUnsupported) {
+      edits.push({
+        start: cond.test.start,
+        end: cond.test.end,
+        replacement: `${causeIdent}._tag === "ProviderAdapterSteerRunUnsupportedError" || ${causeIdent}._tag === "ProviderAdapterSteerDeclinedError"`,
+      });
+    } else {
+      throw new Error(`AcpAdapterV2.steerTurn mapError checks unexpected tags: ${tags.join(", ")}`);
+    }
+  }
+
+  if (targets.includes("dispatchPolicy")) {
+    const fns = topLevelDecls(ast).filter((n) => n.type === "FunctionDeclaration" && n.id?.name === "resolveMessageDispatchIntent");
+    if (fns.length !== 1) throw new Error(`resolveMessageDispatchIntent declared ${fns.length} times`);
+    const fnNode = fns[0];
+    if (fnNode.params[0]?.type !== "Identifier") throw new Error("resolveMessageDispatchIntent projection parameter changed shape");
+    const projParam = fnNode.params[0].name;
+    const bodyStmts = fnNode.body.body;
+    const steerIfIdx = bodyStmts.findIndex((s) =>
+      s.type === "IfStatement" &&
+      s.test.type === "BinaryExpression" && s.test.operator === "!==" &&
+      s.test.left.type === "MemberExpression" && !s.test.left.computed &&
+      s.test.left.object.type === "Identifier" && s.test.left.property.name === "type" &&
+      s.test.right.type === "Literal" && s.test.right.value === "steer_active" &&
+      s.consequent.type === "ReturnStatement" &&
+      s.consequent.argument?.type === "Identifier" && s.consequent.argument.name === s.test.left.object.name
+    );
+    if (steerIfIdx < 0) throw new Error("resolveMessageDispatchIntent steer_active guard changed shape");
+    const hasPendingQueue = bodyStmts.slice(steerIfIdx + 1).some((s) =>
+      s.type === "IfStatement" && !s.alternate &&
+      isPositivePendingRequestExpr(s.test, ast, projParam) &&
+      isReturnsQueueAfterActive(s.consequent)
+    );
+    if (!hasPendingQueue) {
+      if (countIdentifiers(fnNode.body, "waitsOnPendingRequest") > 0 || countIdentifiers(fnNode.body, "runtimeRequests") > 0) {
+        throw new Error("resolveMessageDispatchIntent has unexpected pending-request check");
+      }
+      const anchor = bodyStmts[steerIfIdx];
+      edits.push({
+        start: anchor.end,
+        end: anchor.end,
+        replacement: `\n\tif (${AG_STEER_MARK} ${projParam}.runtimeRequests.some((r) => r.status === "pending" && r.responseCapability.type !== "message")) return { type: "queue_after_active" };`,
+      });
+    }
+  }
+
+  if (targets.includes("orchestratorSteer")) {
+    // 3a. Mailbox / delegated-completion steering inside dispatchMessage
+    const noticeBlocks = [];
+    walkAst(ast, (n) => {
+      if (n.type !== "BlockStatement") return;
+      for (let i = 0; i < n.body.length; i++) {
+        const stmt = n.body[i];
+        if (stmt.type !== "VariableDeclaration") continue;
+        const decl = stmt.declarations.find((d) =>
+          d.id?.type === "Identifier" && d.id.name === "noticeKind" &&
+          text.slice(d.init?.start ?? 0, d.init?.end ?? 0).replace(/\s+/g, "") === "command.notification?.source.kind"
+        );
+        if (decl) noticeBlocks.push({ block: n, index: i });
+      }
+    });
+    if (noticeBlocks.length !== 1) throw new Error(`Orchestrator noticeKind block found ${noticeBlocks.length} times`);
+    const { block: noticeBlock, index: noticeIdx } = noticeBlocks[0];
+    const outerIf = noticeBlock.body.slice(noticeIdx + 1, noticeIdx + 4).find((s) => s.type === "IfStatement");
+    if (!outerIf || outerIf.consequent.type !== "BlockStatement") throw new Error("Orchestrator notice steering if-block changed shape");
+    const innerIfs = [];
+    for (const s of outerIf.consequent.body) {
+      if (s.type === "IfStatement") {
+        let assignsSteerActive = false;
+        walkAst(s.consequent, (n) => {
+          if (n.type === "AssignmentExpression" && n.left.type === "Identifier" && n.left.name === "dispatchMode" &&
+              n.right.type === "ObjectExpression" &&
+              n.right.properties.some((p) => staticPropKey(p) === "type" && p.value?.type === "Literal" && p.value.value === "steer_active")) {
+            assignsSteerActive = true;
+          }
+        });
+        if (assignsSteerActive) innerIfs.push(s);
+      }
+    }
+    if (innerIfs.length !== 1) throw new Error(`Orchestrator notice inner steer_active if found ${innerIfs.length} times`);
+    const innerIf = innerIfs[0];
+    const innerTerms = collectAndTerms(innerIf.test);
+    const hasActiveChecks = countIdentifiers(innerIf.test, "active") > 0 &&
+      countIdentifiers(innerIf.test, "activeTurn") > 0 &&
+      countIdentifiers(innerIf.test, "providerSessionId") > 0;
+    if (!hasActiveChecks || innerIf.test.type !== "LogicalExpression" || innerIf.test.operator !== "&&") {
+      throw new Error("Orchestrator notice inner steer condition changed shape");
+    }
+    const hasPendingGuard = hasNegatedPendingGuard(outerIf.test, ast, "projection") || hasNegatedPendingGuard(innerIf.test, ast, "projection");
+    const hasFollowUpGuard = collectAndTerms(outerIf.test).some(isFollowUpGuardTerm) || innerTerms.some(isFollowUpGuardTerm);
+    if (!hasPendingGuard || !hasFollowUpGuard) {
+      if (!hasPendingGuard &&
+          (countIdentifiers(outerIf.test, "runtimeRequests") > 0 || countIdentifiers(outerIf.test, "waitsOnPendingRequest") > 0 ||
+           countIdentifiers(innerIf.test, "runtimeRequests") > 0 || countIdentifiers(innerIf.test, "waitsOnPendingRequest") > 0)) {
+        throw new Error("Orchestrator notice steering has unexpected pending-request guard");
+      }
+      if (!hasFollowUpGuard &&
+          (countIdentifiers(outerIf.test, "steerFollowUpOfRunId") > 0 || countIdentifiers(innerIf.test, "steerFollowUpOfRunId") > 0)) {
+        throw new Error("Orchestrator notice steering has unexpected steerFollowUpOfRunId guard");
+      }
+      const missing = [];
+      if (!hasFollowUpGuard) missing.push("command.steerFollowUpOfRunId === void 0");
+      if (!hasPendingGuard) missing.push('!projection.runtimeRequests.some((r) => r.status === "pending" && r.responseCapability.type !== "message")');
+      edits.push({
+        start: innerIf.test.start,
+        end: innerIf.test.start,
+        replacement: `${AG_STEER_MARK} ${missing.join(" && ")} && `,
+      });
+    }
+
+    // 3b. dispatchQueuedMessagePromoteToSteer: guard goal-stop and early-return before steerWhenReadyRunId / cancel / dispatchSteerIntoRun.
+    const promoteCalls = findEffectFnCalls(ast, "Orchestrator.dispatchQueuedMessagePromoteToSteer");
+    if (promoteCalls.length !== 1) throw new Error(`Orchestrator.dispatchQueuedMessagePromoteToSteer found ${promoteCalls.length} times`);
+    const promoteFn = promoteCalls[0].arguments[0];
+    if (promoteFn?.type !== "FunctionExpression" || !promoteFn.generator || promoteFn.body?.type !== "BlockStatement") {
+      throw new Error("dispatchQueuedMessagePromoteToSteer signature changed shape");
+    }
+    const promoteBody = promoteFn.body.body;
+    const goalIfIdx = promoteBody.findIndex((s) =>
+      s.type === "IfStatement" &&
+      s.test.type === "LogicalExpression" && s.test.operator === "||" &&
+      countIdentifiers(s.test.left, "goalCommand") > 0 &&
+      countIdentifiers(s.test.right, "isSlashCommand") > 0
+    );
+    if (goalIfIdx < 0) throw new Error("dispatchQueuedMessagePromoteToSteer goal/slash branch changed shape");
+    const goalIf = promoteBody[goalIfIdx];
+    const stopsDecls = [];
+    walkAst(goalIf.consequent, (n) => {
+      if (n.type === "VariableDeclarator" && n.id?.type === "Identifier" && n.id.name === "stops") stopsDecls.push(n);
+    });
+    if (stopsDecls.length !== 1) throw new Error(`dispatchQueuedMessagePromoteToSteer goal stops declaration found ${stopsDecls.length} times`);
+    const stopsDecl = stopsDecls[0];
+    if (!hasNegatedPendingGuard(stopsDecl.init, ast, "projection")) {
+      if (countIdentifiers(stopsDecl.init, "runtimeRequests") > 0 || countIdentifiers(stopsDecl.init, "waitsOnPendingRequest") > 0) {
+        throw new Error("dispatchQueuedMessagePromoteToSteer goal stops has unexpected pending-request guard");
+      }
+      if (stopsDecl.init?.type !== "LogicalExpression" || stopsDecl.init.operator !== "&&" || countIdentifiers(stopsDecl.init, "goalCommandStopsActiveRun") !== 1) {
+        throw new Error("dispatchQueuedMessagePromoteToSteer goal stops expression changed shape");
+      }
+      edits.push({
+        start: stopsDecl.init.start,
+        end: stopsDecl.init.start,
+        replacement: `${AG_STEER_MARK} !projection.runtimeRequests.some((r) => r.status === "pending" && r.responseCapability.type !== "message") && `,
+      });
+    }
+    const steerReadyIndices = [];
+    for (let i = goalIfIdx + 1; i < promoteBody.length; i++) {
+      if (promoteBody[i].type === "IfStatement" && countIdentifiers(promoteBody[i].consequent, "steerWhenReadyRunId") > 0) {
+        steerReadyIndices.push(i);
+      }
+    }
+    if (steerReadyIndices.length !== 1) throw new Error(`dispatchQueuedMessagePromoteToSteer steerWhenReadyRunId branch found ${steerReadyIndices.length} times`);
+    const steerReadyIdx = steerReadyIndices[0];
+    const hasDispatchSteerAfter = promoteBody.slice(steerReadyIdx + 1).some((s) => countIdentifiers(s, "dispatchSteerIntoRun") > 0);
+    if (!hasDispatchSteerAfter) throw new Error("dispatchQueuedMessagePromoteToSteer missing dispatchSteerIntoRun after steerWhenReadyRunId branch");
+    const between = promoteBody.slice(goalIfIdx + 1, steerReadyIdx);
+    const hasPromotePendingGuard = between.some((s) =>
+      s.type === "IfStatement" && !s.alternate &&
+      isPositivePendingRequestExpr(s.test, ast, "projection") &&
+      isUnconditionalReturnNoSteer(s.consequent)
+    );
+    if (!hasPromotePendingGuard) {
+      if (between.some((s) => countIdentifiers(s, "runtimeRequests") > 0 || countIdentifiers(s, "waitsOnPendingRequest") > 0)) {
+        throw new Error("dispatchQueuedMessagePromoteToSteer has unexpected pending-request guard");
+      }
+      const anchor = promoteBody[steerReadyIdx];
+      edits.push({
+        start: anchor.start,
+        end: anchor.start,
+        replacement: `if (${AG_STEER_MARK} projection.runtimeRequests.some((r) => r.status === "pending" && r.responseCapability.type !== "message")) return;\n\t\t`,
+      });
+    }
+  }
+
+  if (edits.length === 0) return { state: "already", text };
+  const next = applyTextEdits(text, edits);
+  acorn.parse(next, { ...PARSE, sourceType: "module" });
+  return { state: "patched", text: next };
+}
+
+const AG_QUOTA_MARK = "/*t3-keeper-ag-quota-v1*/";
+const AG_QUOTA_STATUS_ERROR_SRC = "/(CANCELLED|UNKNOWN|INVALID_ARGUMENT|DEADLINE_EXCEEDED|NOT_FOUND|ALREADY_EXISTS|PERMISSION_DENIED|RESOURCE_EXHAUSTED|FAILED_PRECONDITION|ABORTED|OUT_OF_RANGE|UNIMPLEMENTED|INTERNAL|UNAVAILABLE|DATA_LOSS|UNAUTHENTICATED) \\(code (\\d{3})\\): (\\P{Cc}+)/u";
+const AG_QUOTA_EXHAUSTED_SRC = '/(?:"reason"\\s*:\\s*"QUOTA_EXHAUSTED"|\\breason:QUOTA_EXHAUSTED\\b)/';
+const AG_QUOTA_RESET_TS_SRC = '/(?:"quotaResetTimeStamp"\\s*:\\s*"([^"\\s]+)"|\\bquotaResetTimeStamp:([^\\s\\],}]+))/';
+const AG_QUOTA_DURATION_GROUP = "((?:\\d+(?:\\.\\d+)?(?:ns|us|\\u00b5s|\\u03bcs|ms|h|m|s))+)";
+const AG_QUOTA_RESET_DELAY_SRC = `/(?:"quotaResetDelay"\\s*:\\s*"${AG_QUOTA_DURATION_GROUP}"|\\bquotaResetDelay:${AG_QUOTA_DURATION_GROUP}(?=[\\s\\],}]|$))/`;
+const AG_QUOTA_RETRY_DELAY_SRC = `/(?:"retryDelay"\\s*:\\s*"${AG_QUOTA_DURATION_GROUP}"|\\bretryDelay:${AG_QUOTA_DURATION_GROUP}(?=[\\s\\],}]|$))/`;
+
+function findUniqueTopVar(ast, name) {
+  const hits = topLevelDecls(ast)
+    .filter((n) => n.type === "VariableDeclaration")
+    .flatMap((n) => n.declarations)
+    .filter((d) => d.id?.type === "Identifier" && d.id.name === name);
+  if (hits.length !== 1) throw new Error(`${name} declared ${hits.length} times`);
+  return hits[0];
+}
+
+function compileQuotaRegex(decl, ast) {
+  if (decl.init?.type === "Literal" && decl.init.regex) {
+    return new RegExp(decl.init.regex.pattern, decl.init.regex.flags);
+  }
+  // Support upstream PR #40244's `delayPattern("quotaResetDelay")` / `delayPattern("retryDelay")` without eval.
+  if (decl.init?.type === "CallExpression" &&
+      decl.init.callee.type === "Identifier" && decl.init.callee.name === "delayPattern" &&
+      decl.init.arguments.length === 1 &&
+      decl.init.arguments[0].type === "Literal" && typeof decl.init.arguments[0].value === "string") {
+    const field = decl.init.arguments[0].value;
+    const durDecl = findUniqueTopVar(ast, "GO_DURATION");
+    const patDecl = findUniqueTopVar(ast, "delayPattern");
+    if (durDecl.init?.type !== "Literal" || typeof durDecl.init.value !== "string") return null;
+    const goDur = durDecl.init.value;
+    let tmpl = null;
+    walkAst(patDecl.init, (n) => {
+      if (n.type === "NewExpression" && n.callee.type === "Identifier" && n.callee.name === "RegExp" &&
+          n.arguments.length === 1 && n.arguments[0].type === "TemplateLiteral") {
+        tmpl = n.arguments[0];
+      }
+    });
+    if (!tmpl) return null;
+    let built = "";
+    for (let i = 0; i < tmpl.quasis.length; i++) {
+      built += tmpl.quasis[i].value.cooked ?? tmpl.quasis[i].value.raw;
+      if (i < tmpl.expressions.length) {
+        const expr = tmpl.expressions[i];
+        if (expr.type === "Identifier" && expr.name === "GO_DURATION") built += goDur;
+        else if (expr.type === "Identifier" && patDecl.init.params?.[0]?.type === "Identifier" && expr.name === patDecl.init.params[0].name) built += field;
+        else return null;
+      }
+    }
+    return new RegExp(built);
+  }
+  return null;
+}
+
+const pickGroup = (m) => m?.[1] ?? m?.[2];
+
+function normalizeMicro(s) {
+  return s.replaceAll("\\u00b5", "\u00b5").replaceAll("\\u03bc", "\u03bc");
+}
+
+function buildResetAtFrom({ textParam, nowParam, isSomeFn, makeFn, formatIsoFn, addFn }) {
+  return [
+    `function resetAtFrom(${textParam}, ${nowParam}) {`,
+    `\t${AG_QUOTA_MARK}`,
+    `\tconst pick = (m) => m?.[1] ?? m?.[2];`,
+    `\tconst parseDelay = (re) => {`,
+    `\t\tconst delay = pick(re.exec(${textParam}));`,
+    `\t\tif (delay === void 0) return void 0;`,
+    `\t\tlet delayMs = 0;`,
+    `\t\tfor (const [, amount, unit] of delay.matchAll(GO_DURATION_PART)) delayMs += Number(amount) * (GO_DURATION_UNIT_MS[unit] ?? 0);`,
+    `\t\treturn delayMs > 0 ? Math.ceil(delayMs) : void 0;`,
+    `\t};`,
+    `\tconst timestamp = pick(RESET_TIMESTAMP.exec(${textParam}));`,
+    `\tconst validTimestamp = timestamp !== void 0 && ${isSomeFn}(${makeFn}(timestamp));`,
+    `\tif (validTimestamp && Date.parse(timestamp) > Date.parse(${formatIsoFn}(${nowParam}))) return timestamp;`,
+    `\tconst delayMs = parseDelay(RESET_DELAY) ?? parseDelay(RETRY_DELAY);`,
+    `\treturn delayMs !== void 0 ? ${formatIsoFn}(${addFn}(${nowParam}, { milliseconds: delayMs })) : validTimestamp ? timestamp : void 0;`,
+    `}`,
+  ].join("\n");
+}
+
+function calleeBaseName(callee) {
+  const c = unwrapChain(callee);
+  if (c?.type === "Identifier") return c.name.replace(/\$\d+$/, "");
+  if (c?.type === "MemberExpression" && !c.computed && c.property.type === "Identifier") {
+    return c.property.name.replace(/\$\d+$/, "");
+  }
+  return null;
+}
+
+function isComputedLitMember(node, objName, idx) {
+  const expr = unwrapChain(node);
+  return !!expr && expr.type === "MemberExpression" && expr.computed &&
+    expr.object.type === "Identifier" && expr.object.name === objName &&
+    expr.property.type === "Literal" && expr.property.value === idx;
+}
+
+function isDualCaptureHelper(fnNode) {
+  if (!fnNode || fnNode.params?.length !== 1 || fnNode.params[0].type !== "Identifier") return false;
+  const m = fnNode.params[0].name;
+  const expr = extractSingleReturnExpr(fnNode);
+  return !!expr && expr.type === "LogicalExpression" && (expr.operator === "??" || expr.operator === "||") &&
+    isComputedLitMember(expr.left, m, 1) && isComputedLitMember(expr.right, m, 2);
+}
+
+function isGoDurationConstantsValid(ast) {
+  let partDecl, unitDecl;
+  try {
+    partDecl = findUniqueTopVar(ast, "GO_DURATION_PART");
+    unitDecl = findUniqueTopVar(ast, "GO_DURATION_UNIT_MS");
+  } catch {
+    return false;
+  }
+  if (partDecl.init?.type !== "Literal" || !partDecl.init.regex || !partDecl.init.regex.flags.includes("g")) return false;
+  const partRe = new RegExp(partDecl.init.regex.pattern, partDecl.init.regex.flags);
+  const parts = [...("1h2m3.5s".matchAll(partRe))].map((m) => [m[1], m[2]]);
+  const subMs = [...("0.0001s".matchAll(partRe))].map((m) => [m[1], m[2]]);
+  const micro1 = [...("5\u00b5s".matchAll(partRe))].map((m) => [m[1], m[2]]);
+  const micro2 = [...("5\u03bcs".matchAll(partRe))].map((m) => [m[1], m[2]]);
+  if (parts.length !== 3 || parts[0][0] !== "1" || parts[0][1] !== "h" ||
+      parts[1][0] !== "2" || parts[1][1] !== "m" || parts[2][0] !== "3.5" || parts[2][1] !== "s" ||
+      subMs.length !== 1 || subMs[0][0] !== "0.0001" || subMs[0][1] !== "s" ||
+      micro1.length !== 1 || micro1[0][0] !== "5" || micro1[0][1] !== "\u00b5s" ||
+      micro2.length !== 1 || micro2[0][0] !== "5" || micro2[0][1] !== "\u03bcs") {
+    return false;
+  }
+  if (unitDecl.init?.type !== "ObjectExpression") return false;
+  const units = new Map();
+  for (const prop of unitDecl.init.properties) {
+    const k = staticPropKey(prop);
+    if (k !== null && prop.value?.type === "Literal" && typeof prop.value.value === "number") {
+      units.set(k, prop.value.value);
+    }
+  }
+  return units.get("ms") === 1 && units.get("s") === 1000 && units.get("m") === 60000 &&
+    units.get("h") === 3600000 && units.get("us") === 0.001 && units.get("ns") === 1e-6 &&
+    units.get("\u00b5s") === 0.001 && units.get("\u03bcs") === 0.001;
+}
+
+function isDurationProduct(expr, amount, unit) {
+  if (!expr || expr.type !== "BinaryExpression" || expr.operator !== "*") return false;
+  const isAmount = (n) =>
+    (n?.type === "CallExpression" && n.callee.type === "Identifier" && n.callee.name === "Number" &&
+     n.arguments.length === 1 && n.arguments[0].type === "Identifier" && n.arguments[0].name === amount) ||
+    (n?.type === "UnaryExpression" && n.operator === "+" && n.argument?.type === "Identifier" && n.argument.name === amount);
+  const isUnitLookup = (n) => {
+    const raw = (n?.type === "LogicalExpression" && (n.operator === "??" || n.operator === "||") &&
+      n.right?.type === "Literal" && n.right.value === 0) ? n.left : n;
+    return raw?.type === "MemberExpression" && raw.computed &&
+      raw.object.type === "Identifier" && raw.object.name === "GO_DURATION_UNIT_MS" &&
+      raw.property.type === "Identifier" && raw.property.name === unit;
+  };
+  return (isAmount(expr.left) && isUnitLookup(expr.right)) || (isAmount(expr.right) && isUnitLookup(expr.left));
+}
+
+function isDurationLoopBody(stmts, delayIdent) {
+  if (stmts.length !== 4) return false;
+  const [guardStmt, initStmt, loopStmt, retStmt] = stmts;
+  // 1. if (delay === void 0) return void 0;
+  if (guardStmt.type !== "IfStatement" || guardStmt.alternate) return false;
+  const isStrictUndefCheck = (t) => t.type === "BinaryExpression" && t.operator === "===" &&
+    ((t.left.type === "Identifier" && t.left.name === delayIdent && isUndefinedNode(t.right)) ||
+     (t.right.type === "Identifier" && t.right.name === delayIdent && isUndefinedNode(t.left)));
+  const isLooseNullishCheck = (t) => t.type === "BinaryExpression" && t.operator === "==" &&
+    ((t.left.type === "Identifier" && t.left.name === delayIdent && isVoidZeroOrNull(t.right)) ||
+     (t.right.type === "Identifier" && t.right.name === delayIdent && isVoidZeroOrNull(t.left)));
+  const missingDelay = isStrictUndefCheck(guardStmt.test) || isLooseNullishCheck(guardStmt.test) ||
+    (guardStmt.test.type === "UnaryExpression" && guardStmt.test.operator === "!" &&
+     guardStmt.test.argument.type === "Identifier" && guardStmt.test.argument.name === delayIdent);
+  let guardRet = guardStmt.consequent;
+  if (guardRet.type === "BlockStatement" && guardRet.body.length === 1) guardRet = guardRet.body[0];
+  if (!missingDelay || guardRet.type !== "ReturnStatement" || (guardRet.argument !== null && !isUndefinedNode(guardRet.argument))) {
+    return false;
+  }
+  // 2. let delayMs = 0;
+  if (initStmt.type !== "VariableDeclaration" || (initStmt.kind !== "let" && initStmt.kind !== "var") || initStmt.declarations.length !== 1) return false;
+  const initDecl = initStmt.declarations[0];
+  if (initDecl.id?.type !== "Identifier" || initDecl.init?.type !== "Literal" || initDecl.init.value !== 0) return false;
+  const acc = initDecl.id.name;
+  // 3. for (const [, amount, unit] of delay.matchAll(GO_DURATION_PART)) delayMs += Number(amount) * (GO_DURATION_UNIT_MS[unit] ?? 0);
+  if (loopStmt.type !== "ForOfStatement" || loopStmt.left.type !== "VariableDeclaration" || loopStmt.left.declarations.length !== 1) {
+    return false;
+  }
+  const pat = loopStmt.left.declarations[0].id;
+  if (pat?.type !== "ArrayPattern" || pat.elements.length !== 3 ||
+      pat.elements[1]?.type !== "Identifier" || pat.elements[2]?.type !== "Identifier") {
+    return false;
+  }
+  const amount = pat.elements[1].name;
+  const unit = pat.elements[2].name;
+  if (loopStmt.right.type !== "CallExpression" ||
+      !isMemberIdent(loopStmt.right.callee, delayIdent, "matchAll") ||
+      loopStmt.right.arguments.length !== 1 ||
+      loopStmt.right.arguments[0].type !== "Identifier" ||
+      loopStmt.right.arguments[0].name !== "GO_DURATION_PART") {
+    return false;
+  }
+  let loopBody = loopStmt.body;
+  if (loopBody.type === "BlockStatement") {
+    if (loopBody.body.length !== 1) return false;
+    loopBody = loopBody.body[0];
+  }
+  if (loopBody.type !== "ExpressionStatement" || loopBody.expression.type !== "AssignmentExpression") return false;
+  const assign = loopBody.expression;
+  if (assign.left.type !== "Identifier" || assign.left.name !== acc) return false;
+  const validAccum = (assign.operator === "+=" && isDurationProduct(assign.right, amount, unit)) ||
+    (assign.operator === "=" && assign.right.type === "BinaryExpression" && assign.right.operator === "+" &&
+     ((assign.right.left.type === "Identifier" && assign.right.left.name === acc && isDurationProduct(assign.right.right, amount, unit)) ||
+      (assign.right.right.type === "Identifier" && assign.right.right.name === acc && isDurationProduct(assign.right.left, amount, unit))));
+  if (!validAccum) return false;
+  // 4. return delayMs > 0 ? Math.ceil(delayMs) : void 0;
+  if (retStmt.type !== "ReturnStatement" || retStmt.argument?.type !== "ConditionalExpression") return false;
+  const cond = retStmt.argument;
+  const positiveTest = cond.test.type === "BinaryExpression" &&
+    ((cond.test.operator === ">" && cond.test.left.type === "Identifier" && cond.test.left.name === acc && cond.test.right.type === "Literal" && cond.test.right.value === 0) ||
+     (cond.test.operator === "<" && cond.test.right.type === "Identifier" && cond.test.right.name === acc && cond.test.left.type === "Literal" && cond.test.left.value === 0));
+  const ceilAcc = cond.consequent.type === "CallExpression" &&
+    isMemberIdent(cond.consequent.callee, "Math", "ceil") &&
+    cond.consequent.arguments.length === 1 &&
+    cond.consequent.arguments[0].type === "Identifier" && cond.consequent.arguments[0].name === acc;
+  return positiveTest && ceilAcc && isUndefinedNode(cond.alternate);
+}
+
+function isRegexExecCall(node, reName, textParam) {
+  return node?.type === "CallExpression" &&
+    isMemberIdent(node.callee, reName, "exec") &&
+    node.arguments.length === 1 &&
+    node.arguments[0].type === "Identifier" && node.arguments[0].name === textParam;
+}
+
+function isMatchedRegexCall(node, matchFnName, reName, textParam) {
+  return node?.type === "CallExpression" &&
+    node.callee.type === "Identifier" && node.callee.name === matchFnName &&
+    node.arguments.length === 1 && isRegexExecCall(node.arguments[0], reName, textParam);
+}
+
+function isValidUpstreamResetAtFrom(fnNode, ast, textParam, nowParam) {
+  if (!isGoDurationConstantsValid(ast)) return false;
+  const body = fnNode.body.body;
+  let idx = 0;
+
+  // Optional local capture helper (`const pick = (m) => m?.[1] ?? m?.[2]`) or verified top-level `matchedValue`.
+  let matchFnName = null;
+  if (body[idx]?.type === "VariableDeclaration" && body[idx].declarations.length === 1 &&
+      body[idx].declarations[0].id?.type === "Identifier" && isDualCaptureHelper(body[idx].declarations[0].init)) {
+    matchFnName = body[idx].declarations[0].id.name;
+    idx += 1;
+  } else {
+    const topMatch = findTopLevelFnLike(ast, "matchedValue");
+    if (isDualCaptureHelper(topMatch)) matchFnName = "matchedValue";
+  }
+  if (!matchFnName) return false;
+
+  // Optional local `parseDelay(re)` helper OR verified top-level `parsePositiveDelayMs(delay)`.
+  let delayParserKind = null;
+  let delayParserName = null;
+  if (body[idx]?.type === "VariableDeclaration" && body[idx].declarations.length === 1 &&
+      body[idx].declarations[0].id?.type === "Identifier" &&
+      (body[idx].declarations[0].init?.type === "ArrowFunctionExpression" || body[idx].declarations[0].init?.type === "FunctionExpression")) {
+    const fn = body[idx].declarations[0].init;
+    if (fn.params.length === 1 && fn.params[0].type === "Identifier" && fn.body.type === "BlockStatement" && fn.body.body.length === 5) {
+      const reParam = fn.params[0].name;
+      const first = fn.body.body[0];
+      if (first.type === "VariableDeclaration" && first.declarations.length === 1 &&
+          first.declarations[0].id?.type === "Identifier" &&
+          isMatchedRegexCall(first.declarations[0].init, matchFnName, reParam, textParam) &&
+          isDurationLoopBody(fn.body.body.slice(1), first.declarations[0].id.name)) {
+        delayParserKind = "localRe";
+        delayParserName = body[idx].declarations[0].id.name;
+        idx += 1;
+      }
+    }
+  }
+  if (!delayParserKind) {
+    const topParse = findTopLevelFnLike(ast, "parsePositiveDelayMs");
+    if (topParse?.params?.length === 1 && topParse.params[0].type === "Identifier" &&
+        topParse.body?.type === "BlockStatement" &&
+        isDurationLoopBody(topParse.body.body, topParse.params[0].name)) {
+      delayParserKind = "topDelay";
+      delayParserName = "parsePositiveDelayMs";
+    }
+  }
+  if (!delayParserKind) return false;
+
+  // Remaining statements in resetAtFrom must be exactly the 5-step flow:
+  // 1) timestamp = matchFn(RESET_TIMESTAMP.exec(text))
+  // 2) parsedTimestamp / validTimestamp
+  // 3) if (valid && future) return timestamp
+  // 4) delayMs = parse(RESET_DELAY) ?? parse(RETRY_DELAY)
+  // 5) return delayMs !== void 0 ? formatIso(add(now, { milliseconds: delayMs })) : ...
+  const rest = body.slice(idx);
+  if (rest.length !== 5) return false;
+  const [tsStmt, validStmt, futureIf, delayStmt, finalRet] = rest;
+
+  // Step 1: timestamp
+  if (tsStmt.type !== "VariableDeclaration" || tsStmt.declarations.length !== 1) return false;
+  const tsDecl = tsStmt.declarations[0];
+  if (tsDecl.id?.type !== "Identifier" || !isMatchedRegexCall(tsDecl.init, matchFnName, "RESET_TIMESTAMP", textParam)) return false;
+  const tsVar = tsDecl.id.name;
+
+  // Step 2: parsedTimestamp (Option) OR validTimestamp (boolean)
+  if (validStmt.type !== "VariableDeclaration" || validStmt.declarations.length !== 1) return false;
+  const validDecl = validStmt.declarations[0];
+  if (validDecl.id?.type !== "Identifier") return false;
+  const validVar = validDecl.id.name;
+  const isMakeTs = (n) => n?.type === "CallExpression" && calleeBaseName(n.callee) === "make" &&
+    n.arguments.length === 1 && n.arguments[0].type === "Identifier" && n.arguments[0].name === tsVar;
+  const isNoneCall = (n) => n?.type === "CallExpression" && calleeBaseName(n.callee) === "none" && n.arguments.length === 0;
+  const isIsSomeCall = (n, argPred) => n?.type === "CallExpression" && calleeBaseName(n.callee) === "isSome" &&
+    n.arguments.length === 1 && argPred(n.arguments[0]);
+  const isTsEqUndef = (n, op) => {
+    if (n?.type !== "BinaryExpression" || n.operator !== op) return false;
+    const matchVal = (op === "===" || op === "!==") ? isUndefinedNode : isVoidZeroOrNull;
+    return (n.left.type === "Identifier" && n.left.name === tsVar && matchVal(n.right)) ||
+      (n.right.type === "Identifier" && n.right.name === tsVar && matchVal(n.left));
+  };
+
+  let tsKind = null;
+  if (validDecl.init?.type === "ConditionalExpression" &&
+      ((isTsEqUndef(validDecl.init.test, "===") && isNoneCall(validDecl.init.consequent) && isMakeTs(validDecl.init.alternate)) ||
+       (isTsEqUndef(validDecl.init.test, "!==") && isMakeTs(validDecl.init.consequent) && isNoneCall(validDecl.init.alternate)))) {
+    tsKind = "option";
+  } else if (validDecl.init?.type === "LogicalExpression" && validDecl.init.operator === "&&" &&
+      isTsEqUndef(validDecl.init.left, "!==") && isIsSomeCall(validDecl.init.right, isMakeTs)) {
+    tsKind = "bool";
+  }
+  if (!tsKind) return false;
+
+  const isTsValidExpr = (n) => tsKind === "option"
+    ? isIsSomeCall(n, (a) => a?.type === "Identifier" && a.name === validVar)
+    : (n?.type === "Identifier" && n.name === validVar);
+
+  // Step 3: future-only early return
+  if (futureIf.type !== "IfStatement" || futureIf.alternate) return false;
+  let futureRet = futureIf.consequent;
+  if (futureRet.type === "BlockStatement" && futureRet.body.length === 1) futureRet = futureRet.body[0];
+  if (futureRet.type !== "ReturnStatement" || futureRet.argument?.type !== "Identifier" || futureRet.argument.name !== tsVar) {
+    return false;
+  }
+  const futureTerms = collectAndTerms(futureIf.test);
+  if (futureTerms.length !== 2) return false;
+  const isFutureTerm = (n) => {
+    if (tsKind === "option" && n?.type === "CallExpression" && calleeBaseName(n.callee) === "isGreaterThan" &&
+        n.arguments.length === 2 &&
+        isMemberIdent(n.arguments[0], validVar, "value") &&
+        n.arguments[1].type === "Identifier" && n.arguments[1].name === nowParam) {
+      return true;
+    }
+    if (n?.type === "BinaryExpression" && (n.operator === ">" || n.operator === "<")) {
+      const lhs = n.operator === ">" ? n.left : n.right;
+      const rhs = n.operator === ">" ? n.right : n.left;
+      const isDateParseTs = lhs?.type === "CallExpression" && isMemberIdent(lhs.callee, "Date", "parse") &&
+        lhs.arguments.length === 1 && lhs.arguments[0].type === "Identifier" && lhs.arguments[0].name === tsVar;
+      const isDateParseNow = rhs?.type === "CallExpression" && isMemberIdent(rhs.callee, "Date", "parse") &&
+        rhs.arguments.length === 1 && rhs.arguments[0].type === "CallExpression" &&
+        calleeBaseName(rhs.arguments[0].callee) === "formatIso" &&
+        rhs.arguments[0].arguments.length === 1 &&
+        rhs.arguments[0].arguments[0].type === "Identifier" && rhs.arguments[0].arguments[0].name === nowParam;
+      return isDateParseTs && isDateParseNow;
+    }
+    return false;
+  };
+  const validFutureCheck = (isTsValidExpr(futureTerms[0]) && isFutureTerm(futureTerms[1])) ||
+    (isTsValidExpr(futureTerms[1]) && isFutureTerm(futureTerms[0]));
+  if (!validFutureCheck) return false;
+
+  // Step 4: delayMs = parse(RESET_DELAY) ?? parse(RETRY_DELAY) (strictly direct CallExpressions; rejects discarded sequences)
+  if (delayStmt.type !== "VariableDeclaration" || delayStmt.declarations.length !== 1) return false;
+  const delayDecl = delayStmt.declarations[0];
+  if (delayDecl.id?.type !== "Identifier" || delayDecl.init?.type !== "LogicalExpression" || delayDecl.init.operator !== "??") {
+    return false;
+  }
+  const delayVar = delayDecl.id.name;
+  const isDelayCall = (n, reName) => {
+    if (n?.type !== "CallExpression" || n.callee.type !== "Identifier" || n.callee.name !== delayParserName || n.arguments.length !== 1) {
+      return false;
+    }
+    return delayParserKind === "localRe"
+      ? (n.arguments[0].type === "Identifier" && n.arguments[0].name === reName)
+      : isMatchedRegexCall(n.arguments[0], matchFnName, reName, textParam);
+  };
+  if (!isDelayCall(delayDecl.init.left, "RESET_DELAY") || !isDelayCall(delayDecl.init.right, "RETRY_DELAY")) {
+    return false;
+  }
+
+  // Step 5: return delayMs !== void 0 ? formatIso(add(now, { milliseconds: delayMs })) : ...
+  if (finalRet.type !== "ReturnStatement" || finalRet.argument?.type !== "ConditionalExpression") return false;
+  const retCond = finalRet.argument;
+  const isDelayDef = (n, op) => {
+    if (n?.type !== "BinaryExpression" || n.operator !== op) return false;
+    const matchVal = (op === "===" || op === "!==") ? isUndefinedNode : isVoidZeroOrNull;
+    return (n.left.type === "Identifier" && n.left.name === delayVar && matchVal(n.right)) ||
+      (n.right.type === "Identifier" && n.right.name === delayVar && matchVal(n.left));
+  };
+  let delayBranch, fallbackBranch;
+  if (isDelayDef(retCond.test, "!==") || isDelayDef(retCond.test, "!=")) {
+    delayBranch = retCond.consequent;
+    fallbackBranch = retCond.alternate;
+  } else if (isDelayDef(retCond.test, "===") || isDelayDef(retCond.test, "==")) {
+    delayBranch = retCond.alternate;
+    fallbackBranch = retCond.consequent;
+  } else {
+    return false;
+  }
+  const isAddDelayIso = delayBranch?.type === "CallExpression" && calleeBaseName(delayBranch.callee) === "formatIso" &&
+    delayBranch.arguments.length === 1 &&
+    delayBranch.arguments[0].type === "CallExpression" && calleeBaseName(delayBranch.arguments[0].callee) === "add" &&
+    delayBranch.arguments[0].arguments.length === 2 &&
+    delayBranch.arguments[0].arguments[0].type === "Identifier" && delayBranch.arguments[0].arguments[0].name === nowParam &&
+    delayBranch.arguments[0].arguments[1].type === "ObjectExpression" &&
+    delayBranch.arguments[0].arguments[1].properties.length === 1 &&
+    staticPropKey(delayBranch.arguments[0].arguments[1].properties[0]) === "milliseconds" &&
+    delayBranch.arguments[0].arguments[1].properties[0].value?.type === "Identifier" &&
+    delayBranch.arguments[0].arguments[1].properties[0].value.name === delayVar;
+  if (!isAddDelayIso) return false;
+  const validFallback = isVoidZeroOrNull(fallbackBranch) ||
+    (fallbackBranch?.type === "ConditionalExpression" &&
+     isTsValidExpr(fallbackBranch.test) &&
+     fallbackBranch.consequent?.type === "Identifier" && fallbackBranch.consequent.name === tsVar &&
+     isVoidZeroOrNull(fallbackBranch.alternate));
+  return validFallback;
+}
+
+function classifyResetAtFrom(fnNode, ast, text) {
+  if (fnNode.params.length !== 2 || fnNode.params[0].type !== "Identifier" || fnNode.params[1].type !== "Identifier") {
+    throw new Error("resetAtFrom parameter list changed shape");
+  }
+  const textParam = fnNode.params[0].name;
+  const nowParam = fnNode.params[1].name;
+  const src = text.slice(fnNode.start, fnNode.end);
+
+  // Extract isSome(make(timestamp)) and formatIso(add(now, { milliseconds: ... })) bindings from AST.
+  const isSomeHits = [];
+  const formatAddHits = [];
+  walkAst(fnNode.body, (n) => {
+    if (n.type === "CallExpression" && n.callee.type === "Identifier" && n.arguments.length === 1 &&
+        n.arguments[0].type === "CallExpression" && n.arguments[0].callee.type === "Identifier" &&
+        n.arguments[0].arguments.length === 1 && n.arguments[0].arguments[0].type === "Identifier" &&
+        n.arguments[0].arguments[0].name === "timestamp") {
+      isSomeHits.push({ isSomeFn: n.callee.name, makeFn: n.arguments[0].callee.name });
+    }
+    if (n.type === "CallExpression" && n.callee.type === "Identifier" && n.arguments.length === 1 &&
+        n.arguments[0].type === "CallExpression" && n.arguments[0].callee.type === "Identifier" &&
+        n.arguments[0].arguments.length === 2 &&
+        n.arguments[0].arguments[0].type === "Identifier" && n.arguments[0].arguments[0].name === nowParam &&
+        n.arguments[0].arguments[1].type === "ObjectExpression" &&
+        n.arguments[0].arguments[1].properties.some((p) => staticPropKey(p) === "milliseconds")) {
+      formatAddHits.push({ formatIsoFn: n.callee.name, addFn: n.arguments[0].callee.name });
+    }
+  });
+
+  // 1. Our own keeper helper (exact match -> already; older keeper version -> upgrade in place).
+  if (src.includes("/*t3-keeper-ag-quota-")) {
+    if (isSomeHits.length !== 1 || formatAddHits.length !== 1) {
+      throw new Error("resetAtFrom keeper helper is malformed; run --restore first");
+    }
+    const want = buildResetAtFrom({ textParam, nowParam, ...isSomeHits[0], ...formatAddHits[0] });
+    if (src === want) return { state: "ready" };
+    return { state: "old", replacement: want };
+  }
+
+  // 2. Known pre-fix shape: reads only ?.[1], returns valid timestamp unconditionally without checking > now.
+  const body = fnNode.body.body;
+  const readsOnlyGroup1 = (() => {
+    let g1 = 0, g2 = 0;
+    walkAst(fnNode.body, (n) => {
+      if (n.type === "MemberExpression" && n.computed && n.property.type === "Literal") {
+        if (n.property.value === 1) g1 += 1;
+        if (n.property.value === 2) g2 += 1;
+      }
+    });
+    return g1 === 3 && g2 === 0;
+  })();
+  const hasEarlyUnconditionalTsReturn = body.some((s) =>
+    s.type === "IfStatement" &&
+    s.consequent.type === "ReturnStatement" &&
+    s.consequent.argument?.type === "Identifier" && s.consequent.argument.name === "timestamp" &&
+    !text.slice(s.test.start, s.test.end).includes("Date.parse") &&
+    !text.slice(s.test.start, s.test.end).includes("isGreaterThan")
+  );
+  if (readsOnlyGroup1 && hasEarlyUnconditionalTsReturn && isSomeHits.length === 1 && formatAddHits.length === 1) {
+    return { state: "old", replacement: buildResetAtFrom({ textParam, nowParam, ...isSomeHits[0], ...formatAddHits[0] }) };
+  }
+
+  // 3. Upstream fixed shape (e.g. PR #40244): structurally verify dual-capture helper,
+  //    real duration conversion loop with Math.ceil(delayMs), future-only timestamp guard,
+  //    direct RESET_DELAY ?? RETRY_DELAY fallback, and add(now, { milliseconds: delayMs }).
+  if (isValidUpstreamResetAtFrom(fnNode, ast, textParam, nowParam)) {
+    return { state: "ready" };
+  }
+  throw new Error("resetAtFrom has unexpected shape");
+}
+
+/**
+ * antigravityQuotaOutcome: updates AntigravityTurnOutcome's 5 regexes and resetAtFrom helper
+ * to parse Antigravity 1.5 JSON quota payloads and future/delay reset times (upstream #40244).
+ * Classifies all 6 components independently and yields ("already") only when all 6 satisfy contract.
+ */
+function unitAntigravityQuotaOutcome(text) {
+  if (!text.includes("AntigravityTurnOutcome.watch")) {
+    throw new Error("AntigravityTurnOutcome.watch marker missing");
+  }
+  const ast = acorn.parse(text, { ...PARSE, sourceType: "module" });
+  const statusDecl = findUniqueTopVar(ast, "STATUS_ERROR");
+  const quotaDecl = findUniqueTopVar(ast, "QUOTA_EXHAUSTED");
+  const tsDecl = findUniqueTopVar(ast, "RESET_TIMESTAMP");
+  const resetDelayDecl = findUniqueTopVar(ast, "RESET_DELAY");
+  const retryDelayDecl = findUniqueTopVar(ast, "RETRY_DELAY");
+  const resetFns = topLevelDecls(ast).filter((n) => n.type === "FunctionDeclaration" && n.id?.name === "resetAtFrom");
+  if (resetFns.length !== 1) throw new Error(`resetAtFrom declared ${resetFns.length} times`);
+  const resetFn = resetFns[0];
+
+  const edits = [];
+
+  // 1. STATUS_ERROR
+  const statusRe = compileQuotaRegex(statusDecl, ast);
+  if (!statusRe) throw new Error("STATUS_ERROR is not a recognized regex");
+  const statusReady = (() => {
+    const m1 = statusRe.exec("ARESOURCE_EXHAUSTED (code 429): Individual quota reached.");
+    const m2 = statusRe.exec("ZINTERNAL (code 500): Internal error");
+    const m3 = statusRe.exec("FOOBAR (code 429): fake");
+    return m1?.[1] === "RESOURCE_EXHAUSTED" && m1?.[2] === "429" && m1?.[3] === "Individual quota reached." &&
+      m2?.[1] === "INTERNAL" && m2?.[2] === "500" && m3 === null;
+  })();
+  if (!statusReady) {
+    if (statusDecl.init?.type === "Literal" && statusDecl.init.regex?.pattern === "(?<![A-Z_])([A-Z_]+) \\(code (\\d{3})\\): (\\P{Cc}+)" && statusDecl.init.regex.flags === "u") {
+      edits.push({ start: statusDecl.init.start, end: statusDecl.init.end, replacement: AG_QUOTA_STATUS_ERROR_SRC });
+    } else {
+      throw new Error("STATUS_ERROR has unexpected shape");
+    }
+  }
+
+  // 2. QUOTA_EXHAUSTED
+  const quotaRe = compileQuotaRegex(quotaDecl, ast);
+  if (!quotaRe) throw new Error("QUOTA_EXHAUSTED is not a recognized regex");
+  const quotaReady = quotaRe.test('{"reason": "QUOTA_EXHAUSTED"}') && quotaRe.test("[reason:QUOTA_EXHAUSTED]") && !quotaRe.test('{"reason": "OTHER"}');
+  if (!quotaReady) {
+    if (quotaDecl.init?.type === "Literal" && quotaDecl.init.regex?.pattern === "\\breason:QUOTA_EXHAUSTED\\b" && quotaDecl.init.regex.flags === "") {
+      edits.push({ start: quotaDecl.init.start, end: quotaDecl.init.end, replacement: AG_QUOTA_EXHAUSTED_SRC });
+    } else {
+      throw new Error("QUOTA_EXHAUSTED has unexpected shape");
+    }
+  }
+
+  // 3. RESET_TIMESTAMP
+  const tsRe = compileQuotaRegex(tsDecl, ast);
+  if (!tsRe) throw new Error("RESET_TIMESTAMP is not a recognized regex");
+  const tsReady = pickGroup(tsRe.exec('{"quotaResetTimeStamp": "2026-11-21T06:28:46Z", "x": 1}')) === "2026-11-21T06:28:46Z" &&
+    pickGroup(tsRe.exec("[quotaResetTimeStamp:2026-11-21T06:28:46Z]")) === "2026-11-21T06:28:46Z" &&
+    tsRe.exec('{"other": "2026-11-21T06:28:46Z"}') === null;
+  if (!tsReady) {
+    if (tsDecl.init?.type === "Literal" && tsDecl.init.regex?.pattern === "\\bquotaResetTimeStamp:([^\\s\\]]+)" && tsDecl.init.regex.flags === "") {
+      edits.push({ start: tsDecl.init.start, end: tsDecl.init.end, replacement: AG_QUOTA_RESET_TS_SRC });
+    } else {
+      throw new Error("RESET_TIMESTAMP has unexpected shape");
+    }
+  }
+
+  // 4. RESET_DELAY
+  const resetDelayRe = compileQuotaRegex(resetDelayDecl, ast);
+  if (!resetDelayRe) throw new Error("RESET_DELAY is not a recognized regex");
+  const resetDelayReady = pickGroup(resetDelayRe.exec('{"quotaResetDelay": "2h24m51s"}')) === "2h24m51s" &&
+    pickGroup(resetDelayRe.exec('{"quotaResetDelay": "0.0001s"}')) === "0.0001s" &&
+    pickGroup(resetDelayRe.exec("[quotaResetDelay:2h24m51s]")) === "2h24m51s" &&
+    resetDelayRe.exec('{"quotaResetDelay": "bad"}') === null;
+  if (!resetDelayReady) {
+    const oldPat = normalizeMicro("\\bquotaResetDelay:((?:\\d+(?:\\.\\d+)?(?:ns|us|\\u00b5s|\\u03bcs|ms|h|m|s))+)(?=[\\s\\]])");
+    if (resetDelayDecl.init?.type === "Literal" && normalizeMicro(resetDelayDecl.init.regex?.pattern ?? "") === oldPat && resetDelayDecl.init.regex.flags === "") {
+      edits.push({ start: resetDelayDecl.init.start, end: resetDelayDecl.init.end, replacement: AG_QUOTA_RESET_DELAY_SRC });
+    } else {
+      throw new Error("RESET_DELAY has unexpected shape");
+    }
+  }
+
+  // 5. RETRY_DELAY
+  const retryDelayRe = compileQuotaRegex(retryDelayDecl, ast);
+  if (!retryDelayRe) throw new Error("RETRY_DELAY is not a recognized regex");
+  const retryDelayReady = pickGroup(retryDelayRe.exec('{"retryDelay": "0.0001s"}')) === "0.0001s" &&
+    pickGroup(retryDelayRe.exec("[retryDelay:15s]")) === "15s" &&
+    retryDelayRe.exec('{"retryDelay": "bad"}') === null;
+  if (!retryDelayReady) {
+    const oldPat = normalizeMicro("\\bretryDelay:((?:\\d+(?:\\.\\d+)?(?:ns|us|\\u00b5s|\\u03bcs|ms|h|m|s))+)(?=[\\s\\]])");
+    if (retryDelayDecl.init?.type === "Literal" && normalizeMicro(retryDelayDecl.init.regex?.pattern ?? "") === oldPat && retryDelayDecl.init.regex.flags === "") {
+      edits.push({ start: retryDelayDecl.init.start, end: retryDelayDecl.init.end, replacement: AG_QUOTA_RETRY_DELAY_SRC });
+    } else {
+      throw new Error("RETRY_DELAY has unexpected shape");
+    }
+  }
+
+  // 6. resetAtFrom
+  const resetState = classifyResetAtFrom(resetFn, ast, text);
+  if (resetState.state === "old") {
+    edits.push({ start: resetFn.start, end: resetFn.end, replacement: resetState.replacement });
+  }
+
+  if (edits.length === 0) return { state: "already", text };
+  const next = applyTextEdits(text, edits);
+  acorn.parse(next, { ...PARSE, sourceType: "module" });
+  return { state: "patched", text: next };
+}
+
 /**
  * antigravityQuestions: wire extractElicitationForm into makeAntigravityAcpAdapterFlavor so
  * Antigravity ask_question cards fold qN + qN_other, keep custom answers unlocked, support
@@ -1676,6 +2889,8 @@ const UNITS = [
   { name: "titleGuide", file: "titleGuideFile", run: unitTitleGuide },
   { name: "geminiQuota", file: "geminiProbe", run: unitGeminiQuota },
   { name: "antigravityQuestions", file: "antigravityFlavor", run: unitAntigravityQuestions },
+  { name: "antigravitySteer", file: "acpSteer", run: unitAntigravitySteer },
+  { name: "antigravityQuotaOutcome", file: "antigravityOutcome", run: unitAntigravityQuotaOutcome },
   { name: "extras", file: "index", run: unitExtras }, // after wrap: it takes wrap's padding
   { name: "firstClick", file: "desktopMain", run: unitFirstClick },
 ];
@@ -1731,6 +2946,10 @@ function findTargets(fd, layout) {
     delegatedTitles: pickUnique(SERVER, /\.mjs$/, (t, ast) => hasTopLevelFunction(t, "threadTitle", ast)),
     geminiProbe: pickUnique(SERVER, /\.mjs$/, (t) => t.includes(ANTIGRAVITY_UA_MARK)),
     antigravityFlavor: pickUnique(SERVER, /\.mjs$/, (t, ast) => hasTopLevelFunction(t, "makeAntigravityAcpAdapterFlavor", ast)),
+    acpSteer: pickUnique(SERVER, /\.mjs$/, (t) => t.includes("AcpAdapterV2.steerWithPrompt") && t.includes("AcpAdapterV2.steerTurn")),
+    dispatchPolicy: pickUnique(SERVER, /\.mjs$/, (t, ast) => hasTopLevelFunction(t, "resolveMessageDispatchIntent", ast)),
+    orchestratorSteer: pickUnique(SERVER, /\.mjs$/, (t) => t.includes("Orchestrator.dispatchQueuedMessagePromoteToSteer") && t.includes("command.notification?.source.kind")),
+    antigravityOutcome: pickUnique(SERVER, /\.mjs$/, (t, ast) => hasTopLevelFunction(t, "resetAtFrom", ast) && t.includes("AntigravityTurnOutcome.watch")),
     desktopMain: entryAt(layout.header, DESKTOP_MAIN) ? DESKTOP_MAIN : null,
   };
 }
@@ -1746,7 +2965,10 @@ function plan(fd, layout, targets) {
   const results = {};
   const texts = {};
   const fileSteps = {};
-  const serverSlots = ["binCli", "delegatedTitles", "sanitizeTitles", "ruleFile", "titleGuideFile", "geminiProbe", "antigravityFlavor"];
+  const serverSlots = [
+    "binCli", "delegatedTitles", "sanitizeTitles", "ruleFile", "titleGuideFile",
+    "geminiProbe", "antigravityFlavor", "acpSteer", "dispatchPolicy", "orchestratorSteer", "antigravityOutcome",
+  ];
   const isServerSlot = (file) => serverSlots.includes(file);
   const resolveSlot = (fileKey) => {
     const rel = targets[fileKey];
@@ -1765,7 +2987,15 @@ function plan(fd, layout, targets) {
   const recordStep = (file, name, applyFn) => {
     (fileSteps[file] ??= []).push({ name, apply: applyFn });
   };
-  const fitSlots = new Set();
+  const multiFileUnits = new Set(["fit", "antigravitySteer"]);
+  const permanentlyFailed = new Map();
+  const markFailed = (name, error) => {
+    const msg = typeof error === "string" ? error : error.message;
+    results[name] = { state: "failed", error: msg };
+    if (multiFileUnits.has(name) && !permanentlyFailed.has(name)) {
+      permanentlyFailed.set(name, msg);
+    }
+  };
   for (const unit of UNITS) {
     if (unit.name === "fit") {
       try {
@@ -1784,9 +3014,8 @@ function plan(fd, layout, targets) {
           grouped.get(slot).push(wrapper);
         }
         if (grouped.size === 0) {
-          results.fit = ctx.disabled.has("fit")
-            ? { state: "disabled" }
-            : { state: "failed", error: "binCli not found in this build" };
+          if (ctx.disabled.has("fit")) results.fit = { state: "disabled" };
+          else markFailed("fit", "binCli not found in this build");
           continue;
         }
         const staged = new Map();
@@ -1799,7 +3028,6 @@ function plan(fd, layout, targets) {
           texts[slot] = out.text;
           if (out.state === "patched") {
             fitState = "patched";
-            fitSlots.add(slot);
             recordStep(slot, "fit", (src, extra = {}) => unitFit(src, { ...opts, ...extra }).text);
           } else if (out.state === "retained" && fitState === "disabled") {
             fitState = "retained";
@@ -1807,13 +3035,45 @@ function plan(fd, layout, targets) {
         }
         results.fit = { state: fitState };
       } catch (error) {
-        results.fit = { state: "failed", error: error.message };
+        markFailed("fit", error);
+      }
+      continue;
+    }
+    if (unit.name === "antigravitySteer") {
+      try {
+        const steerTargets = [
+          ["acpSteer", resolveSlot("acpSteer"), "acpSteer bundle not found in this build"],
+          ["dispatchPolicy", resolveSlot("dispatchPolicy"), "dispatchPolicy bundle not found in this build"],
+          ["orchestratorSteer", resolveSlot("orchestratorSteer"), "orchestratorSteer bundle not found in this build"],
+        ];
+        const grouped = new Map();
+        for (const [targetName, slot, missingError] of steerTargets) {
+          if (!slot) throw new Error(missingError);
+          if (!grouped.has(slot)) grouped.set(slot, []);
+          grouped.get(slot).push(targetName);
+        }
+        const staged = new Map();
+        for (const [slot, subTargets] of grouped) {
+          const opts = { targets: subTargets };
+          staged.set(slot, { opts, out: unitAntigravitySteer(readTarget(slot), opts) });
+        }
+        let steerState = "already";
+        for (const [slot, { opts, out }] of staged) {
+          texts[slot] = out.text;
+          if (out.state === "patched") {
+            steerState = "patched";
+            recordStep(slot, "antigravitySteer", (src) => unitAntigravitySteer(src, opts).text);
+          }
+        }
+        results.antigravitySteer = { state: steerState };
+      } catch (error) {
+        markFailed("antigravitySteer", error);
       }
       continue;
     }
     const targetFile = resolveSlot(unit.file);
     if (!targetFile) {
-      results[unit.name] = { state: "failed", error: `${unit.file} not found in this build` };
+      markFailed(unit.name, `${unit.file} not found in this build`);
       continue;
     }
     const before = readTarget(targetFile);
@@ -1841,7 +3101,7 @@ function plan(fd, layout, targets) {
       results[unit.name] = { state: out.state, ...(out.error ? { error: out.error } : {}) };
       texts[targetFile] = out.text;
     } catch (error) {
-      results[unit.name] = { state: "failed", error: error.message };
+      markFailed(unit.name, error);
     }
   }
   const balanceFile = (file, text, patchedSet) => {
@@ -1868,19 +3128,21 @@ function plan(fd, layout, targets) {
     return { built: balanceFile(file, cur, patchedSet), patchedSet };
   };
   // If multiple server units together overflow a file's byte budget, replay them incrementally
-  // in UNITS order so earlier units (like fit) survive while only overflowing units fail.
-  const rebuildIncremental = (file, steps, { restoreFailed = false } = {}) => {
+  // in UNITS order while excluding any already-failed multi-file units so rollback never revives one.
+  const rebuildIncremental = (file, steps, excludedUnits, { restoreFailed = false } = {}) => {
     let cur = originals[file].toString("utf8");
     const kept = new Set();
     let built = null;
+    let newlyFailedMulti = false;
     for (const step of steps) {
+      if (excludedUnits.has(step.name)) continue;
       const candidateSet = new Set([...kept, step.name]);
       try {
         const next = step.apply(cur);
         built = balanceFile(file, next, candidateSet);
         cur = next;
         kept.add(step.name);
-        if (restoreFailed) results[step.name] = { state: "patched" };
+        if (restoreFailed && !excludedUnits.has(step.name)) results[step.name] = { state: "patched" };
       } catch (error) {
         if (step.name === "fit" && /no comment block could absorb/.test(error.message)) {
           try {
@@ -1888,17 +3150,21 @@ function plan(fd, layout, targets) {
             built = balanceFile(file, compactNext, candidateSet);
             cur = compactNext;
             kept.add(step.name);
-            if (restoreFailed) results[step.name] = { state: "patched" };
+            if (restoreFailed && !excludedUnits.has(step.name)) results[step.name] = { state: "patched" };
             continue;
           } catch (compactError) {
-            results[step.name] = { state: "failed", error: compactError.message };
+            const wasFailed = permanentlyFailed.has(step.name);
+            markFailed(step.name, compactError);
+            if (!wasFailed && permanentlyFailed.has(step.name)) newlyFailedMulti = true;
             continue;
           }
         }
-        results[step.name] = { state: "failed", error: error.message };
+        const wasFailed = permanentlyFailed.has(step.name);
+        markFailed(step.name, error);
+        if (!wasFailed && permanentlyFailed.has(step.name)) newlyFailedMulti = true;
       }
     }
-    return { built, kept };
+    return { built, kept, newlyFailedMulti };
   };
   const files = {};
   const publishedUnits = {};
@@ -1923,31 +3189,41 @@ function plan(fd, layout, targets) {
         } catch {}
       }
       if (steps.length > 1) {
-        const { built, kept } = rebuildIncremental(file, steps);
+        const { built, kept } = rebuildIncremental(file, steps, permanentlyFailed);
         if (built) {
           files[file] = built;
           publishedUnits[file] = kept;
         }
       } else {
         for (const name of patchedSet) {
-          if (results[name]?.state === "patched") results[name] = { state: "failed", error: error.message };
+          if (results[name]?.state === "patched") markFailed(name, error);
         }
       }
     }
   }
-  if (fitSlots.size > 0 && results.fit?.state === "failed") {
-    for (const file of fitSlots) {
-      if (!files[file] || !publishedUnits[file]?.has("fit")) continue;
-      const remaining = (fileSteps[file] ?? []).filter((s) => s.name !== "fit");
+  // Generalized atomic rollback across all multi-file units (fixed point): if any multi-file unit
+  // failed on any chunk, strip it from every shared/sibling chunk without reviving any other failed unit.
+  let rollbackChanged = true;
+  while (rollbackChanged) {
+    rollbackChanged = false;
+    for (const file of Object.keys(publishedUnits)) {
+      const pub = publishedUnits[file];
+      if (!pub || ![...pub].some((name) => permanentlyFailed.has(name))) continue;
+      const remaining = (fileSteps[file] ?? []).filter((s) => !permanentlyFailed.has(s.name));
       delete files[file];
       delete publishedUnits[file];
-      if (remaining.length === 0) continue;
-      const { built, kept } = rebuildIncremental(file, remaining, { restoreFailed: true });
-      if (built) {
-        files[file] = built;
-        publishedUnits[file] = kept;
+      if (remaining.length > 0) {
+        const { built, kept } = rebuildIncremental(file, remaining, permanentlyFailed, { restoreFailed: true });
+        if (built) {
+          files[file] = built;
+          publishedUnits[file] = kept;
+        }
       }
+      rollbackChanged = true;
     }
+  }
+  for (const [name, error] of permanentlyFailed) {
+    results[name] = { state: "failed", error };
   }
   return { results, files, missingHooks: scanWrapHooks(fd, layout) };
 }
@@ -2099,7 +3375,7 @@ function reminderPlanFrom(results, files) {
   const startupReasons = [];
   const serverFiles = Object.keys(files).filter((k) => k !== "index" && k !== "mainJs" && k !== "desktopMain");
   if (serverFiles.length > 0) {
-    for (const unit of ["rule", "fit", "titleGuide", "geminiQuota", "antigravityQuestions"]) {
+    for (const unit of ["rule", "fit", "titleGuide", "geminiQuota", "antigravityQuestions", "antigravitySteer", "antigravityQuotaOutcome"]) {
       if (results[unit]?.state === "patched") startupReasons.push(unit);
     }
     if (startupReasons.length === 0) startupReasons.push("server");
@@ -2339,7 +3615,7 @@ function cmdAuto() {
 
 // For test/keeper.test.mjs.
 export {
-  unitWrap, unitMinWidth, unitRule, unitFit, unitTitleGuide, unitGeminiQuota, unitAntigravityQuestions, unitExtras, unitFirstClick, finishBinCli, absorb, FIT_TITLE, FIT_TITLE_COMPACT, FIT_TITLE_V9, TITLE_GUIDE, ANTIGRAVITY_QUESTIONS_HELPER, WRAP_CSS, TMP_PREFIX,
+  unitWrap, unitMinWidth, unitRule, unitFit, unitTitleGuide, unitGeminiQuota, unitAntigravityQuestions, unitAntigravitySteer, unitAntigravityQuotaOutcome, unitExtras, unitFirstClick, finishBinCli, absorb, FIT_TITLE, FIT_TITLE_COMPACT, FIT_TITLE_V9, TITLE_GUIDE, ANTIGRAVITY_QUESTIONS_HELPER, WRAP_CSS, TMP_PREFIX,
   extrasBoot, EXTRAS_ID, STYLE_ID, cspAllowsLoader,
   readLayout, readEntry, writeEntries, findTargets, inspect, apply, asarIdentity, sha, removeStaleTemps, launchedByT3,
 };
