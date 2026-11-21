@@ -93,7 +93,7 @@ function legacyFit(text) {
 }
 
 const statesOf = (out) => Object.fromEntries(Object.entries(out.results).map(([name, r]) => [name, r.state]));
-const freshStates = { wrap: "patched", minWidth: "patched", rule: "patched", fit: "patched", titleGuide: "patched", geminiQuota: bundleOf(probeTarget(pristine)[0], pristine).includes(`${UA_MARK}1.0.0 `) ? "patched" : "already", extras: "patched", firstClick: "patched" };
+const freshStates = { wrap: "patched", minWidth: "patched", rule: "patched", fit: "patched", titleGuide: "patched", geminiQuota: bundleOf(probeTarget(pristine)[0], pristine).includes(`${UA_MARK}1.0.0 `) ? "patched" : "already", antigravityQuestions: "patched", extras: "patched", firstClick: "patched" };
 
 // ---------- parser-based room making (Astra round 1 fixtures) ----------
 
@@ -218,7 +218,7 @@ test("an already-patched v9 archive upgrades fit and titleGuide in place and is 
   for (const name of ["reminders.json", "reminder-journal.json"]) fs.rmSync(path.join(process.env.T3_KEEPER_HOME, name), { force: true });
   const archiveBytes = fs.statSync(asar).size;
   const result = K.apply({ reason: "v9 upgrade" });
-  assert.deepEqual(statesOf(result), { wrap: "already", minWidth: "already", rule: "already", fit: "patched", titleGuide: "patched", geminiQuota: "already", extras: "already", firstClick: "already" });
+  assert.deepEqual(statesOf(result), { wrap: "already", minWidth: "already", rule: "already", fit: "patched", titleGuide: "patched", geminiQuota: "already", antigravityQuestions: "already", extras: "already", firstClick: "already" });
   const after = binCliOf();
   assert.equal(Buffer.byteLength(after), Buffer.byteLength(legacy));
   assert.equal(fs.statSync(asar).size, archiveBytes);
@@ -947,7 +947,7 @@ test("split fit patches and disables both title bundles together", () => {
   fresh(); setDisabled(['fit']);
   const disabled = K.inspect(asar);
   assert.equal(disabled.results.fit.state, 'disabled');
-  assert.equal(disabled.files.delegatedTitles, undefined);
+  assert.ok(!disabled.files.delegatedTitles || !disabled.files.delegatedTitles.buf.toString().includes('function t3KeeperFitTitle('));
 });
 
 test("split fit refuses a missing delegate formatter without publishing half a fitter", () => {
@@ -962,7 +962,7 @@ test("split fit refuses a missing delegate formatter without publishing half a f
   } finally { fs.closeSync(fd); }
   const out = K.inspect(asar);
   assert.equal(out.results.fit.state, 'failed');
-  assert.equal(out.files.delegatedTitles, undefined);
+  assert.ok(!out.files.delegatedTitles || !out.files.delegatedTitles.buf.toString().includes('function t3KeeperFitTitle('));
   assert.ok(!out.files.binCli.buf.toString().includes('function t3KeeperFitTitle('));
 });
 

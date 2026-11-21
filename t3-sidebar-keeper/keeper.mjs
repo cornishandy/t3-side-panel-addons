@@ -12,6 +12,11 @@
  *   geminiQuota binCli-*.mjs      Antigravity limits probe sends a current version, so Google
  *                                 returns the Gemini quota rows (server: next T3 launch); builds
  *                                 that already send 2.24.0 or newer are left as they are
+ *   antigravityQuestions server-*.mjs
+ *                                 adds extractElicitationForm to Antigravity's ACP flavor so
+ *                                 ask_question folds qN + qN_other, unlocks custom answers, and
+ *                                 splits Claude-style headers/option descriptions (server: next
+ *                                 T3 launch); yields cleanly if upstream adds its own extractor
  *   extras    client/index.html   tiny inline loader for the t3-extras add-ons (127.0.0.1:8793);
  *                                 its bytes come out of wrap's <style> padding
  *   firstClick desktop main.cjs   acceptFirstMouse on the Mac window, so the first click on an
@@ -89,7 +94,7 @@ const USER_DATA = process.env.T3_USER_DATA_DIR || path.join(os.homedir(), "Libra
 const FRAMEWORK = path.join(APP, "Contents/Frameworks/Electron Framework.framework/Electron Framework");
 const STYLE_ID = "t3-keeper-sidebar-2"; // bump the number when WRAP_CSS changes
 const KEEP_BACKUPS = 3;
-const KEEPER_VERSION = 17; // bump when units change so --auto re-checks an already-handled build
+const KEEPER_VERSION = 18; // bump when units change so --auto re-checks an already-handled build
 const MIN_FREE_BYTES = 1024 ** 3;
 const TMP_PREFIX = ".app.asar.t3-keeper-";
 const PARSE = { ecmaVersion: "latest", allowHashBang: true };
@@ -915,7 +920,7 @@ function unitFit(text, ctx = {}) {
     }
     return { state: "patched", text: text.replace(FIT_TITLE_V9, () => FIT_TITLE).replace(oldWrapper, () => nextWrapper) };
   }
-  const wrappers = ctx.wrappers ?? (text.includes("function threadTitle(") ? FIT_WRAPPERS : FIT_WRAPPERS.slice(0, 2));
+  const wrappers = ctx.wrappers ?? (hasTopLevelFunction(text, "threadTitle") ? FIT_WRAPPERS : FIT_WRAPPERS.slice(0, 2));
   // sanitizeThreadTitle would cut at 117 UTF-16 units (can split an emoji) before our fitter sees it.
   const maxDecl = /^const MAX_THREAD_TITLE_CHARS = \d+;$/gm;
   if (wrappers.some(([n]) => n === "sanitizeThreadTitle") && ([...text.matchAll(maxDecl)].length !== 1 || text.split("MAX_THREAD_TITLE_CHARS").length !== 3)) {
@@ -984,13 +989,37 @@ function titleGuideBody(text) {
  * original byte length by shrinking or padding one real block comment. The
  * replacement keeps a line break, so automatic semicolon insertion can't change.
  */
-function finishBinCli(text, targetBytes, fitApplied) {
+function findNamedFunctions(node, names, out = []) {
+  if (!node || typeof node !== "object") return out;
+  if ((node.type === "FunctionDeclaration" || node.type === "FunctionExpression") &&
+      node.id?.type === "Identifier" && names.includes(node.id.name)) {
+    out.push(node);
+  }
+  for (const [k, v] of Object.entries(node)) {
+    if (k === "start" || k === "end" || k === "loc" || k === "type") continue;
+    if (Array.isArray(v)) {
+      for (const item of v) findNamedFunctions(item, names, out);
+    } else if (v && typeof v === "object" && typeof v.type === "string") {
+      findNamedFunctions(v, names, out);
+    }
+  }
+  return out;
+}
+
+function finishBinCli(text, targetBytes, fitApplied, extraTopFunctions = []) {
   const comments = [];
   const ast = acorn.parse(text, { ...PARSE, sourceType: "module", onComment: comments });
-  if (fitApplied) {
-    const top = ast.body.filter((n) => n.type === "FunctionDeclaration").map((n) => n.id.name);
-    for (const name of ["t3KeeperFitTitle", ...FIT_WRAPPERS.filter(([n]) => text.includes(`function ${n}(`)).flatMap(([n]) => [n, `${n}$t3orig`])]) {
-      if (top.filter((n) => n === name).length !== 1) throw new Error(`${name} is not a single top-level function`);
+  const top = ast.body.filter((n) => n.type === "FunctionDeclaration").map((n) => n.id.name);
+  const requiredTop = fitApplied
+    ? ["t3KeeperFitTitle", ...FIT_WRAPPERS.filter(([n]) => top.includes(n) || top.includes(`${n}$t3orig`)).flatMap(([n]) => [n, `${n}$t3orig`])]
+    : [];
+  for (const name of requiredTop) {
+    if (top.filter((n) => n === name).length !== 1) throw new Error(`${name} is not a single top-level function`);
+  }
+  if (extraTopFunctions.length > 0) {
+    const found = findNamedFunctions(ast, extraTopFunctions);
+    for (const name of extraTopFunctions) {
+      if (found.filter((n) => n.id.name === name).length !== 1) throw new Error(`${name} is not a single named function`);
     }
   }
   try { return absorb(text, targetBytes, "module", comments); }
@@ -998,7 +1027,11 @@ function finishBinCli(text, targetBytes, fitApplied) {
     if (!/no comment block could absorb/.test(error.message)) throw error;
     // Bundles without large comments: reclaim only whitespace between tokens.
     // Keep newlines (ASI) and every token/comment byte intact, then pad EOF.
-    const protectedFunctions = ast.body.filter((n) => n.type === "FunctionDeclaration" && ["t3KeeperFitTitle", ...FIT_WRAPPERS.map(([name]) => name)].includes(n.id.name));
+    const protectedTopNames = ["t3KeeperFitTitle", ...FIT_WRAPPERS.map(([name]) => name)];
+    const protectedFunctions = [
+      ...ast.body.filter((n) => n.type === "FunctionDeclaration" && protectedTopNames.includes(n.id.name)),
+      ...findNamedFunctions(ast, [ANTIGRAVITY_QUESTIONS_FN]),
+    ];
     let kept = "", end = 0;
     for (const token of acorn.tokenizer(text, { ...PARSE, sourceType: "module" })) {
       const gap = text.slice(end, token.start);
@@ -1007,7 +1040,8 @@ function finishBinCli(text, targetBytes, fitApplied) {
       kept += text.slice(token.start, token.end);
       end = token.end;
     }
-    kept += text.slice(end);
+    const tail = text.slice(end);
+    kept += /^[\r\n \t]*$/.test(tail) ? tail.replace(/[ \t]+/g, "") : tail;
     const room = targetBytes - Buffer.byteLength(kept);
     if (room < 0) throw error;
     if (!sameTokens(text, kept, "module")) throw new Error("server indentation reclaim changed tokens");
@@ -1016,7 +1050,7 @@ function finishBinCli(text, targetBytes, fitApplied) {
   }
 }
 
-/** Restore the original byte length by shrinking or padding one ASCII block comment that spans lines. */
+/** Restore the original byte length by shrinking or padding ASCII block comment(s) that span lines. */
 function absorb(text, targetBytes, sourceType, comments = null) {
   const delta = Buffer.byteLength(text) - targetBytes;
   if (delta === 0) return text;
@@ -1024,16 +1058,40 @@ function absorb(text, targetBytes, sourceType, comments = null) {
     comments = [];
     acorn.parse(text, { ...PARSE, sourceType, onComment: comments });
   }
+  const eligible = [];
   for (const c of comments) {
     if (c.type !== "Block") continue;
     const old = text.slice(c.start, c.end);
     if (!/^[\x00-\x7f]*$/.test(old) || !/[\n\r]/.test(old)) continue;
     const fill = old.length - delta - 5; // "/*" + "\n" + spaces + "*/"
-    if (fill < 0) continue;
-    const next = text.slice(0, c.start) + `/*\n${" ".repeat(fill)}*/` + text.slice(c.end);
-    if (Buffer.byteLength(next) !== targetBytes) continue;
-    acorn.parse(next, { ...PARSE, sourceType });
-    return next;
+    if (fill >= 0) {
+      const next = text.slice(0, c.start) + `/*\n${" ".repeat(fill)}*/` + text.slice(c.end);
+      if (Buffer.byteLength(next) === targetBytes) {
+        acorn.parse(next, { ...PARSE, sourceType });
+        return next;
+      }
+    }
+    if (old.length > 5) eligible.push({ start: c.start, end: c.end, maxSave: old.length - 5 });
+  }
+  if (delta > 0 && eligible.length > 1) {
+    let remaining = delta;
+    const edits = [];
+    for (const c of eligible.sort((a, b) => b.maxSave - a.maxSave)) {
+      if (remaining <= 0) break;
+      const take = Math.min(c.maxSave, remaining);
+      edits.push({ start: c.start, end: c.end, fill: c.maxSave - take });
+      remaining -= take;
+    }
+    if (remaining === 0) {
+      let next = text;
+      for (const e of edits.sort((a, b) => b.start - a.start)) {
+        next = next.slice(0, e.start) + `/*\n${" ".repeat(e.fill)}*/` + next.slice(e.end);
+      }
+      if (Buffer.byteLength(next) === targetBytes) {
+        acorn.parse(next, { ...PARSE, sourceType });
+        return next;
+      }
+    }
   }
   throw new Error(`no comment block could absorb ${delta} bytes`);
 }
@@ -1093,6 +1151,357 @@ function unitFirstClick(text) {
   return { state: "patched", text: text.slice(0, at) + FIRST_CLICK + text.slice(at) };
 }
 
+const ANTIGRAVITY_QUESTIONS_FN = "t3KeeperAntigravityElicitationForm";
+// Pure ASCII so byte length === string length and absorb()/reclaim stay exact.
+const ANTIGRAVITY_QUESTIONS_HELPER = String.raw`function t3KeeperAntigravityElicitationForm(request) {
+	/*t3-keeper-agq-1*/
+	const isRec = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+	const trim = (v) => (typeof v === "string" ? v.trim() : "");
+	if (!isRec(request) || request.mode !== "form" || !isRec(request.requestedSchema)) return void 0;
+	const schema = request.requestedSchema;
+	if (!isRec(schema.properties) || (Array.isArray(schema.required) && schema.required.length > 0)) return void 0;
+	const entries = Object.entries(schema.properties);
+	if (entries.length === 0) return void 0;
+	const groups = new Map();
+	for (const [key, prop] of entries) {
+		const m = /^q([1-9]\d*)(_other)?$/.exec(key);
+		if (!m || !isRec(prop)) return void 0;
+		const n = Number(m[1]);
+		let g = groups.get(n);
+		if (!g) groups.set(n, g = { id: "q" + n });
+		if (m[2]) g.other = prop;
+		else g.main = prop;
+	}
+	const isPlainStr = (p) => isRec(p) && p.type === "string" && !("oneOf" in p) && !("enum" in p) && !("anyOf" in p) && !("items" in p);
+	const readChoices = (list, isEnum) => {
+		if (!Array.isArray(list) || list.length === 0) return void 0;
+		const out = [];
+		const seen = new Set();
+		for (const item of list) {
+			let value, title, desc;
+			if (isEnum) {
+				if (typeof item !== "string" || !item.trim()) return void 0;
+				value = item;
+				title = item.trim();
+			} else {
+				if (!isRec(item) || typeof item.const !== "string" || !item.const.length) return void 0;
+				title = trim(item.title);
+				if (!title) return void 0;
+				value = item.const;
+				desc = trim(item.description);
+			}
+			if (seen.has(value)) return void 0;
+			seen.add(value);
+			let label = title;
+			let description = desc && desc !== title ? desc : title;
+			if (!desc) {
+				const sep = /\s+[\u2014\u2013]\s+/.exec(title);
+				if (sep) {
+					const left = title.slice(0, sep.index).trim();
+					const right = title.slice(sep.index + sep[0].length).trim();
+					if (left.length >= 1 && right.length >= 2 && !/^\d+$/.test(left)) {
+						label = left;
+						description = right;
+					}
+				}
+			}
+			out.push({ label, description, value });
+		}
+		return out;
+	};
+	const splitHeader = (raw, fallback) => {
+		const s = trim(raw);
+		const wait = /^I'm waiting on you now:\s*/i.exec(s);
+		const prefix = wait ? "I'm waiting on you now: " : "";
+		const body = wait ? s.slice(wait[0].length) : s;
+		const ok = (h, rest, explicit, colon) => {
+			if (!h || h.length > 24 || !rest || rest.length < 2 || rest.startsWith("//")) return null;
+			const numbered = /^\d+\.\s+/.test(h);
+			const core = numbered ? h.replace(/^\d+\.\s+/, "") : h;
+			const maxWords = explicit ? 5 : 3;
+			const minCore = explicit ? 1 : 2;
+			if (core.length < minCore || core.split(/\s+/).length > maxWords) return null;
+			if (explicit && colon ? (/[?!]/.test(core) || /\.(?:\s|$)/.test(core)) : /[.?!,;'"()]/.test(core)) return null;
+			if (explicit && colon ? !/[\p{L}\p{N}]/u.test(core) : !/^[\p{L}\p{N}]/u.test(core)) return null;
+			if (!explicit && !/^optional$/i.test(core) && h.length > 20) return null;
+			return { header: h, question: prefix + rest };
+		};
+		const br = /^\[([^\[\]\n]{1,24})\]\s+([\s\S]+)$/.exec(body);
+		if (br) {
+			const r = ok(br[1].trim(), br[2].trim(), true, false);
+			if (r) return r;
+		}
+		const numColon = /^((?:\d+\.\s+[^\n:]{1,21}|Optional)):\s+([\s\S]+)$/i.exec(body);
+		if (numColon) {
+			const r = ok(numColon[1].trim(), numColon[2].trim(), true, true);
+			if (r) return r;
+		}
+		const num = /^((?:\d+\.\s+[^\n:]{1,21}?|Optional))(?:\s+[\u2014\u2013\u00b7-]\s+|\r?\n)([\s\S]+)$/i.exec(body);
+		if (num) {
+			const r = ok(num[1].trim(), num[2].trim(), true, false);
+			if (r) return r;
+		}
+		const m = /^([^\n:]{1,20}?)(?::\s+|\s+[\u2014\u2013\u00b7]\s+|\r?\n)([\s\S]+)$/.exec(body);
+		if (m) {
+			const r = ok(m[1].trim(), m[2].trim(), false, false);
+			if (r) return r;
+		}
+		return { header: fallback, question: s };
+	};
+	const ordered = [...groups.entries()].sort((a, b) => a[0] - b[0]);
+	const total = ordered.length;
+	const questions = [];
+	for (let i = 0; i < total; i++) {
+		if (ordered[i][0] !== i + 1) return void 0;
+		const { id, main, other } = ordered[i][1];
+		const fallback = total === 1 ? "Question" : "Question " + (i + 1);
+		if (!isPlainStr(other)) return void 0;
+		if (!main) {
+			const raw = trim(other.title);
+			if (!raw) return void 0;
+			const { header, question } = splitHeader(raw, fallback);
+			questions.push({ id, header, question, options: [] });
+			continue;
+		}
+		const rawTitle = trim(main.title);
+		if (!rawTitle) return void 0;
+		let options, multiSelect = false;
+		if (main.type === "string") {
+			options = Array.isArray(main.oneOf) ? readChoices(main.oneOf, false) : Array.isArray(main.enum) ? readChoices(main.enum, true) : void 0;
+		} else if (main.type === "array" && isRec(main.items)) {
+			multiSelect = true;
+			options = Array.isArray(main.items.anyOf) ? readChoices(main.items.anyOf, false) : main.items.type === "string" && Array.isArray(main.items.enum) ? readChoices(main.items.enum, true) : void 0;
+		}
+		if (!options) return void 0;
+		const rawDesc = trim(main.description);
+		const parsed = rawDesc && rawDesc !== rawTitle && rawTitle.length <= 24 ? { header: rawTitle, question: rawDesc } : splitHeader(rawTitle, fallback);
+		questions.push({
+			id,
+			header: parsed.header,
+			question: parsed.question,
+			options,
+			...multiSelect ? { multiSelect: true } : {}
+		});
+	}
+	const splitAtt = (v, vals) => {
+		const re = /\n\nAttached (?:image|file) "(?:\\.|[^"\\\r\n])*": "/g;
+		let match = null;
+		for (let m; (m = re.exec(v)) !== null; ) {
+			if (vals.has(v.slice(0, m.index))) match = m;
+		}
+		return match ? { prefix: v.slice(0, match.index), suffix: v.slice(match.index + 2) } : void 0;
+	};
+	return {
+		questions,
+		respond: (answers) => {
+			if (!isRec(answers)) return { action: "cancel" };
+			const content = {};
+			for (const q of questions) {
+				if (!Object.hasOwn(answers, q.id)) return { action: "cancel" };
+				const answer = answers[q.id];
+				const otherId = q.id + "_other";
+				const vals = new Set(q.options.map((o) => o.value));
+				if (q.options.length === 0) {
+					if (typeof answer !== "string" || !answer.trim()) return { action: "cancel" };
+					content[otherId] = answer;
+				} else if (q.multiSelect) {
+					if (Array.isArray(answer)) {
+						const sel = [];
+						const extra = [];
+						for (const item of answer) {
+							if (typeof item !== "string") return { action: "cancel" };
+							if (vals.has(item)) {
+								if (!sel.includes(item)) sel.push(item);
+							} else if (item.trim()) extra.push(item);
+						}
+						if (sel.length === 0 && extra.length === 0) return { action: "cancel" };
+						if (sel.length > 0) content[q.id] = sel;
+						if (extra.length > 0) content[otherId] = extra.join("\n\n");
+					} else if (typeof answer === "string") {
+						if (vals.has(answer)) content[q.id] = [answer];
+						else {
+							const att = splitAtt(answer, vals);
+							if (att) {
+								content[q.id] = [att.prefix];
+								content[otherId] = att.suffix;
+							} else if (answer.trim()) content[otherId] = answer;
+							else return { action: "cancel" };
+						}
+					} else return { action: "cancel" };
+				} else {
+					if (typeof answer !== "string") return { action: "cancel" };
+					if (vals.has(answer)) content[q.id] = answer;
+					else {
+						const att = splitAtt(answer, vals);
+						if (att) {
+							content[q.id] = att.prefix;
+							content[otherId] = att.suffix;
+						} else if (answer.trim()) content[otherId] = answer;
+						else return { action: "cancel" };
+					}
+				}
+			}
+			return { action: "accept", content };
+		}
+	};
+}
+`;
+
+function staticPropKey(prop) {
+  if (!prop || prop.type !== "Property") return null;
+  if (!prop.computed) {
+    if (prop.key.type === "Identifier") return prop.key.name;
+    if (prop.key.type === "Literal" && !prop.key.regex && (typeof prop.key.value === "string" || typeof prop.key.value === "number" || typeof prop.key.value === "bigint")) {
+      return String(prop.key.value);
+    }
+    return null;
+  }
+  if (prop.key.type === "Literal" && !prop.key.regex && (prop.key.value === null || typeof prop.key.value !== "object")) {
+    return String(prop.key.value);
+  }
+  if (prop.key.type === "TemplateLiteral" && prop.key.expressions.length === 0 && prop.key.quasis.length === 1) {
+    return prop.key.quasis[0].value.cooked ?? prop.key.quasis[0].value.raw;
+  }
+  return null;
+}
+
+function classifyObjectLiteral(expr, targetKey) {
+  if (!expr) return "opaque";
+  if (expr.type === "ConditionalExpression") {
+    const a = classifyObjectLiteral(expr.consequent, targetKey);
+    const b = classifyObjectLiteral(expr.alternate, targetKey);
+    return a === b ? a : "opaque";
+  }
+  if (expr.type !== "ObjectExpression") return "opaque";
+  let hasKey = false;
+  for (const p of expr.properties) {
+    if (p.type === "Property") {
+      const k = staticPropKey(p);
+      if (k === null || (!p.computed && k === "__proto__")) return "opaque";
+      if (k === targetKey) hasKey = true;
+    } else if (p.type === "SpreadElement") {
+      const sub = classifyObjectLiteral(p.argument, targetKey);
+      if (sub === "opaque") return "opaque";
+      if (sub === "has-key") hasKey = true;
+    } else {
+      return "opaque";
+    }
+  }
+  return hasKey ? "has-key" : "no-key";
+}
+
+function collectFunctionReturns(node, out = []) {
+  if (!node || typeof node !== "object") return out;
+  if (node.type === "ReturnStatement") {
+    out.push(node);
+    return out;
+  }
+  if (node.type === "FunctionDeclaration" || node.type === "FunctionExpression" ||
+      node.type === "ArrowFunctionExpression" || node.type === "ClassDeclaration" || node.type === "ClassExpression") {
+    return out;
+  }
+  for (const [k, v] of Object.entries(node)) {
+    if (k === "start" || k === "end" || k === "loc" || k === "type") continue;
+    if (Array.isArray(v)) {
+      for (const item of v) collectFunctionReturns(item, out);
+    } else if (v && typeof v === "object" && typeof v.type === "string") {
+      collectFunctionReturns(v, out);
+    }
+  }
+  return out;
+}
+
+function countIdentifiers(node, name) {
+  if (!node || typeof node !== "object") return 0;
+  let total = node.type === "Identifier" && node.name === name ? 1 : 0;
+  for (const [k, v] of Object.entries(node)) {
+    if (k === "start" || k === "end" || k === "loc" || k === "type") continue;
+    if (Array.isArray(v)) {
+      for (const item of v) total += countIdentifiers(item, name);
+    } else if (v && typeof v === "object" && typeof v.type === "string") {
+      total += countIdentifiers(v, name);
+    }
+  }
+  return total;
+}
+
+function hasTopLevelFunction(text, name) {
+  if (!text.includes(name)) return false;
+  try {
+    const ast = acorn.parse(text, { ...PARSE, sourceType: "module" });
+    return ast.body.some((n) => n.type === "FunctionDeclaration" && n.id?.name === name);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * antigravityQuestions: wire extractElicitationForm into makeAntigravityAcpAdapterFlavor so
+ * Antigravity ask_question cards fold qN + qN_other, keep custom answers unlocked, support
+ * multi-select/free-form/attachments, and match Claude's header + option-description layout.
+ * Yields cleanly ("already") if upstream T3 adds its own extractElicitationForm.
+ */
+function unitAntigravityQuestions(text) {
+  const ast = acorn.parse(text, { ...PARSE, sourceType: "module" });
+  const flavors = ast.body.filter((n) => n.type === "FunctionDeclaration" && n.id?.name === "makeAntigravityAcpAdapterFlavor");
+  if (flavors.length !== 1) throw new Error(`makeAntigravityAcpAdapterFlavor declared ${flavors.length} times`);
+  const returns = collectFunctionReturns(flavors[0].body);
+  if (returns.length !== 1 || returns[0].argument?.type !== "ObjectExpression" || !flavors[0].body.body.includes(returns[0])) {
+    throw new Error("makeAntigravityAcpAdapterFlavor return object changed shape");
+  }
+  const props = returns[0].argument.properties;
+  const permProp = props.find((p) => staticPropKey(p) === "extractPermissionQuestion");
+  if (!permProp || !props.some((p) => staticPropKey(p) === "driver")) {
+    throw new Error("makeAntigravityAcpAdapterFlavor properties changed shape");
+  }
+  if (props.some((p) => p.type === "Property" && (staticPropKey(p) === null || (!p.computed && staticPropKey(p) === "__proto__")))) {
+    throw new Error("makeAntigravityAcpAdapterFlavor return object uses a dynamic computed key; changed shape");
+  }
+  const spreadStates = props
+    .filter((p) => p.type === "SpreadElement")
+    .map((p) => classifyObjectLiteral(p.argument, "extractElicitationForm"));
+  if (spreadStates.includes("opaque")) {
+    throw new Error("makeAntigravityAcpAdapterFlavor return object uses an unsupported spread; changed shape");
+  }
+  const extractProps = props.filter((p) => staticPropKey(p) === "extractElicitationForm");
+  if (extractProps.length > 1) throw new Error("extractElicitationForm appears more than once");
+  const extractProp = extractProps[0] ?? null;
+  const pointsToOurs = Boolean(
+    extractProp &&
+    !extractProp.computed &&
+    !extractProp.method &&
+    extractProp.kind === "init" &&
+    extractProp.value.type === "FunctionExpression" &&
+    extractProp.value.id?.name === ANTIGRAVITY_QUESTIONS_FN
+  );
+  if (pointsToOurs && spreadStates.includes("has-key")) {
+    throw new Error("extractElicitationForm is shadowed by a spread; run --restore first");
+  }
+  const strayKeeper = text.includes(ANTIGRAVITY_QUESTIONS_FN) || countIdentifiers(ast, ANTIGRAVITY_QUESTIONS_FN) > 0;
+  if (extractProp && !pointsToOurs) {
+    if (strayKeeper) throw new Error("extractElicitationForm no longer references keeper helper; run --restore first");
+    return { state: "already", text };
+  }
+  if (!extractProp && spreadStates.includes("has-key")) {
+    if (strayKeeper) throw new Error("extractElicitationForm no longer references keeper helper; run --restore first");
+    return { state: "already", text };
+  }
+  const wantFn = ANTIGRAVITY_QUESTIONS_HELPER.trimEnd();
+  if (pointsToOurs) {
+    const existing = text.slice(extractProp.value.start, extractProp.value.end);
+    if (existing === wantFn) return { state: "already", text };
+    if (!existing.includes("/*t3-keeper-agq-")) {
+      throw new Error(`${ANTIGRAVITY_QUESTIONS_FN} is not a supported keeper helper; run --restore first`);
+    }
+    return { state: "patched", text: text.slice(0, extractProp.value.start) + wantFn + text.slice(extractProp.value.end) };
+  }
+  if (strayKeeper) {
+    throw new Error(`${ANTIGRAVITY_QUESTIONS_FN} already appears unexpectedly; run --restore first`);
+  }
+  const propLine = `extractElicitationForm: ${wantFn},\n`;
+  return { state: "patched", text: text.slice(0, permProp.start) + propLine + text.slice(permProp.start) };
+}
+
 const UNITS = [
   { name: "wrap", file: "index", run: unitWrap },
   { name: "minWidth", file: "mainJs", run: unitMinWidth },
@@ -1100,6 +1509,7 @@ const UNITS = [
   { name: "fit", file: "binCli", run: unitFit },
   { name: "titleGuide", file: "binCli", run: unitTitleGuide },
   { name: "geminiQuota", file: "binCli", run: unitGeminiQuota },
+  { name: "antigravityQuestions", file: "antigravityFlavor", run: unitAntigravityQuestions },
   { name: "extras", file: "index", run: unitExtras }, // after wrap: it takes wrap's padding
   { name: "firstClick", file: "desktopMain", run: unitFirstClick },
 ];
@@ -1133,8 +1543,9 @@ function findTargets(fd, layout) {
   return {
     index: entryAt(layout.header, `${CLIENT}/index.html`) ? `${CLIENT}/index.html` : null,
     mainJs: pick(ASSETS, /^main-[\w-]+\.js$/, (t) => t.includes("chat_thread_sidebar_width")),
-    binCli: pick(SERVER, /^(?:binCli|runtimeLayer)-[\w-]+\.mjs$/, (t) => t.includes("function sanitizeThreadTitle(")),
-    delegatedTitles: pick(SERVER, /^server-[\w-]+\.mjs$/, (t) => t.includes("function threadTitle(")),
+    binCli: pick(SERVER, /^(?:binCli|runtimeLayer)-[\w-]+\.mjs$/, (t) => hasTopLevelFunction(t, "sanitizeThreadTitle")),
+    delegatedTitles: pick(SERVER, /^server-[\w-]+\.mjs$/, (t) => hasTopLevelFunction(t, "threadTitle")),
+    antigravityFlavor: pick(SERVER, /^(?:server|binCli|runtimeLayer)-[\w-]+\.mjs$/, (t) => hasTopLevelFunction(t, "makeAntigravityAcpAdapterFlavor")),
     desktopMain: entryAt(layout.header, DESKTOP_MAIN) ? DESKTOP_MAIN : null,
   };
 }
@@ -1149,63 +1560,145 @@ function plan(fd, layout, targets) {
   const originals = {};
   const results = {};
   const texts = {};
+  const fileSteps = {};
+  const resolveSlot = (fileKey) => {
+    const rel = targets[fileKey];
+    if (!rel) return null;
+    if (fileKey === "antigravityFlavor") {
+      if (rel === targets.delegatedTitles) return "delegatedTitles";
+      if (rel === targets.binCli) return "binCli";
+    }
+    return fileKey;
+  };
+  const readTarget = (file) => {
+    originals[file] ??= readEntry(fd, layout, targets[file]);
+    return texts[file] ?? originals[file].toString("utf8");
+  };
+  const recordStep = (file, name, applyFn) => {
+    (fileSteps[file] ??= []).push({ name, apply: applyFn });
+  };
+  let splitFitPatched = false;
   for (const unit of UNITS) {
-    const rel = targets[unit.file];
-    if (!rel) {
+    const targetFile = resolveSlot(unit.file);
+    if (!targetFile) {
       results[unit.name] = { state: "failed", error: `${unit.file} not found in this build` };
       continue;
     }
-    originals[unit.file] ??= readEntry(fd, layout, rel);
-    const before = texts[unit.file] ?? originals[unit.file].toString("utf8");
+    const before = readTarget(targetFile);
     try {
       let out;
-      if (unit.name === "fit" && !before.includes("function threadTitle(") && !targets.delegatedTitles && !ctx.disabled.has("fit")) {
+      const runtimeHasThreadTitle = unit.name === "fit" && hasTopLevelFunction(before, "threadTitle");
+      if (unit.name === "fit" && !runtimeHasThreadTitle && !targets.delegatedTitles && !ctx.disabled.has("fit")) {
         throw new Error("delegated threadTitle bundle not found in this build");
       }
-      if (unit.name === "fit" && targets.delegatedTitles && !before.includes("function threadTitle(")) {
-        const file = "delegatedTitles";
-        originals[file] = readEntry(fd, layout, targets[file]);
-        const childBefore = originals[file].toString("utf8");
-        // Balance the delegate half now; publish neither half if runtime balancing fails.
-        out = unitFit(before, { ...ctx, wrappers: FIT_WRAPPERS.slice(0, 2) });
-        const child = unitFit(childBefore, { ...ctx, wrappers: FIT_WRAPPERS.slice(2) });
-        texts[file] = finishBinCli(child.text, originals[file].length, child.state === "patched");
+      if (unit.name === "fit" && targets.delegatedTitles && !runtimeHasThreadTitle) {
+        const childBefore = readTarget("delegatedTitles");
+        const rtOpts = { ...ctx, wrappers: FIT_WRAPPERS.slice(0, 2) };
+        const chOpts = { ...ctx, wrappers: FIT_WRAPPERS.slice(2) };
+        out = unitFit(before, rtOpts);
+        const child = unitFit(childBefore, chOpts);
+        const rtPatched = out.state === "patched";
         if (child.state === "patched") out.state = "patched";
         else if (child.state === "retained" && out.state === "disabled") out.state = "retained";
+        texts.delegatedTitles = child.text;
+        if (child.state === "patched") {
+          recordStep("delegatedTitles", "fit", (src) => unitFit(src, chOpts).text);
+          splitFitPatched = true;
+        }
+        if (rtPatched) {
+          recordStep(targetFile, "fit", (src) => unitFit(src, rtOpts).text);
+          splitFitPatched = true;
+        }
       } else if (unit.name === "geminiQuota" && targets.delegatedTitles && !before.includes(ANTIGRAVITY_UA_MARK)) {
         // 13 Nov nightly: the probe moved to the server bundle, which sends T3's own corrected
         // version. Recognise it there; the old-version rewrite stays in the runtime bundle.
-        const server = texts.delegatedTitles ?? readEntry(fd, layout, targets.delegatedTitles).toString("utf8");
+        const server = readTarget("delegatedTitles");
         if (unitGeminiQuota(server).state !== "already") throw new Error("Antigravity probe in the server bundle sends the old version; this keeper only rewrites it in the runtime bundle");
         out = { state: "already", text: before };
-      } else out = unit.run(before, ctx);
+      } else {
+        out = unit.run(before, ctx);
+        if (out.state === "patched") recordStep(targetFile, unit.name, (src) => unit.run(src, ctx).text);
+      }
       results[unit.name] = { state: out.state, ...(out.error ? { error: out.error } : {}) };
-      texts[unit.file] = out.text;
+      texts[targetFile] = out.text;
     } catch (error) {
       results[unit.name] = { state: "failed", error: error.message };
     }
   }
-  const files = {};
-  for (const [file, text] of Object.entries(texts)) {
+  const isServerSlot = (file) => file === "binCli" || file === "delegatedTitles" || file === "antigravityFlavor";
+  const balanceFile = (file, text, patchedSet) => {
     const original = originals[file];
-    if (text === original.toString("utf8")) continue;
+    if (text === original.toString("utf8")) return null;
+    const finalText =
+      isServerSlot(file)
+        ? finishBinCli(text, original.length, patchedSet.has("fit"), patchedSet.has("antigravityQuestions") ? [ANTIGRAVITY_QUESTIONS_FN] : [])
+      : file === "desktopMain" ? absorb(text, original.length, "script")
+      : text;
+    const buf = Buffer.from(finalText, "utf8");
+    if (buf.length !== original.length) throw new Error("byte length changed");
+    // Only the UI files are re-read by a running T3 (Shift-Cmd-R); the server and the
+    // desktop main process have already loaded theirs.
+    return { rel: targets[file], buf, original, live: file === "index" || file === "mainJs" };
+  };
+  // If multiple server units together overflow a file's byte budget, replay them incrementally
+  // in UNITS order so earlier units (like fit) survive while only overflowing units fail.
+  const rebuildIncremental = (file, steps, { restoreFailed = false } = {}) => {
+    let cur = originals[file].toString("utf8");
+    const kept = new Set();
+    let built = null;
+    for (const step of steps) {
+      try {
+        const next = step.apply(cur);
+        const candidateSet = new Set([...kept, step.name]);
+        built = balanceFile(file, next, candidateSet);
+        cur = next;
+        kept.add(step.name);
+        if (restoreFailed) results[step.name] = { state: "patched" };
+      } catch (error) {
+        results[step.name] = { state: "failed", error: error.message };
+      }
+    }
+    return { built, kept };
+  };
+  const files = {};
+  const publishedUnits = {};
+  for (const [file, text] of Object.entries(texts)) {
+    const steps = fileSteps[file] ?? [];
+    const patchedSet = new Set(steps.map((s) => s.name));
     try {
-      const finalText =
-        file === "binCli" ? finishBinCli(text, original.length, results.fit.state === "patched")
-        : file === "desktopMain" ? absorb(text, original.length, "script")
-        : text;
-      const buf = Buffer.from(finalText, "utf8");
-      if (buf.length !== original.length) throw new Error("byte length changed");
-      // Only the UI files are re-read by a running T3 (Shift-Cmd-R); the server and the
-      // desktop main process have already loaded theirs.
-      files[file] = { rel: targets[file], buf, original, live: file === "index" || file === "mainJs" };
+      const built = balanceFile(file, text, patchedSet);
+      if (built) {
+        files[file] = built;
+        publishedUnits[file] = patchedSet;
+      }
     } catch (error) {
-      for (const unit of UNITS.filter((u) => u.file === file && results[u.name].state === "patched")) {
-        results[unit.name] = { state: "failed", error: error.message };
+      if (steps.length > 1) {
+        const { built, kept } = rebuildIncremental(file, steps);
+        if (built) {
+          files[file] = built;
+          publishedUnits[file] = kept;
+        }
+      } else {
+        for (const name of patchedSet) {
+          if (results[name]?.state === "patched") results[name] = { state: "failed", error: error.message };
+        }
       }
     }
   }
-  if (results.fit.state === "failed") delete files.delegatedTitles;
+  if (splitFitPatched && results.fit?.state === "failed") {
+    for (const file of ["binCli", "delegatedTitles"]) {
+      if (!files[file] || !publishedUnits[file]?.has("fit")) continue;
+      const remaining = (fileSteps[file] ?? []).filter((s) => s.name !== "fit");
+      delete files[file];
+      delete publishedUnits[file];
+      if (remaining.length === 0) continue;
+      const { built, kept } = rebuildIncremental(file, remaining, { restoreFailed: true });
+      if (built) {
+        files[file] = built;
+        publishedUnits[file] = kept;
+      }
+    }
+  }
   return { results, files, missingHooks: scanWrapHooks(fd, layout) };
 }
 
@@ -1359,9 +1852,18 @@ function reminderPlanFrom(results, files) {
     if (results.fit?.state === "patched") startupReasons.push("fit");
     if (results.titleGuide?.state === "patched") startupReasons.push("titleGuide");
     if (results.geminiQuota?.state === "patched") startupReasons.push("geminiQuota");
+    if (results.antigravityQuestions?.state === "patched") startupReasons.push("antigravityQuestions");
     if (startupReasons.length === 0) startupReasons.push("server");
   }
-  if (files.delegatedTitles && !startupReasons.includes("fit")) startupReasons.push("fit");
+  if (files.delegatedTitles) {
+    if (results.fit?.state === "patched" && !startupReasons.includes("fit")) startupReasons.push("fit");
+    if (results.antigravityQuestions?.state === "patched" && !startupReasons.includes("antigravityQuestions")) startupReasons.push("antigravityQuestions");
+    if (startupReasons.length === 0) startupReasons.push("server");
+  }
+  if (files.antigravityFlavor) {
+    if (results.antigravityQuestions?.state === "patched" && !startupReasons.includes("antigravityQuestions")) startupReasons.push("antigravityQuestions");
+    if (startupReasons.length === 0) startupReasons.push("server");
+  }
   if (files.desktopMain) startupReasons.push(results.firstClick?.state === "patched" ? "firstClick" : "desktop-main");
   return { startupReasons, uiChanged: Boolean(files.index || files.mainJs) };
 }
@@ -1597,7 +2099,7 @@ function cmdAuto() {
 
 // For test/keeper.test.mjs.
 export {
-  unitWrap, unitMinWidth, unitRule, unitFit, unitTitleGuide, unitGeminiQuota, unitExtras, unitFirstClick, finishBinCli, absorb, FIT_TITLE, FIT_TITLE_V9, TITLE_GUIDE, WRAP_CSS, TMP_PREFIX,
+  unitWrap, unitMinWidth, unitRule, unitFit, unitTitleGuide, unitGeminiQuota, unitAntigravityQuestions, unitExtras, unitFirstClick, finishBinCli, absorb, FIT_TITLE, FIT_TITLE_V9, TITLE_GUIDE, ANTIGRAVITY_QUESTIONS_HELPER, WRAP_CSS, TMP_PREFIX,
   extrasBoot, EXTRAS_ID, STYLE_ID, cspAllowsLoader,
   readLayout, readEntry, writeEntries, findTargets, inspect, apply, asarIdentity, sha, removeStaleTemps, launchedByT3,
 };
