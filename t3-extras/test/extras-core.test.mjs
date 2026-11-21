@@ -1451,3 +1451,185 @@ test("stale estimates explain freshness even when a failed refresh kept a recent
   assert.match(C.forecast(recent, NOW).text, /reading is stale/);
   assert.doesNotMatch(C.forecast(recent, NOW).text, /reading is .* old/);
 });
+
+test("sidebar shelf rules (A''): defaults, unit ranges, per-unit memory, legacy migration, and input parsing", () => {
+  const d = C.readSettings(null);
+  assert.deepEqual(plain(d.snoozedRule), { unit: "rows", value: 3, lastUnit: "rows", last: { rows: 3, min: 30, hours: 12, days: 1 } });
+  assert.deepEqual(plain(d.settledRule), { unit: "rows", value: 3, lastUnit: "rows", last: { rows: 3, min: 30, hours: 12, days: 1 } });
+
+  // Valid independent rules across rows, min, hours, days, and all with per-unit memory.
+  const ok = C.readSettings(JSON.stringify({
+    snoozedRule: { unit: "hours", value: 168, last: { rows: 9, min: 45, hours: 168, days: 7 } },
+    settledRule: { unit: "days", value: 365, last: { rows: 10, min: 1440, hours: 24, days: 365 } },
+  }));
+  assert.equal(ok.snoozedRule.unit, "hours");
+  assert.equal(ok.snoozedRule.value, 168);
+  assert.equal(ok.snoozedRule.last.rows, 9);
+  assert.equal(ok.snoozedRule.last.min, 45);
+  assert.equal(ok.settledRule.unit, "days");
+  assert.equal(ok.settledRule.value, 365);
+  assert.equal(ok.settledRule.last.min, 1440);
+
+  // No limit preserves lastUnit and last map.
+  const all = C.readSettings(JSON.stringify({
+    snoozedRule: { unit: "all", lastUnit: "hours", value: 6, last: { rows: 5, min: 30, hours: 6, days: 2 } },
+  }));
+  assert.equal(all.snoozedRule.unit, "all");
+  assert.equal(all.snoozedRule.lastUnit, "hours");
+  assert.equal(all.snoozedRule.last.hours, 6);
+
+  // Legacy D'' keys migrate seamlessly when snoozedRule/settledRule are absent.
+  const migNum = C.readSettings(JSON.stringify({ snoozedLimit: 8, settledLimit: 10 }));
+  assert.equal(migNum.snoozedRule.unit, "rows");
+  assert.equal(migNum.snoozedRule.value, 8);
+  assert.equal(migNum.settledRule.value, 10);
+  const migAll = C.readSettings(JSON.stringify({ snoozedLimit: "all", snoozedLimitLast: 7, settledLimit: "all", settledLimitLast: 5 }));
+  assert.equal(migAll.snoozedRule.unit, "all");
+  assert.equal(migAll.snoozedRule.lastUnit, "rows");
+  assert.equal(migAll.snoozedRule.last.rows, 7);
+  assert.equal(migAll.settledRule.last.rows, 5);
+
+  // Invalid, 0, negative, float, or out-of-range values fall back to unit defaults.
+  for (const bad of [0, -1, 26, 2.5, "3", null]) {
+    assert.equal(C.readSettings(JSON.stringify({ snoozedRule: { unit: "rows", value: bad } })).snoozedRule.value, 3);
+  }
+  for (const bad of [0, -2, 11, 25, 3.1, "3", null]) {
+    assert.equal(C.readSettings(JSON.stringify({ settledRule: { unit: "rows", value: bad } })).settledRule.value, 3);
+  }
+  assert.equal(C.readSettings(JSON.stringify({ snoozedRule: { unit: "min", value: 1441 } })).snoozedRule.value, 30);
+  assert.equal(C.readSettings(JSON.stringify({ snoozedRule: { unit: "hours", value: 169 } })).snoozedRule.value, 12);
+  assert.equal(C.readSettings(JSON.stringify({ snoozedRule: { unit: "days", value: 366 } })).snoozedRule.value, 1);
+  assert.equal(C.readSettings(JSON.stringify({ snoozedRule: { unit: "weeks", value: 2 } })).snoozedRule.unit, "rows");
+
+  // Typed input parsing clamps unsigned digits to [min, max] per unit; invalid/empty returns null.
+  assert.equal(C.parseShelfInput("15", "snoozed", "rows"), 15);
+  assert.equal(C.parseShelfInput("99", "snoozed", "rows"), 25);
+  assert.equal(C.parseShelfInput("0", "snoozed", "rows"), 1);
+  assert.equal(C.parseShelfInput("15", "settled", "rows"), 10);
+  assert.equal(C.parseShelfInput("90", "settled", "min"), 90);
+  assert.equal(C.parseShelfInput("2000", "settled", "min"), 1440);
+  assert.equal(C.parseShelfInput("200", "snoozed", "hours"), 168);
+  assert.equal(C.parseShelfInput("500", "settled", "days"), 365);
+  for (const invalid of ["", "   ", "abc", "-3", "3.5", "1e2", null]) {
+    assert.equal(C.parseShelfInput(invalid, "snoozed", "hours"), null, `invalid=${String(invalid)}`);
+  }
+
+  // Plain-English rule summaries.
+  assert.equal(C.shelfRuleSummary("snoozed", { unit: "rows", value: 3 }), "First 3 rows");
+  assert.equal(C.shelfRuleSummary("snoozed", { unit: "hours", value: 12 }, 3), "Waking in less than 12 hours · 3 now");
+  assert.equal(C.shelfRuleSummary("snoozed", { unit: "hours", value: 1 }, null), "Waking in less than 1 hour");
+  assert.equal(C.shelfRuleSummary("settled", { unit: "hours", value: 12 }, 6), "Settled less than 12 hours ago · 6 now");
+  assert.equal(C.shelfRuleSummary("settled", { unit: "all", value: 3 }), "All rows");
+});
+
+test("sidebar shelf time evaluation: badge cross-check, clock skew, overdue wake, unrecognized badge, and shelf order check", () => {
+  const T = NOW;
+  // Badge interval parsing (including Opus's nit: unrecognized "2w" -> null).
+  assert.deepEqual(plain(C.parseSettledBadgeInterval("now")), { lo: 0, hi: 60e3 });
+  assert.deepEqual(plain(C.parseSettledBadgeInterval("45m")), { lo: 45 * MIN, hi: 46 * MIN });
+  assert.deepEqual(plain(C.parseSettledBadgeInterval("1h")), { lo: 1 * H, hi: 2 * H });
+  assert.deepEqual(plain(C.parseSettledBadgeInterval("9d")), { lo: 9 * DAY, hi: 10 * DAY });
+  assert.equal(C.parseSettledBadgeInterval("2w"), null);
+  assert.equal(C.parseSettledBadgeInterval("Working"), null);
+
+  // Fresh local snapshot inside badge interval is authoritative (65m vs 110m at 90m cutoff, both with "1h" badge!).
+  assert.equal(C.evaluateShelfRowTime("settled", { badgeText: "1h", settledAt: T - 65 * MIN }, 90 * MIN, T, true), "match");
+  assert.equal(C.evaluateShelfRowTime("settled", { badgeText: "1h", settledAt: T - 110 * MIN }, 90 * MIN, T, true), "outside");
+
+  // Stale snapshot (3d) contradicting live "now" badge falls back to badge -> match!
+  assert.equal(C.evaluateShelfRowTime("settled", { badgeText: "now", settledAt: T - 3 * DAY }, 1 * H, T, true), "match");
+
+  // Small future clock skew (<= 120s) clamps to 0ms (match); > 120s ignored -> falls back to badge / unknown.
+  assert.equal(C.evaluateShelfRowTime("settled", { badgeText: "now", settledAt: T + 30e3 }, 1 * H, T, true), "match");
+  assert.equal(C.evaluateShelfRowTime("settled", { badgeText: "", settledAt: T + 30e3 }, 1 * H, T, true), "match");
+  assert.equal(C.evaluateShelfRowTime("settled", { badgeText: "", settledAt: T + 300e3 }, 1 * H, T, true), "unknown");
+
+  // DOM fallback without fresh snapshot: folds ONLY when badge.lo >= limitMs; fails open across boundary.
+  assert.equal(C.evaluateShelfRowTime("settled", { badgeText: "1h", settledAt: null }, 1 * H, T, false), "outside", "1h >= 1h folds");
+  assert.equal(C.evaluateShelfRowTime("settled", { badgeText: "1h", settledAt: null }, 45 * MIN, T, false), "outside", "1h >= 45m folds");
+  assert.equal(C.evaluateShelfRowTime("settled", { badgeText: "1h", settledAt: null }, 90 * MIN, T, false), "unknown", "1h spans 60-119m -> fail open at 90m");
+  assert.equal(C.evaluateShelfRowTime("settled", { badgeText: "2h", settledAt: null }, 90 * MIN, T, false), "outside", "2h >= 90m folds");
+
+  // Opus nit: unrecognized badge ("2w") behaves like no badge (fresh snapshot decides; without one fails open).
+  assert.equal(C.evaluateShelfRowTime("settled", { badgeText: "2w", settledAt: T - 14 * DAY }, 1 * DAY, T, true), "outside");
+  assert.equal(C.evaluateShelfRowTime("settled", { badgeText: "2w", settledAt: null }, 1 * DAY, T, false), "unknown");
+
+  // Snoozed: uses snoozedUntil, strict < T, overdue <= 0 stays visible, missing/stale fails open.
+  assert.equal(C.evaluateShelfRowTime("snoozed", { snoozedUntil: T - 5 * MIN }, 1 * H, T, true), "match", "overdue wake stays visible");
+  assert.equal(C.evaluateShelfRowTime("snoozed", { snoozedUntil: T + 59 * MIN }, 1 * H, T, true), "match");
+  assert.equal(C.evaluateShelfRowTime("snoozed", { snoozedUntil: T + 60 * MIN }, 1 * H, T, true), "outside", "strict < 1h");
+  assert.equal(C.evaluateShelfRowTime("snoozed", { snoozedUntil: T + 5 * H }, 1 * H, T, false), "unknown", "stale snapshot fails open");
+
+  // Shelf-level monotonic order check.
+  assert.equal(C.shelfSnapshotOrderValid("settled", [{ settledAt: T - 1 * H }, { settledAt: T - 2 * H }, { settledAt: T - 5 * H }]), true);
+  assert.equal(C.shelfSnapshotOrderValid("settled", [{ settledAt: T - 5 * H }, { settledAt: T - 1 * H }]), false);
+  assert.equal(C.shelfSnapshotOrderValid("snoozed", [{ snoozedUntil: T + 1 * H }, { snoozedUntil: T + 12 * H }]), true);
+  assert.equal(C.shelfSnapshotOrderValid("snoozed", [{ snoozedUntil: T + 12 * H }, { snoozedUntil: T + 1 * H }]), false);
+});
+
+test("sidebar shelf fold plan (A''): rows vs time mode, zero-match header anchor, unknown-time rows-mode rule, and scope resets", () => {
+  const mk = (n, protectedIdx = []) => Array.from({ length: n }, (_, i) => ({ protected: protectedIdx.includes(i) }));
+
+  // Astra/Sol R3 check: 10 ordinary rows with NO timestamps under "3 rows" MUST still cap to 3 + Show 7 more!
+  const pRowsNoTs = plain(C.shelfFoldPlan(mk(10), { unit: "rows", value: 3 }, false, { shelf: "settled", now: NOW, snapshotFresh: false }));
+  assert.deepEqual(pRowsNoTs.folded, [false, false, false, true, true, true, true, true, true, true]);
+  assert.equal(pRowsNoTs.hiddenCount, 7);
+  assert.equal(pRowsNoTs.toggleMode, "more");
+  assert.equal(pRowsNoTs.toggleAfterIndex, 2);
+  // Switching same 10 unknown rows to "hours" keeps all 10 visible (fail open in time mode only!).
+  const pTimeNoTs = plain(C.shelfFoldPlan(mk(10), { unit: "hours", value: 3 }, false, { shelf: "settled", now: NOW, snapshotFresh: false }));
+  assert.deepEqual(pTimeNoTs.folded, Array(10).fill(false));
+  assert.equal(pTimeNoTs.showToggle, false);
+  assert.equal(pTimeNoTs.liveCount, null);
+
+  // Settled time mode: 3 rows < 3h, 7 rows older -> Show 7 older anchored after index 2, liveCount = 3.
+  const settledItems = [0.5, 0.9, 1.1, 5.7, 8, 10, 22, 23, 23.5, 23.8].map((h) => ({ protected: false, settledAt: NOW - h * H, badgeText: `${Math.floor(h)}h` }));
+  const pSt3h = plain(C.shelfFoldPlan(settledItems, { unit: "hours", value: 3 }, false, { shelf: "settled", now: NOW, snapshotFresh: true }));
+  assert.equal(pSt3h.hiddenCount, 7);
+  assert.equal(pSt3h.liveCount, 3);
+  assert.equal(pSt3h.toggleMode, "older");
+  assert.equal(pSt3h.toggleAfterIndex, 2);
+  assert.equal(pSt3h.hideNativeMore, true);
+
+  // Zero matches in time mode (< 10 min): all 10 fold, toggle anchors at -1 (header/placeholder), liveCount = 0!
+  const pZero = plain(C.shelfFoldPlan(settledItems, { unit: "min", value: 10 }, false, { shelf: "settled", now: NOW, snapshotFresh: true }));
+  assert.equal(pZero.hiddenCount, 10);
+  assert.equal(pZero.liveCount, 0);
+  assert.equal(pZero.showToggle, true);
+  assert.equal(pZero.toggleAfterIndex, -1);
+  assert.equal(pZero.toggleMode, "older");
+  // Expanded zero-match keeps Show fewer anchored at -1.
+  const pZeroExp = plain(C.shelfFoldPlan(settledItems, { unit: "min", value: 10 }, true, { shelf: "settled", now: NOW, snapshotFresh: true }));
+  assert.equal(pZeroExp.hiddenCount, 0);
+  assert.equal(pZeroExp.showToggle, true);
+  assert.equal(pZeroExp.toggleAfterIndex, -1);
+  assert.equal(pZeroExp.toggleMode, "fewer");
+
+  // Snoozed time mode (< 12h on Andy's 7 live wake times): rows 0..2 match, 3..6 fold behind "Show 4 later".
+  const snoozedItems = [1.3, 11.5, 11.5, 12.5, 26.5, 36.5, 132.5].map((h) => ({ protected: false, snoozedUntil: NOW + h * H }));
+  const pSn12h = plain(C.shelfFoldPlan(snoozedItems, { unit: "hours", value: 12 }, false, { shelf: "snoozed", now: NOW, snapshotFresh: true }));
+  assert.equal(pSn12h.hiddenCount, 4);
+  assert.equal(pSn12h.liveCount, 3);
+  assert.equal(pSn12h.toggleMode, "later");
+  assert.equal(pSn12h.toggleAfterIndex, 2);
+
+  // Unknown row after an outside row keeps toggle anchored directly after the contiguous visible run (firstOverflow - 1).
+  const mixedItems = [
+    { protected: false, settledAt: NOW - 0.5 * H, badgeText: "30m" },
+    { protected: false, settledAt: NOW - 0.9 * H, badgeText: "54m" },
+    { protected: false, settledAt: NOW - 5.0 * H, badgeText: "5h" },
+    { protected: false, settledAt: null, badgeText: "" },
+  ];
+  const pMixed = plain(C.shelfFoldPlan(mixedItems, { unit: "hours", value: 3 }, false, { shelf: "settled", now: NOW, snapshotFresh: true }));
+  assert.deepEqual(pMixed.folded, [false, false, true, false]);
+  assert.equal(pMixed.toggleAfterIndex, 1, "unknown trailing row keeps toggle directly after contiguous visible run");
+
+  // Scope change detection including disjoint singleton lists.
+  const k = (prefix, n) => Array.from({ length: n }, (_, i) => `${prefix}${i + 1}`);
+  assert.equal(C.shelfScopeChanged(k("s", 10), k("s", 35), "settled"), false, "pagination growth keeps expandedAll");
+  assert.equal(C.shelfScopeChanged(k("s", 35), k("s", 34), "settled"), false, "unsettling 1 row keeps expandedAll");
+  assert.equal(C.shelfScopeChanged(k("s", 11), k("s", 10), "settled"), false, "unsettling 1 row from 11 keeps expandedAll");
+  assert.equal(C.shelfScopeChanged(k("s", 35), k("s", 10), "settled"), true, "paginated 35 -> 10 scope reset clears expandedAll");
+  assert.equal(C.shelfScopeChanged(k("a", 10), k("b", 10), "settled"), true, "disjoint project switch clears expandedAll");
+  assert.equal(C.shelfScopeChanged(["a1"], ["b1"], "settled"), true, "disjoint singleton list clears expandedAll");
+});

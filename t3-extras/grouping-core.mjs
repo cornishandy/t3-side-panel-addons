@@ -410,6 +410,8 @@ function classifyOne(thread, bags, now, timeZone) {
     createdAt: parseTime(thread.createdAt),
     activityAt: when.at,
     ageAt: parseTime(thread.ageAt), // what T3 prints as the row's age (latestUserMessageAt ?? updatedAt)
+    settledAt: parseTime(thread.settledAt),
+    snoozedUntil: parseTime(thread.snoozedUntil),
     activitySource: when.source,
     recentBucket: when.bucket ?? (when.at == null ? "none" : bucket(when.at, now, timeZone)),
     activity,

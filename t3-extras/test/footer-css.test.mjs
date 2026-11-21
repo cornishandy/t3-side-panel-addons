@@ -44,11 +44,15 @@ test("the team list and the Made list target T3's collapsible, and the ✦ switc
   assert.ok(code.includes(`html[data-t3x-footer-made="hide"] ${MADE} { display: none; }`));
   assert.ok(code.includes(`html[data-t3x-footer-made="always-open"] ${MADE} [data-markdown-details-summary] { pointer-events: none;`));
   assert.ok(code.includes(`html[data-t3x-mac-app] ${MADE} [itemprop~="mac-only"] { display: none; }`));
+  for (const v4Hook of ['[itemprop~="made-pill"]', '[itemprop~="made-tailnet"]', '[itemprop="made-desc"]', '[itemprop="made-when"]', 'data-t3x-tailnet', 'html[data-t3x-footer-made-badges="dots"]', 'html[data-t3x-footer-made-badges="plain"]', 'html[data-t3x-footer-made-group="day"]']) {
+    assert.ok(code.includes(v4Hook), "v4 Made hook: " + v4Hook);
+  }
+  assert.ok(!/href\*\s*=/.test(code), "tailnet badge must use hostname parsing, never href*= substring matching");
 });
 
 test("no model pills, no !important, no layout outside the footer", () => {
   assert.ok(!/itemprop~="(opus|fable|haiku|sonnet|sol|astra|grok|gemini|flash)"/.test(code), "model pills are gone");
   assert.ok(!code.includes("!important"));
   assert.ok(!/(^|[;}])\s*(body|:root)\b/.test(code));
-  for (const m of code.matchAll(/(^|[;}])\s*html\b([^{]*)\{/g)) assert.match(m[2], /^\[data-t3x-(?:footer-team="[a-z-]+"|footer-made="[a-z-]+"|mac-app)\] /, "html rule outside the switch: " + m[2].slice(0, 60));
+  for (const m of code.matchAll(/(^|[;}])\s*html\b([^{]*)\{/g)) assert.match(m[2], /^\[data-t3x-(?:footer-team="[a-z-]+"|footer-made(?:-(?:badges|group))?="[a-z-]+"|mac-app)\] /, "html rule outside the switch: " + m[2].slice(0, 60));
 });

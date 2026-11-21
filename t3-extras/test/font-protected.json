@@ -1,7 +1,7 @@
 {
   "public/extras.js": "892ad7f7c0bac5a3d0ec5a78e6ba72934c745d0569d905aae2f15a147df0c14b",
   "public/extras.css": "bb0dcd6b78acc14b0eda19aca610069479bd7d6e7cc0fba83a1c604369aae677",
-  "test/footer-css.test.mjs": "3a3e249589d231a371e4ff49349c20ee0744f141aa7b662bacd250bbd07b568e",
-  "footerCssBlock": "66ad73e9b5bc1fc60c8f389820e6acd53154ce02d9940b0d2413fc10c520ee9a",
-  "footerReadmeParagraph": "04f34b8d981aa00900da08fb43bcc9a328b474da48d7ec63b154f5ae51797363"
+  "test/footer-css.test.mjs": "7ba81e2b2b37d24e869c97ccf2b089412dc3b7e384611fe5f6053c1573df6239",
+  "footerCssBlock": "f790a438aead963da2863b720474dfd224f38ec087afed671507629d318d395d",
+  "footerReadmeParagraph": "08cbca7536bdd77f9c2bca9116dad39ce8759ad92e6ce1c1b8e3d859f46379f3"
 }

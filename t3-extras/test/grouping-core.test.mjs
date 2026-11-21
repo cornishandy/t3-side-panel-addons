@@ -186,6 +186,11 @@ test("settledAt alone does not settle; only the override value settled does", ()
   });
   assert.equal(settled.row.shelf, "settled");
   assert.equal(settled.row.activity, "open");
+  assert.equal(settled.row.settledAt, Date.parse("2020-01-01T00:00:00.000Z"));
+  assert.equal(settled.row.snoozedUntil, null);
+  const bad = classify({ thread: { settledAt: "not-a-date", snoozedUntil: 12345 } });
+  assert.equal(bad.row.settledAt, null);
+  assert.equal(bad.row.snoozedUntil, null);
 });
 
 test("a linked pull request without a watch is not a waiting state", () => {

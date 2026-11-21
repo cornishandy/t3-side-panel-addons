@@ -67,6 +67,8 @@
     foldOlder: true, // active threads older than olderAfter fold under one "Older than 2 days" header
     olderOpen: false, // that header's remembered state
     olderAfter: "2d", // OLDER_AFTER: from what age a thread counts as older ("auto" = by gaps)
+    snoozedRule: Object.freeze({ unit: "rows", value: 3, lastUnit: "rows", last: Object.freeze({ rows: 3, min: 30, hours: 12, days: 1 }) }),
+    settledRule: Object.freeze({ unit: "rows", value: 3, lastUnit: "rows", last: Object.freeze({ rows: 3, min: 30, hours: 12, days: 1 }) }),
     oneRowTitles: true, // one line per title; a trailing (N) or (Model) stays visible
     titleLines: 2, // TITLE_LINES: with one-row titles off (compact threads), lines at most, used only as needed
     timeGaps: true, // a gap between active threads last active 25+ min apart, instead of lines
@@ -107,9 +109,14 @@
     popSpots: Object.freeze({}), // each moved popup's spot, from the window edges nearest it (see readSpots)
     footerTeam: "start-open", // the reply footer's team list: always-show | start-open | start-folded | always-hide
     footerMade: "open-short", // the reply footer's Made so far list: start-folded | open-short | always-open | hide
+    footerMadeGroup: "flat", // Made so far grouping: flat | day
+    footerMadeBadges: "pills", // Made so far type badges: pills | dots | plain
+    footerMadePreview: "hover-alt", // Made so far floating mini-viewer: hover-alt | direct | alt-only | off
+    footerMadePreviewAll: false, // opt-in: also enable floating mini-viewer on links outside Made so far
+    footerMadeMoreOpen: false, // ✦ panel "Display & mini-viewer" disclosure state
     fontTargets: Object.freeze({ composer: true, quotes: true, projects: true, pills: true, headings: true, replies: true, mine: true, ...Object.fromEntries(INTERFACE_TARGETS.map(([key]) => [key, false])) }),
   });
-  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "narrowAutoHide", "printOnly", "showPartly", "showHidden", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen", "popMove"];
+  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "narrowAutoHide", "printOnly", "showPartly", "showHidden", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen", "popMove", "footerMadePreviewAll", "footerMadeMoreOpen"];
   const MARKERS = ["bar", "outline", "off"];
   const TITLE_LINES = Object.freeze([2, 3, "unlimited"]);
   // The Older section's choices: value, hours (null = by gaps, olderCutoff), panel label, header words.
@@ -121,6 +128,102 @@
     ["1w", 168, "1 week", "a week"],
     ["auto", null, "Auto", null],
   ]);
+  const SHELF_UNITS = Object.freeze(["rows", "min", "hours", "days"]);
+  const SHELF_UNIT_MS = Object.freeze({ min: 60e3, hours: 3600e3, days: 86400e3 });
+  const SHELF_LIMITS = Object.freeze({
+    snoozed: Object.freeze({
+      key: "snoozedRule", legacyKey: "snoozedLimit", legacyLastKey: "snoozedLimitLast",
+      label: "Snoozed",
+      units: Object.freeze({
+        rows: Object.freeze({ min: 1, max: 25, def: 3 }),
+        min: Object.freeze({ min: 1, max: 1440, def: 30 }),
+        hours: Object.freeze({ min: 1, max: 168, def: 12 }),
+        days: Object.freeze({ min: 1, max: 365, def: 1 }),
+      }),
+    }),
+    settled: Object.freeze({
+      key: "settledRule", legacyKey: "settledLimit", legacyLastKey: "settledLimitLast",
+      label: "Settled",
+      units: Object.freeze({
+        rows: Object.freeze({ min: 1, max: 10, def: 3 }),
+        min: Object.freeze({ min: 1, max: 1440, def: 30 }),
+        hours: Object.freeze({ min: 1, max: 168, def: 12 }),
+        days: Object.freeze({ min: 1, max: 365, def: 1 }),
+      }),
+    }),
+  });
+  function defaultShelfRule(shelf) {
+    const cfg = SHELF_LIMITS[shelf];
+    const last = {};
+    for (const u of SHELF_UNITS) last[u] = cfg.units[u].def;
+    return { unit: "rows", value: cfg.units.rows.def, lastUnit: "rows", last };
+  }
+  function parseShelfUnitValue(v, shelf, unit) {
+    const u = SHELF_LIMITS[shelf]?.units?.[unit];
+    if (!u) return null;
+    return Number.isInteger(v) && v >= u.min && v <= u.max ? v : null;
+  }
+  function normalizeShelfRule(rawRule, legacyVal, legacyLast, shelf) {
+    const cfg = SHELF_LIMITS[shelf];
+    if (!cfg) return null;
+    const base = defaultShelfRule(shelf);
+    if (rawRule && typeof rawRule === "object" && !Array.isArray(rawRule)) {
+      const last = { ...base.last };
+      if (rawRule.last && typeof rawRule.last === "object") {
+        for (const u of SHELF_UNITS) {
+          const v = parseShelfUnitValue(rawRule.last[u], shelf, u);
+          if (v !== null) last[u] = v;
+        }
+      }
+      const unit = rawRule.unit === "all" || SHELF_UNITS.includes(rawRule.unit) ? rawRule.unit : "rows";
+      const lastUnit = unit !== "all" ? unit : (SHELF_UNITS.includes(rawRule.lastUnit) ? rawRule.lastUnit : "rows");
+      const valUnit = unit === "all" ? lastUnit : unit;
+      const parsedVal = parseShelfUnitValue(rawRule.value, shelf, valUnit);
+      const value = parsedVal ?? last[valUnit];
+      if (unit !== "all") last[unit] = value;
+      return { unit, value, lastUnit, last };
+    }
+    // Migrate legacy D'' numeric/"all" keys cleanly into unit="rows" / "all".
+    if (legacyVal === "all") {
+      const l = parseShelfUnitValue(legacyLast, shelf, "rows") ?? base.last.rows;
+      return { unit: "all", value: l, lastUnit: "rows", last: { ...base.last, rows: l } };
+    }
+    const n = parseShelfUnitValue(legacyVal, shelf, "rows");
+    if (n !== null) {
+      return { unit: "rows", value: n, lastUnit: "rows", last: { ...base.last, rows: n } };
+    }
+    return base;
+  }
+  function shelfRuleEqual(a, b) {
+    if (!a || !b) return a === b;
+    return a.unit === b.unit && (a.unit === "all" || a.value === b.value);
+  }
+  function isShelfTimeRule(rule) {
+    return Boolean(rule && Object.prototype.hasOwnProperty.call(SHELF_UNIT_MS, rule.unit));
+  }
+  function shelfUnitLabel(unit, n) {
+    if (unit === "rows") return n === 1 ? "row" : "rows";
+    if (unit === "min") return n === 1 ? "minute" : "minutes";
+    if (unit === "hours") return n === 1 ? "hour" : "hours";
+    if (unit === "days") return n === 1 ? "day" : "days";
+    return "";
+  }
+  function shelfRuleSummary(shelf, rule, liveCount = null) {
+    if (!rule || rule.unit === "all") return "All rows";
+    if (rule.unit === "rows") return rule.value === 1 ? "First 1 row" : `First ${rule.value} rows`;
+    const span = `${rule.value} ${shelfUnitLabel(rule.unit, rule.value)}`;
+    const base = shelf === "snoozed" ? `Waking in less than ${span}` : `Settled less than ${span} ago`;
+    return Number.isInteger(liveCount) ? `${base} \u00b7 ${liveCount} now` : base;
+  }
+  /** Typed Settings input: unsigned digits clamp to [min, max] for the active unit; empty or non-digit text is invalid (null). */
+  function parseShelfInput(text, shelf, unit = "rows") {
+    const u = SHELF_LIMITS[shelf]?.units?.[unit];
+    if (!u) return null;
+    const trimmed = String(text ?? "").trim();
+    if (!/^\d+$/.test(trimmed)) return null;
+    const n = Number(trimmed);
+    return Math.min(u.max, Math.max(u.min, n));
+  }
   const FOOTER_TEAM = [
     ["always-show", "Always show"],
     ["start-open", "Start open, click to fold"],
@@ -133,6 +236,21 @@
     ["open-short", "Open short lists"],
     ["always-open", "Always open"],
     ["hide", "Hide"],
+  ];
+  const FOOTER_MADE_GROUPS = [
+    ["flat", "Flat"],
+    ["day", "By day"],
+  ];
+  const FOOTER_MADE_BADGES = [
+    ["pills", "Color pills"],
+    ["dots", "Color dots"],
+    ["plain", "Plain text"],
+  ];
+  const FOOTER_MADE_PREVIEWS = [
+    ["hover-alt", "Hover + ⌥-click"],
+    ["direct", "Direct click"],
+    ["alt-only", "⌥-click"],
+    ["off", "Off"],
   ];
   // Round 1's four presets, as heading + body families.
   const LEGACY_PRESETS = { "3A": ["Caveat", "Kalam"], "3B": ["Noteworthy", "Bradley Hand"], "3C": ["Architects Daughter", "Patrick Hand"], "3D": ["SignPainter", "Chalkboard SE"] };
@@ -298,8 +416,14 @@
     if (MARKERS.includes(s.marker)) out.marker = s.marker;
     if (FOOTER_TEAM.some(([v]) => v === s.footerTeam)) out.footerTeam = s.footerTeam;
     if (FOOTER_MADE_MODES.some(([v]) => v === s.footerMade)) out.footerMade = s.footerMade;
+    if (FOOTER_MADE_GROUPS.some(([v]) => v === s.footerMadeGroup)) out.footerMadeGroup = s.footerMadeGroup;
+    if (FOOTER_MADE_BADGES.some(([v]) => v === s.footerMadeBadges)) out.footerMadeBadges = s.footerMadeBadges;
+    if (FOOTER_MADE_PREVIEWS.some(([v]) => v === s.footerMadePreview)) out.footerMadePreview = s.footerMadePreview;
     if (OLDER_AFTER.some(([v]) => v === s.olderAfter)) out.olderAfter = s.olderAfter;
     if (TITLE_LINES.includes(s.titleLines)) out.titleLines = s.titleLines;
+    for (const [shelf, cfg] of Object.entries(SHELF_LIMITS)) {
+      out[cfg.key] = normalizeShelfRule(s[cfg.key], s[cfg.legacyKey], s[cfg.legacyLastKey], shelf);
+    }
     out.popSpots = readSpots(s.popSpots);
     if (s.fontHead || s.fontBody) {
       out.fontHead = fontPick(s.fontHead);
@@ -1860,6 +1984,7 @@
   const FOOTER_DETAILS = ':is(' + FOOTER_CARD + ', ' + FOOTER_MADE_WRAP + ') + div:has(> [data-markdown-details]):not(:has(> [data-markdown-details] > [data-markdown-details-summary] [itemprop~="made"])) > [data-markdown-details]';
   const footerControls = new WeakMap();
   let footerControlsActive = true; // Old direct listeners become inert on loader replacement.
+  let suppressShelfCommit = false; // Declared before __T3X_TEST__ early-return so teardown-splice harnesses avoid TDZ.
   // Capture before T3's delegated handlers: preventing activation keeps the panel mounted
   // and its summary focused. A closed list must still accept our restoration click.
   function footerControl(el, btn, mode) {
@@ -1919,12 +2044,19 @@
   function madeSummary(el) {
     return el.querySelector ? el.querySelector(MADE_SUMMARY) : null;
   }
-  /** The count only when the summary has a finished "Made so far · N:". A half-written summary counts as unknown. */
+  /** The count only when the summary has a finished "Made so far · N:" (legacy) or
+   *  "Made so far · N item(s) · [newest ]<day> <Mon>[ <YYYY>] · <h:mm AM/PM>" (v4).
+   *  A half-written summary or an open content block with zero rendered table rows counts as unknown. */
   function madeCount(el) {
     const btn = madeSummary(el);
     const text = btn && btn.textContent != null ? String(btn.textContent) : "";
-    const m = /Made so far\s*·\s*(\d+)\s*:/.exec(text);
-    return m ? Number(m[1]) : null;
+    const m = /Made so far\s*·\s*(\d+)(?:\s*:|\s+items?\s*·\s*(?:newest\s+)?\d{1,2}\s+[A-Z][a-z]{2}(?:\s+\d{4})?\s*·\s*\d{1,2}:\d{2}\s*[AP]M\b)/.exec(text);
+    if (!m) return null;
+    try {
+      const content = el && el.querySelector ? el.querySelector("[data-markdown-details-content]") : null;
+      if (content && content.querySelector && !content.querySelector("table tr")) return null;
+    } catch {}
+    return Number(m[1]);
   }
   function madeMessageId(el) {
     try {
@@ -2083,6 +2215,19 @@
     if (bag.held) bag.held.delete(key);
     bag.pendingEl.delete(el);
   }
+  /** Hold an auto-opened short list open after Andy interacts with an item (direct link click, Float button, or ⌥-click). */
+  function holdMadeFromEl(el, bag) {
+    if (!el || !bag) return false;
+    const key = madeKey(bag, el);
+    if (!key || !bag.auto || !bag.auto.has(key) || !madeOpen(el)) return false;
+    bag.held = bag.held || new Set();
+    bag.held.add(key);
+    // He clicked inside the open list, so our open click has landed: retire it. Without this,
+    // the same node redrawn closed before the next pass would never reopen. A fold-back still
+    // in flight (false) stays recorded, so the next pass can't queue a second toggle.
+    if (bag.pendingEl && bag.pendingEl.get(el) === true) bag.pendingEl.delete(el);
+    return true;
+  }
   /** A trusted click on a link in the list's rows. Only a list we opened ourselves is held;
    *  a list he opened or closed already has his choice, and that stays as it is. */
   function noteMadeLink(el, event, bag) {
@@ -2097,14 +2242,7 @@
     }
     const btn = madeSummary(el);
     if (btn && btn.contains && btn.contains(link)) return;
-    const key = madeKey(bag, el);
-    if (!key || !bag.auto || !bag.auto.has(key) || !madeOpen(el)) return;
-    bag.held = bag.held || new Set();
-    bag.held.add(key);
-    // He clicked inside the open list, so our open click has landed: retire it. Without this,
-    // the same node redrawn closed before the next pass would never reopen. A fold-back still
-    // in flight (false) stays recorded, so the next pass can't queue a second toggle.
-    if (bag.pendingEl.get(el) === true) bag.pendingEl.delete(el);
+    holdMadeFromEl(el, bag);
   }
   function madeControl(el, btn, mode) {
     let rec = madeControls.get(btn);
@@ -2224,6 +2362,515 @@
     return clicks;
   }
 
+  // ---------- Made so far v4 enhancements: hostname tailnet fallback, By day grouping, Floating mini-viewer ----------
+
+  const MADE_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const MADE_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  /** True only when href parses to an http(s) URL whose hostname ends in .ts.net (never matches path/query substrings). */
+  function isTailnetUrl(href, baseHref) {
+    if (!href || typeof href !== "string") return false;
+    try {
+      const u = new URL(href, baseHref || "http://localhost/");
+      return (u.protocol === "http:" || u.protocol === "https:") && u.hostname.toLowerCase().endsWith(".ts.net");
+    } catch {
+      return false;
+    }
+  }
+  /** Parse an ISO datetime into local-day heading + clock string, or null when invalid. */
+  function dayHeadingFor(isoDatetime, nowDate) {
+    if (!isoDatetime || typeof isoDatetime !== "string") return null;
+    const d = new Date(isoDatetime);
+    if (!Number.isFinite(d.getTime())) return null;
+    const now = nowDate instanceof Date ? nowDate : new Date();
+    const y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
+    const key = `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const row0 = new Date(y, m, day).getTime();
+    const diffDays = Math.round((today0 - row0) / 86400000);
+    const shortDate = `${day} ${MADE_MONTHS[m]}${y !== now.getFullYear() ? ` ${y}` : ""}`;
+    let label;
+    if (diffDays === 0) label = `Today · ${shortDate}`;
+    else if (diffDays === 1) label = `Yesterday · ${shortDate}`;
+    else if (diffDays > 1 && diffDays < 7 && y === now.getFullYear()) label = `${MADE_DAYS[d.getDay()]} · ${shortDate}`;
+    else label = shortDate;
+    const hh = d.getHours(), mm = d.getMinutes();
+    const clock = `${hh % 12 || 12}:${String(mm).padStart(2, "0")} ${hh >= 12 ? "PM" : "AM"}`;
+    return { key, label, clock };
+  }
+  /** Pure zero-overlap position for the shared body-level Float overlay (viewport coords).
+   *  Modes: narrow-band1 (phone <30rem), desktop-inline, desktop-col3-below, desktop-outside-right, desktop-col3-above. */
+  function computeFloatPos(rowRect, cellRect, col3Rect, whenRect, lastRect, btnW, btnH, narrow, extraRight, vw, vh, prevWhenRect) {
+    const clampX = (x) => Math.max(4, Math.min(x, Math.max(4, (vw || 9999) - btnW - 4)));
+    const clampY = (y) => Math.max(4, Math.min(y, Math.max(4, (vh || 9999) - btnH - 4)));
+    if (narrow) {
+      const left = clampX((rowRect.left || 0) + 74);
+      const top = clampY((rowRect.top || 0) + 6);
+      return { left: Math.round(left), top: Math.round(top), mode: "narrow-band1" };
+    }
+    const idealLeft = (lastRect.right || 0) + 8 + (extraRight || 0);
+    const maxInlineRight = (cellRect.right || 0) - 4;
+    if (idealLeft + btnW <= maxInlineRight) {
+      const top = (lastRect.top || 0) + ((lastRect.height || btnH) - btnH) / 2;
+      return { left: Math.round(clampX(idealLeft)), top: Math.round(clampY(top)), mode: "desktop-inline" };
+    }
+    const fbLeft = clampX((col3Rect.right || rowRect.right || 0) - btnW - 6);
+    const whenBottom = whenRect ? whenRect.bottom : (rowRect.top + 20);
+    const fitsBelowInsideRow = (whenBottom + 3 + btnH) <= ((rowRect.bottom || 0) - 1);
+    if (fitsBelowInsideRow) {
+      return { left: Math.round(fbLeft), top: Math.round(clampY(whenBottom + 3)), mode: "desktop-col3-below" };
+    }
+    // For short 1-line full-width rows, prefer the margin right of the table so adjacent rows' timestamps are never covered.
+    const outsideRight = (rowRect.right || 0) + 6;
+    if (outsideRight + btnW <= (vw || 9999) - 4) {
+      const midTop = (rowRect.top || 0) + (((rowRect.bottom || 0) - (rowRect.top || 0) - btnH) / 2);
+      return { left: Math.round(outsideRight), top: Math.round(clampY(midTop)), mode: "desktop-outside-right" };
+    }
+    const fbTopAbove = clampY((rowRect.top || 0) - btnH - 2);
+    let aboveLeft = fbLeft;
+    for (const obstacle of [prevWhenRect, whenRect]) {
+      if (!obstacle) continue;
+      const hitY = fbTopAbove < (obstacle.bottom || 0) && (fbTopAbove + btnH) > (obstacle.top || 0);
+      const hitX = aboveLeft < (obstacle.right || 0) && (aboveLeft + btnW) > (obstacle.left || 0);
+      if (hitX && hitY) {
+        const shifted = (obstacle.left || 0) - btnW - 6;
+        if (shifted >= 4) aboveLeft = clampX(shifted);
+      }
+    }
+    return { left: Math.round(aboveLeft), top: Math.round(fbTopAbove), mode: "desktop-col3-above" };
+  }
+  /** Shape checks for T3's Zustand preview stores (never depend on minified export names). */
+  function isMiniPlayerStore(x) {
+    if (!x || typeof x.getState !== "function") return false;
+    try {
+      const s = x.getState();
+      return Boolean(s && typeof s === "object" && s.byThreadKey && typeof s.byThreadKey === "object"
+        && typeof s.open === "function" && typeof s.close === "function"
+        && typeof s.move === "function" && typeof s.resize === "function");
+    } catch {
+      return false;
+    }
+  }
+  function isRightPanelStore(x) {
+    if (!x || typeof x.getState !== "function") return false;
+    try {
+      const s = x.getState();
+      return Boolean(s && typeof s === "object" && s.byThreadKey && typeof s.byThreadKey === "object"
+        && typeof s.openBrowser === "function" && typeof s.close === "function"
+        && typeof s.toggle === "function");
+    } catch {
+      return false;
+    }
+  }
+  function isBrowserSurfaceStore(x) {
+    if (!x || typeof x.getState !== "function" || typeof x.subscribe !== "function") return false;
+    try {
+      const s = x.getState();
+      return Boolean(s && typeof s === "object" && s.byTabId && typeof s.byTabId === "object"
+        && typeof s.claim === "function" && typeof s.present === "function"
+        && typeof s.presentContent === "function" && typeof s.release === "function");
+    } catch {
+      return false;
+    }
+  }
+  const MINI_STORE_ASSET_RE = /\/assets\/previewMiniPlayerStore-[^/?#]+\.js$/;
+  const RIGHT_STORE_ASSET_RE = /\/assets\/rightPanelStore-[^/?#]+\.js$/;
+  const MAIN_STORE_ASSET_RE = /\/assets\/main-[^/?#]+\.js$/;
+  /** Restrict dynamic store imports strictly to trusted same-origin host asset URLs (never foreign origins). */
+  function isTrustedAppAsset(candidateUrl, baseHref, pathRe) {
+    if (!candidateUrl || typeof candidateUrl !== "string") return false;
+    try {
+      const app = new URL(baseHref || "http://localhost/");
+      const parsed = new URL(candidateUrl, app.href);
+      if (!pathRe.test(parsed.pathname)) return false;
+      if (app.origin && app.origin !== "null") return parsed.origin === app.origin;
+      if (parsed.protocol !== app.protocol || parsed.host !== app.host) return false;
+      const appDir = app.pathname.replace(/[^/]*$/, "");
+      return parsed.pathname.startsWith(appDir);
+    } catch {
+      return false;
+    }
+  }
+  /** Discover T3's live previewMiniPlayerStore, rightPanelStore, and main browserSurfaceStore via same-origin Vite ESM URLs + shape checks. */
+  async function findMiniPlayerStores(opts = {}) {
+    if (opts.stores && (isMiniPlayerStore(opts.stores.miniPlayerStore) || isRightPanelStore(opts.stores.rightPanelStore) || isBrowserSurfaceStore(opts.stores.browserSurfaceStore))) {
+      return {
+        miniPlayerStore: isMiniPlayerStore(opts.stores.miniPlayerStore) ? opts.stores.miniPlayerStore : null,
+        rightPanelStore: isRightPanelStore(opts.stores.rightPanelStore) ? opts.stores.rightPanelStore : null,
+        browserSurfaceStore: isBrowserSurfaceStore(opts.stores.browserSurfaceStore) ? opts.stores.browserSurfaceStore : null,
+      };
+    }
+    const base = opts.baseHref || (typeof location !== "undefined" ? location.href : "http://localhost/");
+    const urls = [];
+    if (Array.isArray(opts.resourceUrls)) {
+      urls.push(...opts.resourceUrls);
+    } else if (typeof performance !== "undefined" && typeof performance.getEntriesByType === "function") {
+      try {
+        for (const e of performance.getEntriesByType("resource")) {
+          if (e && typeof e.name === "string") urls.push(e.name);
+        }
+      } catch {}
+    }
+    const doc = opts.doc || (typeof document !== "undefined" ? document : null);
+    if (doc && doc.querySelectorAll) {
+      for (const el of doc.querySelectorAll('link[rel="modulepreload"][href], script[type="module"][src]')) {
+        const raw = el.getAttribute("href") || el.getAttribute("src") || "";
+        if (!raw) continue;
+        try { urls.push(new URL(raw, base).href); } catch {}
+      }
+    }
+    const miniCandidate = opts.miniPlayerUrl && isTrustedAppAsset(opts.miniPlayerUrl, base, MINI_STORE_ASSET_RE)
+      ? opts.miniPlayerUrl
+      : urls.find((u) => isTrustedAppAsset(u, base, MINI_STORE_ASSET_RE)) || null;
+    const rightCandidate = opts.rightPanelUrl && isTrustedAppAsset(opts.rightPanelUrl, base, RIGHT_STORE_ASSET_RE)
+      ? opts.rightPanelUrl
+      : urls.find((u) => isTrustedAppAsset(u, base, RIGHT_STORE_ASSET_RE)) || null;
+    const mainCandidate = opts.mainAssetUrl && isTrustedAppAsset(opts.mainAssetUrl, base, MAIN_STORE_ASSET_RE)
+      ? opts.mainAssetUrl
+      : urls.find((u) => isTrustedAppAsset(u, base, MAIN_STORE_ASSET_RE)) || null;
+    const load = typeof opts.importModule === "function" ? opts.importModule : (u) => import(u);
+    const pick = (mod, check) => {
+      if (!mod || typeof mod !== "object") return null;
+      for (const v of Object.values(mod)) if (check(v)) return v;
+      return null;
+    };
+    let miniPlayerStore = null, rightPanelStore = null, browserSurfaceStore = null;
+    if (miniCandidate) {
+      try { miniPlayerStore = pick(await load(miniCandidate), isMiniPlayerStore); } catch {}
+    }
+    if (rightCandidate) {
+      try { rightPanelStore = pick(await load(rightCandidate), isRightPanelStore); } catch {}
+    }
+    if (mainCandidate) {
+      try { browserSurfaceStore = pick(await load(mainCandidate), isBrowserSurfaceStore); } catch {}
+    }
+    return { miniPlayerStore, rightPanelStore, browserSurfaceStore };
+  }
+  /** True once T3's docked PreviewPanel has presented a live non-zero rect AND measured content for the latest
+   *  serverEpoch of exact (threadRef, tabId). Rejects released (owner===null), already-fitted floating surfaces,
+   *  and stale serverEpoch entries whenever a newer epoch or updatedAt exists for that environment/tab. */
+  function hasMeasuredBrowserSurface(surfaceStore, threadRef, tabId, expectedEpoch) {
+    if (!isBrowserSurfaceStore(surfaceStore) || !threadRef || !threadRef.threadId || !tabId) return false;
+    try {
+      const by = surfaceStore.getState().byTabId;
+      if (!by || typeof by !== "object") return false;
+      const wantEnv = threadRef.environmentId ? String(threadRef.environmentId) : "";
+      const wantTid = String(threadRef.threadId);
+      const wantTab = String(tabId);
+      let maxNumericEnvEpoch = null;
+      const matches = [];
+      for (const [k, rec] of Object.entries(by)) {
+        if (!rec || typeof rec !== "object") continue;
+        if (k === wantTab) {
+          if (!wantEnv) matches.push({ epoch: null, updatedAt: Number(rec.updatedAt) || 0, rec });
+          continue;
+        }
+        let parsed;
+        try { parsed = JSON.parse(k); } catch { continue; }
+        if (!Array.isArray(parsed) || parsed.length < 4) continue;
+        if (String(parsed[0] || "") !== wantEnv) continue;
+        const ep = parsed[2];
+        if (typeof ep === "number" && Number.isFinite(ep)) {
+          if (maxNumericEnvEpoch === null || ep > maxNumericEnvEpoch) maxNumericEnvEpoch = ep;
+        }
+        if (String(parsed[1] || "") === wantTid && String(parsed[3] || "") === wantTab) {
+          matches.push({ epoch: ep, updatedAt: Number(rec.updatedAt) || 0, rec });
+        }
+      }
+      if (!matches.length) return false;
+      const isNumEp = (e) => typeof e === "number" && Number.isFinite(e);
+      const isLiveMeasured = (rec) => Boolean(
+        rec && rec.owner !== null && rec.fitSourceContent !== true
+        && rec.visible && rec.rect && rec.rect.width > 0 && rec.rect.height > 0
+        && rec.content && rec.content.width > 0 && rec.content.height > 0,
+      );
+      if (expectedEpoch !== undefined && expectedEpoch !== null) {
+        if (maxNumericEnvEpoch !== null && (!isNumEp(expectedEpoch) || expectedEpoch < maxNumericEnvEpoch)) return false;
+        const exact = matches.filter((m) => m.epoch === expectedEpoch);
+        if (!exact.length) return false;
+        const maxAt = exact.reduce((hi, m) => (m.updatedAt > hi ? m.updatedAt : hi), -Infinity);
+        // Fail closed across any same-timestamp ties so order of insertion can never flip the verdict.
+        return exact.filter((m) => m.updatedAt === maxAt).every((m) => isLiveMeasured(m.rec));
+      }
+      // Strict transitive lexicographic order: (hasNumericEpoch, numericEpoch, updatedAt) — invariant to key order.
+      matches.sort((a, b) => {
+        const at = isNumEp(a.epoch) ? 1 : 0;
+        const bt = isNumEp(b.epoch) ? 1 : 0;
+        if (at !== bt) return bt - at;
+        if (at === 1 && a.epoch !== b.epoch) return b.epoch - a.epoch;
+        return b.updatedAt - a.updatedAt;
+      });
+      const best = matches[0];
+      if (!best) return false;
+      const bestTier = isNumEp(best.epoch) ? 1 : 0;
+      if (maxNumericEnvEpoch !== null && (bestTier === 0 || best.epoch < maxNumericEnvEpoch)) return false;
+      // Fail closed across any tied top entries (same tier, epoch, and updatedAt).
+      const topTied = matches.filter((m) => (isNumEp(m.epoch) ? 1 : 0) === bestTier && (bestTier === 0 || m.epoch === best.epoch) && m.updatedAt === best.updatedAt);
+      return topTied.every((m) => isLiveMeasured(m.rec));
+    } catch {}
+    return false;
+  }
+  function isAlreadyFloatingTab(miniPlayerStore, threadRef, tabId) {
+    if (!isMiniPlayerStore(miniPlayerStore) || !threadRef || !threadRef.threadId || !tabId) return false;
+    try {
+      const by = miniPlayerStore.getState().byThreadKey;
+      if (!by || typeof by !== "object") return false;
+      const tid = String(threadRef.threadId);
+      const env = threadRef.environmentId ? String(threadRef.environmentId) : "";
+      const entry = env ? (by[`${env}:${tid}`] || null) : (by[tid] || null);
+      return Boolean(entry && entry.source && entry.source.kind === "browser" && entry.source.tabId === tabId);
+    } catch {
+      return false;
+    }
+  }
+  /** Read the active open browser preview tabId written by T3's openBrowser(threadRef, tabId) into rightPanelStore.
+   *  Requires an exact environmentId:threadId key whenever environmentId is present (never crosses environments). */
+  function activeBrowserTabIdFromRightPanel(rightPanelStore, threadRef) {
+    if (!isRightPanelStore(rightPanelStore) || !threadRef || !threadRef.threadId) return null;
+    try {
+      const by = rightPanelStore.getState().byThreadKey;
+      if (!by || typeof by !== "object") return null;
+      const tid = String(threadRef.threadId);
+      const env = threadRef.environmentId ? String(threadRef.environmentId) : "";
+      const entry = env ? (by[`${env}:${tid}`] || null) : (by[tid] || null);
+      if (!entry || !entry.isOpen) return null;
+      const activeId = typeof entry.activeSurfaceId === "string" ? entry.activeSurfaceId : "";
+      if (Array.isArray(entry.surfaces)) {
+        const surf = entry.surfaces.find((s) => s && s.id === activeId);
+        if (surf && surf.kind === "preview" && typeof surf.resourceId === "string" && surf.resourceId) return surf.resourceId;
+      }
+      if (activeId.startsWith("browser:") && activeId !== "browser:new") return activeId.slice("browser:".length);
+    } catch {}
+    return null;
+  }
+  /** Store-first Float: idempotently opens (threadRef, { kind: "browser", tabId }) in previewMiniPlayerStore
+   *  and closes the docked right panel via rightPanelStore.close(threadRef). */
+  function tryFloatViaStores(stores, threadRef, tabId) {
+    if (!stores || !isMiniPlayerStore(stores.miniPlayerStore) || !threadRef || !tabId) return false;
+    try {
+      stores.miniPlayerStore.getState().open(threadRef, { kind: "browser", tabId });
+      if (isRightPanelStore(stores.rightPanelStore)) {
+        try { stores.rightPanelStore.getState().close(threadRef); } catch {}
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  /** Walk React fibers by shape (never minified names) to locate ChatMarkdown preview context & optional file-link chip props. */
+  function findMarkdownPreviewCtx(node, fiberOf) {
+    const find = fiberOf || reactFiber;
+    let ctx = null, chip = null;
+    for (let cur = node, depth = 0; cur && depth < 8; cur = cur.parentElement, depth++) {
+      const start = find(cur);
+      if (!start) continue;
+      for (let f = start, hops = 0; f && hops < 250; f = f.return, hops++) {
+        const p = f.memoizedProps;
+        if (!p || typeof p !== "object") continue;
+        if (!chip && (typeof p.onOpenInBrowser === "function" || typeof p.onOpenMedia === "function")) {
+          chip = { onOpenInBrowser: p.onOpenInBrowser, onOpenMedia: p.onOpenMedia, targetPath: p.targetPath, threadRef: p.threadRef };
+        }
+        const v = p.value;
+        if (!ctx && v && typeof v === "object" && typeof v.openExternalLinkInPreview === "function" && v.threadRef && typeof v.threadRef.threadId === "string") {
+          ctx = v;
+        }
+        if (ctx && chip) break;
+      }
+      if (ctx) break;
+    }
+    return { ctx, chip };
+  }
+  /** Resolve how an anchor can open in T3's floating browser mini-viewer (or native media lightbox), or null when unsupported. */
+  function resolvePreviewTarget(anchor, fiberOf, baseHref) {
+    if (!anchor || anchor.nodeType !== 1) return null;
+    const rawHref = anchor.getAttribute ? (anchor.getAttribute("href") || "") : "";
+    const { ctx, chip } = findMarkdownPreviewCtx(anchor, fiberOf);
+    const canPreview = Boolean(ctx && typeof ctx.openExternalLinkInPreview === "function" && ctx.canOperatePreview !== false);
+    const threadRef = (chip && chip.threadRef) || (ctx && ctx.threadRef) || null;
+    if (/^https?:\/\//i.test(rawHref)) {
+      if (!canPreview) return null;
+      return { kind: "external", url: rawHref, threadRef, open: () => ctx.openExternalLinkInPreview(rawHref) };
+    }
+    if (chip && typeof chip.onOpenInBrowser === "function") {
+      if (!ctx || ctx.canOperatePreview === false) return null;
+      return { kind: "file-browser", path: chip.targetPath || rawHref, threadRef, open: () => chip.onOpenInBrowser() };
+    }
+    if (chip && typeof chip.onOpenMedia === "function") {
+      return { kind: "media-lightbox", path: chip.targetPath || rawHref, threadRef, open: () => chip.onOpenMedia() };
+    }
+    // Local audio/media row in Made so far with a trailing [phone] Tailscale mirror link: float that mirror!
+    const tr = anchor.closest ? anchor.closest("tr") : null;
+    if (tr && canPreview) {
+      const descLink = tr.querySelector ? tr.querySelector('[itemprop="made-desc"] a[href]') : null;
+      const mirrorHref = descLink && descLink.getAttribute ? descLink.getAttribute("href") : "";
+      if (mirrorHref && isTailnetUrl(mirrorHref, baseHref)) {
+        return { kind: "external", url: mirrorHref, threadRef, open: () => ctx.openExternalLinkInPreview(mirrorHref) };
+      }
+    }
+    return null;
+  }
+  function sameThreadRef(a, b) {
+    if (!a || !b) return false;
+    if (String(a.threadId || "") !== String(b.threadId || "")) return false;
+    const ea = a.environmentId ? String(a.environmentId) : "";
+    const eb = b.environmentId ? String(b.environmentId) : "";
+    if (ea || eb) return ea === eb;
+    return true;
+  }
+  function reactProps(node) {
+    if (!node || typeof node !== "object") return null;
+    try {
+      for (const k of Object.keys(node)) {
+        if (k.startsWith("__reactProps$")) return node[k];
+      }
+    } catch {}
+    return null;
+  }
+  /** Enumerate committed PreviewPanel toolbar buttons owned by exact threadRef.
+   *  Requires threadRef and tabId on the SAME nearest owning preview fiber (matching Nightly's PreviewPanel props),
+   *  rejects conflicting child tabIds, and dispatches through the committed button (__reactProps$.onClick / btn.click). */
+  function listPreviewPanelFloatActions(doc, threadRef, tabId, fiberOf) {
+    if (!doc || !doc.querySelectorAll || !threadRef) return [];
+    const find = fiberOf || reactFiber;
+    const buttons = doc.querySelectorAll('button[aria-label="Float preview over chat"], button[aria-label="Close floating preview"]');
+    const out = [];
+    for (const btn of buttons) {
+      if (!btn || btn.isConnected === false) continue;
+      const start = find(btn);
+      if (!start) continue;
+      const domPipOn = btn.getAttribute("aria-label") === "Close floating preview" || btn.getAttribute("aria-pressed") === "true";
+      let ownerThreadRef = null, ownerTabId = null, fiberPipOn = false;
+      const seenTabIds = new Set();
+      for (let f = start, hops = 0; f && hops < 80; f = f.return, hops++) {
+        const p = f.memoizedProps;
+        if (!p || typeof p !== "object") continue;
+        if (typeof p.onPictureInPicture === "function" && p.pictureInPicture === true) fiberPipOn = true;
+        const fThread = p.threadRef && typeof p.threadRef === "object" && typeof p.threadRef.threadId === "string" ? p.threadRef : null;
+        if (fThread) {
+          // Stop at the nearest owning preview fiber: threadRef and tabId must belong to this exact instance.
+          ownerThreadRef = fThread;
+          ownerTabId = typeof p.tabId === "string" && p.tabId ? p.tabId : null;
+          if (typeof p.activeTabId === "string" && p.activeTabId) seenTabIds.add(p.activeTabId);
+          break;
+        }
+        if (typeof p.tabId === "string" && p.tabId) seenTabIds.add(p.tabId);
+        if (typeof p.activeTabId === "string" && p.activeTabId) seenTabIds.add(p.activeTabId);
+      }
+      if (!ownerThreadRef || !sameThreadRef(ownerThreadRef, threadRef)) continue;
+      let tabConflict = false;
+      for (const sid of seenTabIds) if (sid !== ownerTabId) { tabConflict = true; break; }
+      if (!ownerTabId || tabConflict) continue;
+      if (tabId && ownerTabId !== tabId) continue;
+      const disabled = Boolean(btn.disabled) || btn.getAttribute("aria-disabled") === "true";
+      out.push({
+        btn,
+        tabId: ownerTabId,
+        alreadyFloating: domPipOn || fiberPipOn,
+        disabled,
+        invoke: () => {
+          const rp = reactProps(btn);
+          if (rp && typeof rp.onClick === "function") return rp.onClick();
+          if (typeof btn.click === "function") return btn.click();
+          return undefined;
+        },
+      });
+    }
+    return out;
+  }
+  /** Inspect committed PreviewPanel toolbar buttons by fiber shape to find the exact float action for (threadRef, tabId).
+   *  When tabId is null (e.g. Nightly Success with value: undefined & undiscoverable rightPanelStore), recovers a unique
+   *  newly-committed preview for exact threadRef and fails closed when a pre-open snapshot has zero fresh matches. */
+  function findPreviewPanelFloatAction(doc, threadRef, tabId, fiberOf, prevSnapshot) {
+    const matches = listPreviewPanelFloatActions(doc, threadRef, tabId || null, fiberOf);
+    if (!matches.length) return null;
+    if (tabId) return matches.length === 1 ? matches[0] : null;
+    if (prevSnapshot && prevSnapshot.size > 0) {
+      const fresh = matches.filter((m) => !prevSnapshot.has(m.tabId ? `tab:${m.tabId}` : m.btn));
+      return fresh.length === 1 ? fresh[0] : null;
+    }
+    return matches.length === 1 ? matches[0] : null;
+  }
+  const madeDayCache = new WeakMap(); // table -> { sig, rows, dividers }
+  /** Enhance open v4 Made so far tables: hostname-parsed data-t3x-tailnet fallback & optional By day divider rows. */
+  function enhanceMadeLists(root, opts = {}) {
+    if (!root || !root.querySelectorAll) return;
+    const groupMode = opts.group === "day" ? "day" : "flat";
+    const baseHref = opts.baseHref || (typeof location !== "undefined" ? location.href : "http://localhost/");
+    const nowDate = opts.now instanceof Date ? opts.now : new Date();
+    const ownAttr = opts.ownAttr || "data-t3x";
+    let folds;
+    try {
+      folds = root.querySelectorAll(FOOTER_MADE);
+    } catch {
+      return;
+    }
+    for (const fold of folds) {
+      const tables = fold.querySelectorAll ? fold.querySelectorAll('table:has([itemprop~="made-pill"])') : [];
+      for (const tbl of tables) {
+        // 1. Hostname-parsed .ts.net fallback on primary col-2 links only (never nested [itemprop="made-desc"] a)
+        for (const a of tbl.querySelectorAll(':is(th, td):nth-child(2) > a')) {
+          const href = a.getAttribute("href") || "";
+          const next = a.nextElementSibling;
+          const hasExplicit = Boolean(next && (next.getAttribute("itemprop") || "").split(/\s+/).includes("made-tailnet"));
+          if (!hasExplicit && isTailnetUrl(href, baseHref)) a.setAttribute("data-t3x-tailnet", "1");
+          else a.removeAttribute("data-t3x-tailnet");
+        }
+        // 2. Optional By day grouping (inserted rows marked with ownAttr="made-day" for clean teardown/Flat restore)
+        const doc = tbl.ownerDocument || (typeof document !== "undefined" ? document : null);
+        if (groupMode !== "day") {
+          for (const hdr of tbl.querySelectorAll(`tr[${ownAttr}="made-day"]`)) hdr.remove();
+          for (const w of tbl.querySelectorAll('[itemprop="made-when"][data-t3x-clock]')) {
+            w.removeAttribute("data-t3x-clock");
+            if (w.getAttribute("data-t3x-title") === "1") { w.removeAttribute("title"); w.removeAttribute("data-t3x-title"); }
+          }
+          madeDayCache.delete(tbl);
+          continue;
+        }
+        const itemRows = [...tbl.querySelectorAll("thead > tr, tbody > tr")].filter((tr) => !tr.classList.contains("t3x-made-day"));
+        const dayKeyToday = `${nowDate.getFullYear()}-${nowDate.getMonth()}-${nowDate.getDate()}`;
+        const sig = dayKeyToday + "|" + itemRows.map((tr) => tr.querySelector('[itemprop="made-when"]')?.getAttribute("datetime") || "").join(",");
+        const cached = madeDayCache.get(tbl);
+        const cacheValid = Boolean(
+          cached &&
+          cached.sig === sig &&
+          cached.rows.length === itemRows.length &&
+          cached.rows.every((r, i) => r === itemRows[i]) &&
+          cached.dividers.every((d) => d.hdr.isConnected && d.hdr.nextElementSibling === d.beforeRow) &&
+          itemRows.every((tr) => {
+            const w = tr.querySelector('[itemprop="made-when"]');
+            return !w || !dayHeadingFor(w.getAttribute("datetime") || "", nowDate) || w.hasAttribute("data-t3x-clock");
+          }),
+        );
+        if (cacheValid) continue;
+        for (const hdr of tbl.querySelectorAll(`tr[${ownAttr}="made-day"]`)) hdr.remove();
+        let lastKey = null;
+        const dividers = [];
+        for (const tr of itemRows) {
+          const when = tr.querySelector('[itemprop="made-when"]');
+          const info = dayHeadingFor(when?.getAttribute("datetime") || "", nowDate);
+          if (!info) continue;
+          when.setAttribute("data-t3x-clock", info.clock);
+          if (!when.hasAttribute("title")) {
+            when.setAttribute("title", (when.textContent || "").trim());
+            when.setAttribute("data-t3x-title", "1");
+          }
+          if (info.key !== lastKey && doc) {
+            lastKey = info.key;
+            const hdr = doc.createElement("tr");
+            hdr.className = "t3x-made-day";
+            hdr.setAttribute(ownAttr, "made-day");
+            const cell = doc.createElement(tr.parentElement && tr.parentElement.tagName === "THEAD" ? "th" : "td");
+            cell.colSpan = 3;
+            cell.textContent = info.label;
+            hdr.append(cell);
+            tr.before(hdr);
+            dividers.push({ hdr, beforeRow: tr });
+          }
+        }
+        madeDayCache.set(tbl, { sig, rows: itemRows, dividers });
+      }
+    }
+  }
+
   /** The <html> attributes for the CSS-only parts (the footer team and Made modes are always set). */
   function rootAttrs(st) {
     const out = {
@@ -2243,6 +2890,9 @@
       "data-t3x-marker": st.marker !== "off" ? st.marker : null,
       "data-t3x-footer-team": st.footerTeam,
       "data-t3x-footer-made": st.footerMade,
+      "data-t3x-footer-made-group": st.footerMadeGroup,
+      "data-t3x-footer-made-badges": st.footerMadeBadges,
+      "data-t3x-footer-made-preview": st.footerMadePreview,
     };
     for (const t of TARGETS) out[`data-t3x-ft-${t}`] = st.fontTargets[t] ? "" : null;
     return out;
@@ -2313,6 +2963,145 @@
     return o?.[3] ? `Older than ${o[3]}` : "Older";
   };
 
+  /** T3's Math.floor-rounded Settled relative-age badge ("now", "35m", "1h", "2d") as an exact
+   *  [lo, hi) ms interval, or null when absent/unrecognized (e.g. "2w" -> treated like no badge). */
+  function parseSettledBadgeInterval(text) {
+    const m = /^(?:(now)|(\d{1,4})([mhd]))$/.exec(String(text ?? "").trim());
+    if (!m) return null;
+    if (m[1]) return { lo: 0, hi: 60e3 };
+    const n = Number(m[2]);
+    const unitMs = m[3] === "m" ? 60e3 : m[3] === "h" ? 3600e3 : 86400e3;
+    return { lo: n * unitMs, hi: (n + 1) * unitMs };
+  }
+
+  /** Verify cached snapshot timestamps agree with T3's live shelf order (Settled non-increasing
+   *  settledAt; Snoozed non-decreasing snoozedUntil). Disagreement invalidates the shelf snapshot. */
+  function shelfSnapshotOrderValid(shelf, items) {
+    let prev = null;
+    for (const item of Array.isArray(items) ? items : []) {
+      const ts = shelf === "settled" ? item?.settledAt : item?.snoozedUntil;
+      if (!Number.isFinite(ts)) continue;
+      if (prev !== null) {
+        if (shelf === "settled" && ts > prev) return false;
+        if (shelf === "snoozed" && ts < prev) return false;
+      }
+      prev = ts;
+    }
+    return true;
+  }
+
+  /** Evaluate one shelf row against a strict < limitMs window. Returns "match" | "outside" | "unknown".
+   *  Settled: fresh local snapshot authoritative when inside the live DOM badge [lo, hi) (or when no
+   *  recognized badge exists); small future skew (<= 120s) clamps to 0ms; stale/missing falls back to
+   *  the DOM badge and folds ONLY when lo >= limitMs (fail-open otherwise).
+   *  Snoozed: uses snoozedUntil only (overdue <= 0 counts as inside < T; unknown fails open). */
+  function evaluateShelfRowTime(shelf, item, limitMs, now, snapshotFresh) {
+    if (shelf === "settled") {
+      const badge = parseSettledBadgeInterval(item?.badgeText);
+      const ts = item?.settledAt;
+      if (snapshotFresh && Number.isFinite(ts) && ts <= now + 120e3) {
+        const ageMs = Math.max(0, now - ts);
+        if (!badge || (ageMs >= badge.lo && ageMs < badge.hi)) {
+          return ageMs < limitMs ? "match" : "outside";
+        }
+      }
+      if (!badge) return "unknown";
+      if (badge.lo >= limitMs) return "outside";
+      if (badge.hi <= limitMs) return "match";
+      return "unknown";
+    }
+    if (shelf === "snoozed") {
+      const until = item?.snoozedUntil;
+      if (!snapshotFresh || !Number.isFinite(until)) return "unknown";
+      const remMs = until - now;
+      return remMs < limitMs ? "match" : "outside";
+    }
+    return "unknown";
+  }
+
+  /** Plan which mounted rows of an open shelf fold behind its rule (rows, time, or all).
+   *  Protected rows (open route thread or focused/renaming row) are never hidden and never consume
+   *  ordinary slots in rows mode. Unknown-time rows fail open ONLY in time mode (never rows mode).
+   *  Zero matches in time mode anchor at toggleAfterIndex = -1 (right after the header/placeholder). */
+  function shelfFoldPlan(items, ruleOrLimit, expandedAll, opts = {}) {
+    const list = Array.isArray(items) ? items : [];
+    const folded = list.map(() => false);
+    const rule = typeof ruleOrLimit === "object" && ruleOrLimit !== null
+      ? ruleOrLimit
+      : (ruleOrLimit === "all" ? { unit: "all", value: 3 } : { unit: "rows", value: ruleOrLimit });
+    if (!rule || rule.unit === "all") {
+      return { folded, hiddenCount: 0, showToggle: false, toggleAfterIndex: -1, toggleMode: null, hideNativeMore: false, liveCount: null };
+    }
+    if (rule.unit === "rows") {
+      const limit = rule.value;
+      if (!Number.isInteger(limit) || limit < 1) {
+        return { folded, hiddenCount: 0, showToggle: false, toggleAfterIndex: -1, toggleMode: null, hideNativeMore: false, liveCount: null };
+      }
+      let ordinary = 0;
+      let boundaryIndex = -1;
+      const overflow = [];
+      for (let i = 0; i < list.length; i++) {
+        if (list[i]?.protected) continue;
+        ordinary++;
+        if (ordinary === limit) boundaryIndex = i;
+        else if (ordinary > limit) overflow.push(i);
+      }
+      if (!overflow.length) {
+        return { folded, hiddenCount: 0, showToggle: false, toggleAfterIndex: -1, toggleMode: null, hideNativeMore: false, liveCount: null };
+      }
+      if (expandedAll) {
+        return { folded, hiddenCount: 0, showToggle: true, toggleAfterIndex: boundaryIndex, toggleMode: "fewer", hideNativeMore: false, liveCount: null };
+      }
+      for (const i of overflow) folded[i] = true;
+      return { folded, hiddenCount: overflow.length, showToggle: true, toggleAfterIndex: boundaryIndex, toggleMode: "more", hideNativeMore: true, liveCount: null };
+    }
+    const unitMs = SHELF_UNIT_MS[rule.unit];
+    if (!unitMs || !Number.isInteger(rule.value) || rule.value < 1) {
+      return { folded, hiddenCount: 0, showToggle: false, toggleAfterIndex: -1, toggleMode: null, hideNativeMore: false, liveCount: null };
+    }
+    const limitMs = rule.value * unitMs;
+    const shelf = opts.shelf || "settled";
+    const now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    const snapshotFresh = Boolean(opts.snapshotFresh);
+    const overflow = [];
+    let matchCount = 0;
+    let knownCount = 0;
+    for (let i = 0; i < list.length; i++) {
+      const ev = evaluateShelfRowTime(shelf, list[i], limitMs, now, snapshotFresh);
+      if (ev !== "unknown") knownCount++;
+      if (ev === "match") matchCount++;
+      if (list[i]?.protected) continue;
+      if (ev === "outside") overflow.push(i);
+    }
+    const liveCount = list.length === 0 ? 0 : (knownCount > 0 ? matchCount : null);
+    if (!overflow.length) {
+      return { folded, hiddenCount: 0, showToggle: false, toggleAfterIndex: -1, toggleMode: null, hideNativeMore: false, liveCount };
+    }
+    const firstOverflow = overflow[0];
+    // Anchor directly after the contiguous visible run (firstOverflow - 1);
+    // when 0 ordinary rows match (firstOverflow === 0), -1 anchors below the shelf header/placeholder.
+    const toggleAfterIndex = firstOverflow - 1;
+    if (expandedAll) {
+      return { folded, hiddenCount: 0, showToggle: true, toggleAfterIndex, toggleMode: "fewer", hideNativeMore: false, liveCount };
+    }
+    for (const i of overflow) folded[i] = true;
+    const toggleMode = shelf === "settled" ? "older" : "later";
+    return { folded, hiddenCount: overflow.length, showToggle: true, toggleAfterIndex, toggleMode, hideNativeMore: true, liveCount };
+  }
+
+  /** Detect a project-scope switch for an expanded shelf without resetting on pagination (10->35)
+   *  or single-thread updates inside the same scope. Handles disjoint singletons cleanly. */
+  function shelfScopeChanged(prevKeys, nextKeys, shelf) {
+    if (!prevKeys?.length || !nextKeys?.length) return false;
+    const prevSet = new Set(prevKeys);
+    let overlap = 0;
+    for (const k of nextKeys) if (prevSet.has(k)) overlap++;
+    if (shelf === "settled" && prevKeys.length > 10 && nextKeys.length <= 10 && (prevKeys.length - nextKeys.length >= 2 || overlap < nextKeys.length)) return true;
+    const minLen = Math.min(prevKeys.length, nextKeys.length);
+    if (minLen >= 1 && overlap * 2 < minLen) return true;
+    return false;
+  }
+
   /** Gaps by time: for neighbouring rows' age times (ms, newest first; null = unknown), whether a
    *  gap goes before each row. Only where both times are known and the older row was last active
    *  at least GAP_MIN minutes before the newer one; a fixed threshold, so unchanged threads never
@@ -2330,10 +3119,11 @@
 
   const core = {
     rowAgeHours, olderCutoff, olderRows, olderTitle, OLDER_AFTER, TITLE_LINES, titleSuffix, gapsBefore,
+    SHELF_UNITS, SHELF_UNIT_MS, SHELF_LIMITS, defaultShelfRule, normalizeShelfRule, shelfRuleEqual, isShelfTimeRule, shelfRuleSummary, parseShelfInput, parseSettledBadgeInterval, shelfSnapshotOrderValid, evaluateShelfRowTime, shelfFoldPlan, shelfScopeChanged,
     DEFAULTS, POP_KINDS, readSpots, spotFrom, clearSpot, LEGACY_PRESETS, INTERFACE_TARGETS, FONT_ROLES, HIST, bLegend, readSettings, fontVisible, fontUserHidden, fontListed, fontOptions, fontNeighbor, fontTags, T3_FONTS, parseRoute, widthPct, widthLines, screenBlock, storyBlock, fontMenuMark, fontMenuMarkAfterPill, hideFootCopy, fitSwapKeep,
     FONT_GROUPS, normalizeCatalog, FONT_TEXT, BOLD_SAME_CHECKED, firstFamily, usageSentence, fontAbout, creditText, besideSpot, normId, fmtPct, fmtAge, fmtReset, fmtWhen,
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, FONT_SIMILAR_GROUPS, similarFontAreas, usagePageHash, usageContainerMatches,
-    FOOTER_TEAM, FOOTER_MADE_MODES, FOOTER_CARD, FOOTER_MADE, FOOTER_DETAILS, footerPass, madePass, madeCount, newestAssistantId, timelineFromFiber, readHostTimeline, hostNewestId, laneIsWide, macAppOn, readMacPlatform, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
+    FOOTER_TEAM, FOOTER_MADE_MODES, FOOTER_MADE_GROUPS, FOOTER_MADE_BADGES, FOOTER_MADE_PREVIEWS, FOOTER_CARD, FOOTER_MADE, FOOTER_DETAILS, footerPass, madePass, madeCount, holdMadeFromEl, isTailnetUrl, dayHeadingFor, computeFloatPos, isMiniPlayerStore, isRightPanelStore, isBrowserSurfaceStore, findMiniPlayerStores, hasMeasuredBrowserSurface, isAlreadyFloatingTab, activeBrowserTabIdFromRightPanel, tryFloatViaStores, findMarkdownPreviewCtx, resolvePreviewTarget, findPreviewPanelFloatAction, enhanceMadeLists, newestAssistantId, timelineFromFiber, readHostTimeline, hostNewestId, laneIsWide, macAppOn, readMacPlatform, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
     forecast, seriesSegments, mergeSeries, dGeometry, fmtClock, lowRefills, compactParts, composerLabel, labUsageFailedSince, toolGates, labsForMerge, labFailure, handoverGate, HANDOVER_REQUEST, chainLabel, contrast, STALE_MS, T3_STALE_MS,
     wrapMatchMedia, refreshNarrowSidebar, sidebarCands, lineCands, lineGroups, lineLayout, fitParts, plain, forecastBlocks, fableForecast, fableLegend, scopedRowText, spokenUsage, shortBarText, scopedModelOf, resetsTogether, stopLeftOf, lowScoped,
   };
@@ -2451,7 +3241,7 @@
 
   // ---------- <html> switches for the CSS-only parts ----------
 
-  const ROOT_ATTRS = ["data-t3x-selecting", "data-t3x-tight", "data-t3x-compact", "data-t3x-pinned-label", "data-t3x-fold", "data-t3x-older-open", "data-t3x-onerow", "data-t3x-gaps", "data-t3x-inline-icon", "data-t3x-project-full", "data-t3x-working", "data-t3x-keep-sidebar", "data-t3x-marker", "data-t3x-footer-team", "data-t3x-footer-made", "data-t3x-mac-app", "data-t3x-fh", "data-t3x-fb", "data-t3x-fm", ...TARGETS.map((t) => `data-t3x-ft-${t}`)];
+  const ROOT_ATTRS = ["data-t3x-selecting", "data-t3x-tight", "data-t3x-compact", "data-t3x-pinned-label", "data-t3x-fold", "data-t3x-older-open", "data-t3x-onerow", "data-t3x-gaps", "data-t3x-inline-icon", "data-t3x-project-full", "data-t3x-working", "data-t3x-keep-sidebar", "data-t3x-marker", "data-t3x-footer-team", "data-t3x-footer-made", "data-t3x-footer-made-group", "data-t3x-footer-made-badges", "data-t3x-footer-made-preview", "data-t3x-mac-app", "data-t3x-fh", "data-t3x-fb", "data-t3x-fm", ...TARGETS.map((t) => `data-t3x-ft-${t}`)];
   function applyRootAttrs() {
     const r = D.documentElement;
     for (const [name, value] of Object.entries(rootAttrs(settings))) (value === null ? r.removeAttribute(name) : r.setAttribute(name, value));
@@ -3088,28 +3878,43 @@
     place();
     el.focus({ preventScroll: true });
   }
-  function fillPopover() {
+  function restorePanelFocus(focusKey, preferForward = false) {
+    if (!pop || !focusKey) return;
+    const next = pop.el.querySelector(`[data-focus="${CSS.escape(focusKey)}"]`);
+    let focus = next;
+    const match = /^(prev|next|minus|plus|reset)-(\w+)$/.exec(focusKey);
+    const shelfMatch = /^shelf-(minus|plus|input|unit)-(snoozed|settled)(?:-(rows|min|hours|days|all))?$/.exec(focusKey);
+    if (match && (!next || next.disabled)) {
+      const [, action, role] = match;
+      const candidates = action === "minus" ? ["plus", "sel"] : action === "plus" ? ["minus", "sel"] : action === "reset" ? ["plus", "minus", "sel"] : ["sel"];
+      focus = candidates.map((key) => pop.el.querySelector(`[data-focus="${key}-${role}"]`)).find((node) => node && !node.disabled);
+    } else if (shelfMatch && (!next || next.disabled)) {
+      const [, action, shelf] = shelfMatch;
+      const candidates = action === "minus"
+        ? (preferForward ? [`shelf-input-${shelf}`, `shelf-plus-${shelf}`, `shelf-unit-${shelf}-rows`] : [`shelf-plus-${shelf}`, `shelf-input-${shelf}`, `shelf-unit-${shelf}-rows`])
+        : action === "plus"
+          ? (preferForward ? [`shelf-unit-${shelf}-rows`, `shelf-unit-${shelf}-all`, `shelf-minus-${shelf}`, `shelf-input-${shelf}`] : [`shelf-minus-${shelf}`, `shelf-input-${shelf}`, `shelf-unit-${shelf}-rows`])
+          : action === "input"
+            ? [`shelf-unit-${shelf}-all`, `shelf-unit-${shelf}-rows`, `shelf-plus-${shelf}`, `shelf-minus-${shelf}`]
+            : [`shelf-unit-${shelf}-all`, `shelf-unit-${shelf}-rows`, `shelf-input-${shelf}`];
+      focus = candidates.map((key) => pop.el.querySelector(`[data-focus="${CSS.escape(key)}"]`)).find((node) => node && !node.disabled);
+    }
+    if (focus?.closest("[hidden]")) focus = pop.el.querySelector('[data-focus="font-interface"]');
+    focus?.focus({ preventScroll: true });
+  }
+  function fillPopover(focusOverride, preferForward = false) {
     if (!pop) return;
     rowCardHide(); // its row is about to be replaced
     const keep = pop.el.scrollTop;
-    const focusKey = D.activeElement?.closest?.(".t3x-pop") ? D.activeElement.getAttribute("data-focus") : null;
+    const focusKey = focusOverride !== undefined
+      ? focusOverride
+      : (D.activeElement?.closest?.(".t3x-pop") ? D.activeElement.getAttribute("data-focus") : null);
     pop.el.replaceChildren(...[pop.build()].flat(4).filter((n) => n !== null && n !== undefined && n !== false));
     if (settings.popMove) pop.el.querySelector(".t3x-pop-head")?.prepend(grip("this popup"));
     pop.el.scrollTop = keep;
     checkObserveBox();
     if (pop.kind === "panel") { warmSelectedNames(); watchFsHide(pop.el.querySelector(".t3x-fs")); }
-    if (focusKey) {
-      const next = pop.el.querySelector(`[data-focus="${CSS.escape(focusKey)}"]`);
-      const match = /^(prev|next|minus|plus|reset)-(\w+)$/.exec(focusKey);
-      let focus = next;
-      if (match && (!next || next.disabled)) {
-        const [, action, role] = match;
-        const candidates = action === "minus" ? ["plus", "sel"] : action === "plus" ? ["minus", "sel"] : action === "reset" ? ["plus", "minus", "sel"] : ["sel"];
-        focus = candidates.map((key) => pop.el.querySelector(`[data-focus="${key}-${role}"]`)).find((node) => node && !node.disabled);
-      }
-      if (focus?.closest("[hidden]")) focus = pop.el.querySelector('[data-focus="font-interface"]');
-      focus?.focus({ preventScroll: true });
-    }
+    restorePanelFocus(focusKey, preferForward);
   }
   function place() {
     if (!pop) return;
@@ -3137,7 +3942,8 @@
     if (e.key === "Escape" && pop) {
       if (pop.el.querySelector("select:open")) return; // native picker dismisses before its panel
       e.stopPropagation();
-      closePopover(true);
+      suppressShelfCommit = true;
+      try { closePopover(true); } finally { suppressShelfCommit = false; }
     }
   }, true);
   listen(D, "pointerdown", (e) => {
@@ -3634,7 +4440,7 @@
   // list until a plain click on a thread or Escape (T3's ways out of it), every older thread shows
   // and the fold row steps aside (data-t3x-selecting): a bulk action never reaches a hidden thread.
   // It runs after T3 has handled the click or key (document bubble phase), so the click lands.
-  const multiSelect = (e) => (e.shiftKey || e.metaKey || e.ctrlKey) && Boolean(e.target?.closest?.("li[data-thread-item]")?.parentElement?.querySelector(':scope > li[data-testid="sidebar-active-placeholder"]'));
+  const multiSelect = (e) => (e.shiftKey || e.metaKey || e.ctrlKey) && Boolean(e.target?.closest?.("li[data-thread-item]")?.parentElement?.querySelector(':scope > li:is([data-testid="sidebar-active-placeholder"], [data-testid="sidebar-snoozed-header"], [data-testid="sidebar-settled-header"])'));
   const setSelecting = (on) => D.documentElement.toggleAttribute("data-t3x-selecting", on);
   const trackSelection = (e) => {
     if (e.type === "keydown" && e.key === "Escape") return setSelecting(false);
@@ -3645,40 +4451,436 @@
   listen(D, "click", trackSelection);
   listen(D, "keydown", trackSelection);
 
-  // ---------- gaps by time ----------
-  // Exact age times come from the add-ons service (/grouping: ageAt, the time T3 prints as each
-  // row's age); the sidebar's own "1h" text is too coarse. Only the active list gets gaps, never
-  // across Pinned, Working, the fold row or a section marker; rows without a known time get none.
-  let gapTimes = null, gapInflight = null, gapTriedAt = 0, gapEnv = null;
-  function fetchGapTimes() {
-    if (disposed || !settings.timeGaps || gapInflight || Date.now() - gapTriedAt < 60e3) return; // one try a minute, answer or not
-    gapTriedAt = Date.now();
+  // ---------- sidebar sections: Snoozed & Settled count & time-period limits ----------
+  // Open Snoozed (rows 1-25, or waking in < N min/hours/days, or No limit) and Settled (rows 1-10,
+  // or settled < N min/hours/days ago, or No limit) fold rows past their rule via
+  // data-t3x-shelf-folded, placing one owned toggle row right at the cut ("Show N more" in rows
+  // mode; "Show N older" / "Show N later" in time mode; flips in place to "Show fewer").
+  const shelfExpandedAll = { snoozed: false, settled: false };
+  const shelfLiveCount = { snoozed: null, settled: null };
+  const shelfHoverDeferred = { snoozed: false, settled: false };
+  const shelfState = {
+    snoozed: { list: null, scope: "", keys: [], toggleNode: null, toggleEl: null, classObs: null },
+    settled: { list: null, scope: "", keys: [], toggleNode: null, toggleEl: null, classObs: null },
+  };
+  let shelfSyncTimer = 0;
+  let shelfSyncUser = false;
+  let shelfTogglePressed = false;
+  let shelfPendingNativeMoreFocus = false;
+  let shelfNativeMorePending = false;
+  let shelfNativeMoreTimer = 0;
+  function clearShelfNativeMorePending() {
+    shelfNativeMorePending = false;
+    if (shelfNativeMoreTimer) {
+      clearTimeout(shelfNativeMoreTimer);
+      timers.delete(shelfNativeMoreTimer);
+      shelfNativeMoreTimer = 0;
+    }
+  }
+  function scheduleShelfSync(opts) {
+    if (opts?.user) shelfSyncUser = true;
+    if (disposed || paused || shelfSyncTimer) return;
+    shelfSyncTimer = later(0, () => {
+      shelfSyncTimer = 0;
+      const user = shelfSyncUser;
+      shelfSyncUser = false;
+      if (!disposed && !paused) syncShelfLimits({ user });
+    });
+  }
+  function findShelfToggle(shelf) {
+    const { el } = single(`[data-testid="sidebar-${shelf}-shelf-toggle"]`);
+    return el;
+  }
+  function shelfRowProtected(li) {
+    if (li.querySelector('[aria-current]:not([aria-current="false"])')) return true;
+    if (li.contains(D.activeElement)) return true;
+    return false;
+  }
+  const shelfDragging = (list) => Boolean(
+    olderDragging(list)
+    || list.querySelector(':scope > li[data-testid="sidebar-settled-placeholder"]:has(> *)')
+    || list.querySelector(':scope > li[data-testid="sidebar-snoozed-placeholder"]:has(> *)')
+    || list.querySelector('[data-testid="sidebar-settled-shelf-toggle"].text-primary, [data-testid="sidebar-snoozed-shelf-toggle"].text-primary')
+    || D.documentElement.hasAttribute("data-t3x-dragging")
+  );
+  function readSettledRowBadgeText(li) {
+    // T3's sidebar-row-slim puts the relative age inside the right-hand slot's first span
+    // (or card's .group/sidebar-status-slot > span:first-child).
+    const cardSlot = li.querySelector('[class*="group/sidebar-status-slot"] > span:first-child');
+    if (cardSlot) return cardSlot.textContent?.trim() ?? "";
+    const slimSlot = li.querySelector('[data-testid="sidebar-row-slim"] span.ml-auto > span:first-child');
+    if (slimSlot) return slimSlot.textContent?.trim() ?? "";
+    const explicit = li.querySelector("[data-sidebar-age]");
+    if (explicit) return explicit.textContent?.trim() ?? "";
+    return "";
+  }
+  function readShelfRowTimes(li) {
+    if (!groupTimes || !groupEnv) return null;
+    const key = li.getAttribute("data-thread-item") || "";
+    if (!key.startsWith(`${groupEnv}:`)) return null;
+    return groupTimes.get(key.slice(groupEnv.length + 1)) ?? null;
+  }
+  function shelfHeaderAnchor(list, headerLi, shelf) {
+    const ph = list.querySelector(`:scope > li[data-testid="sidebar-${shelf}-placeholder"]`);
+    if (ph && ph.parentElement === list) return ph;
+    return headerLi;
+  }
+  function watchShelfToggleClass(shelf, toggleEl) {
+    const st = shelfState[shelf];
+    if (st.toggleEl === toggleEl) return;
+    st.classObs?.disconnect();
+    st.classObs = null;
+    st.toggleEl = toggleEl;
+    if (toggleEl) {
+      const obs = new MutationObserver(() => scheduleShelfSync());
+      obs.observe(toggleEl, { attributes: true, attributeFilter: ["class"] });
+      st.classObs = obs;
+    }
+  }
+  cleanups.push(() => {
+    for (const st of Object.values(shelfState)) {
+      st.classObs?.disconnect();
+      st.classObs = null;
+      st.toggleEl = null;
+    }
+  });
+  function buildShelfToggle(shelf) {
+    const label = h("span", { class: "t3x-shelf-more-label" });
+    const chev = h("span", { class: "t3x-shelf-more-chev", "aria-hidden": "true" });
+    const btn = h("button", {
+      type: "button",
+      class: "t3x-shelf-more-btn",
+      "data-t3x-shelf-toggle": shelf,
+      "aria-expanded": "false",
+      onpointerdown: () => { shelfTogglePressed = true; },
+      onclick: () => {
+        shelfTogglePressed = false;
+        shelfExpandedAll[shelf] = !shelfExpandedAll[shelf];
+        syncShelfLimits({ user: true });
+      },
+    }, label, chev);
+    return h("li", { [OWN]: `shelf-more-${shelf}`, class: "t3x-shelf-more list-none", hidden: true }, btn);
+  }
+  const finishShelfTogglePointer = () => {
+    if (!shelfTogglePressed) return;
+    shelfTogglePressed = false;
+    later(0, () => { if (!disposed && !paused && !shelfTogglePressed) syncShelfLimits(); });
+  };
+  listen(W, "pointerup", finishShelfTogglePointer, true);
+  listen(W, "pointercancel", finishShelfTogglePointer, true);
+  function updateShelfSummaryText(shelf) {
+    if (pop?.kind !== "panel") return;
+    const el = pop.el.querySelector(`[data-shelf-summary="${shelf}"]`);
+    if (!el) return;
+    const cfg = SHELF_LIMITS[shelf];
+    const next = shelfRuleSummary(shelf, settings[cfg.key], shelfLiveCount[shelf]);
+    if (el.textContent !== next) el.textContent = next;
+  }
+  function isShelfHovered(rows, toggleNode) {
+    if (toggleNode?.isConnected && toggleNode.matches(":hover")) return true;
+    for (const li of rows) if (li.matches(":hover")) return true;
+    return false;
+  }
+  function shelfOfElement(el) {
+    const li = el?.closest?.('li[data-thread-item], li[data-t3x^="shelf-more-"]');
+    if (!li) return null;
+    const own = li.getAttribute(OWN);
+    if (own === "shelf-more-snoozed") return "snoozed";
+    if (own === "shelf-more-settled") return "settled";
+    if (li.querySelector('[data-sidebar-parent="shelf:snoozed"]')) return "snoozed";
+    if (li.querySelector('[data-sidebar-parent="shelf:settled"]')) return "settled";
+    return null;
+  }
+  listen(D, "pointerout", (e) => {
+    if (!shelfHoverDeferred.snoozed && !shelfHoverDeferred.settled) return;
+    const fromShelf = shelfOfElement(e.target);
+    if (!fromShelf || !shelfHoverDeferred[fromShelf]) return;
+    if (shelfOfElement(e.relatedTarget) === fromShelf) return;
+    shelfHoverDeferred[fromShelf] = false;
+    scheduleShelfSync();
+  });
+  listen(D, "pointermove", (e) => {
+    if (!shelfHoverDeferred.snoozed && !shelfHoverDeferred.settled) return;
+    const cur = shelfOfElement(e.target);
+    let resume = false;
+    for (const s of ["snoozed", "settled"]) {
+      if (shelfHoverDeferred[s] && cur !== s) {
+        shelfHoverDeferred[s] = false;
+        resume = true;
+      }
+    }
+    if (resume) scheduleShelfSync();
+  }, { passive: true });
+  function syncShelfLimits(opts = {}) {
+    if (paused || disposed || shelfTogglePressed) return;
+    const now = Date.now();
+    const anyOpenTime = Object.entries(SHELF_LIMITS).some(([shelf, cfg]) => {
+      if (!isShelfTimeRule(settings[cfg.key])) return false;
+      return findShelfToggle(shelf)?.getAttribute("aria-expanded") === "true";
+    });
+    if (anyOpenTime) fetchGroupingTimes();
+    const baseSnapshotFresh = Boolean(
+      groupTimes && groupEnv && groupOk
+      && Number.isFinite(groupAsOf)
+      && (now - groupAsOf) <= 180e3
+      && (groupAsOf - now) <= 120e3
+    );
+    for (const [shelf, cfg] of Object.entries(SHELF_LIMITS)) {
+      const st = shelfState[shelf];
+      const rule = settings[cfg.key];
+      const toggle = findShelfToggle(shelf);
+      watchShelfToggleClass(shelf, toggle);
+      const headerLi = toggle?.closest?.("li");
+      const list = headerLi?.parentElement?.tagName === "UL" ? headerLi.parentElement : null;
+      const isOpen = toggle?.getAttribute("aria-expanded") === "true";
+      if (!list || !isOpen) {
+        shelfExpandedAll[shelf] = false;
+        shelfLiveCount[shelf] = null;
+        shelfHoverDeferred[shelf] = false;
+        if (shelf === "settled") {
+          shelfPendingNativeMoreFocus = false;
+          clearShelfNativeMorePending();
+        }
+        st.list = list;
+        st.scope = "";
+        st.keys = [];
+        for (const li of D.querySelectorAll(`li[data-t3x-shelf-folded="${shelf}"]`)) li.removeAttribute("data-t3x-shelf-folded");
+        if (shelf === "settled") {
+          for (const u of D.querySelectorAll("ul[data-t3x-settled-folded]")) u.removeAttribute("data-t3x-settled-folded");
+        }
+        if (st.toggleNode) {
+          const hadFocus = st.toggleNode.contains(D.activeElement);
+          st.toggleNode.hidden = true;
+          if (st.toggleNode.isConnected) st.toggleNode.remove();
+          if (hadFocus && toggle?.isConnected) toggle.focus({ preventScroll: true });
+        }
+        updateShelfSummaryText(shelf);
+        continue;
+      }
+      if (shelfDragging(list)) continue;
+      const rows = [];
+      for (const li of list.children) {
+        if (li.hasAttribute(OWN)) continue;
+        if (li.matches("li[data-thread-item]") && li.querySelector(`[data-sidebar-parent="shelf:${shelf}"]`)) rows.push(li);
+      }
+      const keys = rows.map((li) => li.getAttribute("data-thread-item") || "");
+      const moreLanded = shelf === "settled" && shelfNativeMorePending && keys.length > st.keys.length;
+      if (moreLanded) clearShelfNativeMorePending();
+      const userAction = Boolean(opts?.user) || moreLanded;
+      // While the pointer hovers a time-mode shelf, defer every non-user sync (30s tick,
+      // T3's 1-minute age-badge mutation, and 60s /grouping refreshes) so rows never vanish under the cursor.
+      if (!userAction && isShelfTimeRule(rule) && isShelfHovered(rows, st.toggleNode)) {
+        shelfHoverDeferred[shelf] = true;
+        continue;
+      }
+      shelfHoverDeferred[shelf] = false;
+      const scope = list.closest('[data-slot="sidebar-content"]')?.getAttribute("data-sidebar-scope") ?? "";
+      const prevKeys = st.keys;
+      const keysChanged = prevKeys.length > 0 && (prevKeys.length !== keys.length || prevKeys.some((k, i) => k !== keys[i]));
+      // Do NOT reset expandedAll merely because <ul> was remounted on same-scope pagination;
+      // reset only on an actual scope change (attribute change or key-set change).
+      if (shelfExpandedAll[shelf]) {
+        const scopeAttrChanged = st.list !== null && st.scope !== scope;
+        if (scopeAttrChanged || shelfScopeChanged(prevKeys, keys, shelf)) {
+          shelfExpandedAll[shelf] = false;
+        }
+      }
+      st.list = list;
+      st.scope = scope;
+      st.keys = keys;
+      if (shelf === "snoozed" && isShelfTimeRule(rule) && keysChanged) {
+        fetchGroupingTimes(true); // bounded 5s refresh when Snoozed membership/order changes
+      }
+      const items = rows.map((li) => {
+        const times = readShelfRowTimes(li);
+        return {
+          protected: shelfRowProtected(li),
+          badgeText: shelf === "settled" ? readSettledRowBadgeText(li) : "",
+          settledAt: times?.settledAt ?? null,
+          snoozedUntil: times?.snoozedUntil ?? null,
+        };
+      });
+      let snapshotFresh = baseSnapshotFresh;
+      if (snapshotFresh && isShelfTimeRule(rule) && !shelfSnapshotOrderValid(shelf, items)) {
+        snapshotFresh = false;
+        fetchGroupingTimes(true); // bounded immediate refresh on order disagreement
+      }
+      const plan = shelfFoldPlan(items, rule, shelfExpandedAll[shelf], { shelf, now, snapshotFresh });
+      shelfLiveCount[shelf] = plan.liveCount;
+      updateShelfSummaryText(shelf);
+      const nativeMoreBtn = shelf === "settled" ? list.querySelector('button[data-sidebar-row="settled:more"]') : null;
+      const activeEl = D.activeElement;
+      const focusLeftNativeMore = Boolean(activeEl && activeEl !== D.body && activeEl !== D.documentElement && (!nativeMoreBtn || !nativeMoreBtn.contains(activeEl)));
+      if (shelf === "settled" && shelfPendingNativeMoreFocus && focusLeftNativeMore) {
+        shelfPendingNativeMoreFocus = false;
+      }
+      const nativeMoreFocused = Boolean(
+        shelf === "settled" && (
+          (nativeMoreBtn && nativeMoreBtn.contains(activeEl))
+          || shelfPendingNativeMoreFocus
+        )
+      );
+      if (shelf === "settled" && (moreLanded || plan.hideNativeMore || !shelfNativeMorePending)) {
+        shelfPendingNativeMoreFocus = false;
+      }
+      const foldedSet = new Set();
+      rows.forEach((li, i) => {
+        if (plan.folded[i]) {
+          foldedSet.add(li);
+          if (li.getAttribute("data-t3x-shelf-folded") !== shelf) li.setAttribute("data-t3x-shelf-folded", shelf);
+        } else if (li.getAttribute("data-t3x-shelf-folded") === shelf) {
+          li.removeAttribute("data-t3x-shelf-folded");
+        }
+      });
+      for (const li of D.querySelectorAll(`li[data-t3x-shelf-folded="${shelf}"]`)) {
+        if (!foldedSet.has(li)) li.removeAttribute("data-t3x-shelf-folded");
+      }
+      if (shelf === "settled") {
+        for (const u of D.querySelectorAll("ul[data-t3x-settled-folded]")) {
+          if (u !== list || !plan.hideNativeMore) u.removeAttribute("data-t3x-settled-folded");
+        }
+        if (plan.hideNativeMore && !list.hasAttribute("data-t3x-settled-folded")) list.setAttribute("data-t3x-settled-folded", "");
+      }
+      if (!plan.showToggle) {
+        if (st.toggleNode) {
+          const hadFocus = st.toggleNode.contains(D.activeElement);
+          st.toggleNode.hidden = true;
+          if (st.toggleNode.isConnected) st.toggleNode.remove();
+          if (hadFocus && toggle?.isConnected) toggle.focus({ preventScroll: true });
+        }
+      } else {
+        st.toggleNode ??= buildShelfToggle(shelf);
+        const node = st.toggleNode;
+        const hadFocus = node.contains(D.activeElement);
+        const anchor = plan.toggleAfterIndex >= 0 ? rows[plan.toggleAfterIndex] : shelfHeaderAnchor(list, headerLi, shelf);
+        if (anchor && (node.parentElement !== list || node.previousElementSibling !== anchor)) {
+          anchor.after(node);
+          if (hadFocus) node.firstElementChild?.focus({ preventScroll: true });
+        }
+        node.hidden = false;
+        const btn = node.firstElementChild;
+        const labelEl = btn.firstElementChild;
+        const isFewer = plan.toggleMode === "fewer";
+        const suffixWord = plan.toggleMode === "older" ? "older" : plan.toggleMode === "later" ? "later" : "more";
+        const text = isFewer ? "Show fewer" : `Show ${plan.hiddenCount} ${suffixWord}`;
+        if (labelEl.textContent !== text) labelEl.textContent = text;
+        btn.setAttribute("aria-expanded", isFewer ? "true" : "false");
+        const lower = cfg.label.toLowerCase();
+        const ariaLabel = isFewer
+          ? `Show fewer ${lower} threads`
+          : `Show ${plan.hiddenCount} ${suffixWord} ${lower} ${plan.hiddenCount === 1 ? "thread" : "threads"}`;
+        btn.setAttribute("aria-label", ariaLabel);
+        btn.title = isFewer ? `Return ${cfg.label} to ${shelfRuleSummary(shelf, rule).toLowerCase()}` : ariaLabel;
+        if (shelf === "settled" && plan.hideNativeMore && nativeMoreFocused && !isFewer) {
+          btn.focus({ preventScroll: true });
+        }
+      }
+    }
+  }
+  function openShelfIfCollapsed(shelf) {
+    const toggle = findShelfToggle(shelf);
+    if (toggle && toggle.getAttribute("aria-expanded") === "false") {
+      toggle.click();
+      return true;
+    }
+    return false;
+  }
+  // Clicking T3's native "Show 25 more": in rows mode, counts as a temporary reveal for the current
+  // scope so newly loaded rows stay visible immediately; in time mode, keeps the active time cutoff
+  // in charge (unless the user already expanded via "Show N older") and transfers keyboard focus to
+  // "Show N older" if newly loaded older rows fold and hide the native button.
+  listen(D, "click", (e) => {
+    const btn = e.target?.closest?.('button[data-sidebar-row="settled:more"]');
+    if (!btn || btn.disabled || btn.getAttribute("aria-disabled") === "true") return;
+    if (settings.settledRule.unit === "rows") {
+      shelfExpandedAll.settled = true;
+    } else if (isShelfTimeRule(settings.settledRule) && !shelfExpandedAll.settled) {
+      clearShelfNativeMorePending();
+      shelfNativeMorePending = true;
+      shelfNativeMoreTimer = later(15e3, () => {
+        shelfNativeMorePending = false;
+        shelfNativeMoreTimer = 0;
+        shelfPendingNativeMoreFocus = false;
+      });
+      if (btn.contains(D.activeElement)) shelfPendingNativeMoreFocus = true;
+    }
+    scheduleShelfSync({ user: true });
+  }, true);
+  // Protect focused/renaming shelf rows immediately, and re-fold once focus leaves.
+  const onShelfFocus = (e) => {
+    if (e.target?.closest?.("li[data-thread-item]") || e.relatedTarget?.closest?.("li[data-thread-item]")) scheduleShelfSync();
+  };
+  listen(D, "focusin", onShelfFocus);
+  listen(D, "focusout", onShelfFocus);
+
+  // ---------- shared /grouping timestamps (gaps by time + shelf time limits) ----------
+  let gapTimes = null, groupTimes = null, groupInflight = null, groupTriedAt = 0, groupForceAt = 0, groupEnv = null, groupAsOf = 0, groupOk = false;
+  function fetchGroupingTimes(force = false) {
+    if (disposed || groupInflight) return;
+    const now = Date.now();
+    if (force) {
+      if (now - groupForceAt < 5e3) return;
+      groupForceAt = now;
+    } else if (now - groupTriedAt < 60e3) {
+      return;
+    }
+    groupTriedAt = now;
     const ctrl = new AbortController();
     requests.add(ctrl);
     const kill = setTimeout(() => ctrl.abort(), 15e3);
-    gapInflight = fetch(`${BASE}grouping`, { cache: "no-store", signal: ctrl.signal })
+    const req = fetch(`${BASE}grouping`, { cache: "no-store", signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then(guarded("gaps", (j) => {
         if (disposed) return;
-        const m = new Map();
-        for (const t of Array.isArray(j?.threads) ? j.threads : []) if (typeof t?.id === "string" && Number.isFinite(t.ageAt)) m.set(t.id, t.ageAt);
-        gapTimes = m.size ? m : null;
-        gapEnv = typeof j?.localEnvironmentId === "string" && j.localEnvironmentId ? j.localEnvironmentId : null;
+        const gm = new Map();
+        const tm = new Map();
+        for (const t of Array.isArray(j?.threads) ? j.threads : []) {
+          if (typeof t?.id !== "string") continue;
+          if (Number.isFinite(t.ageAt)) gm.set(t.id, t.ageAt);
+          if (Number.isFinite(t.ageAt) || Number.isFinite(t.settledAt) || Number.isFinite(t.snoozedUntil)) {
+            tm.set(t.id, {
+              ageAt: Number.isFinite(t.ageAt) ? t.ageAt : null,
+              settledAt: Number.isFinite(t.settledAt) ? t.settledAt : null,
+              snoozedUntil: Number.isFinite(t.snoozedUntil) ? t.snoozedUntil : null,
+            });
+          }
+        }
+        gapTimes = gm.size ? gm : null;
+        groupTimes = tm.size ? tm : null;
+        groupEnv = typeof j?.localEnvironmentId === "string" && j.localEnvironmentId ? j.localEnvironmentId : null;
+        groupOk = j?.ok === true && Boolean(groupEnv);
+        groupAsOf = Number.isFinite(j?.asOf) ? j.asOf : 0;
+        if (groupInflight === req) groupInflight = null;
         decorateGaps();
-      }), () => { if (!disposed) gapTimes = null; })
+        syncShelfLimits();
+      }), () => {
+        if (groupInflight === req) groupInflight = null;
+        if (!disposed) {
+          gapTimes = null;
+          groupTimes = null;
+          groupOk = false;
+          groupAsOf = 0;
+          syncShelfLimits();
+        }
+      })
       .finally(() => {
         clearTimeout(kill);
         requests.delete(ctrl);
-        gapInflight = null;
+        if (groupInflight === req) groupInflight = null;
       });
+    groupInflight = req;
+  }
+  function fetchGapTimes() {
+    if (!settings.timeGaps) return;
+    fetchGroupingTimes(false);
   }
   // T3 keys a row "<environment id>:<thread id>"; the service reads this Mac's database only, so
   // a row matches only with this Mac's environment and the complete thread id.
   function rowTime(li) {
-    if (!gapTimes || !gapEnv) return null;
+    if (!gapTimes || !groupEnv) return null;
     const key = li.getAttribute("data-thread-item") || "";
-    if (!key.startsWith(`${gapEnv}:`)) return null;
-    return gapTimes.get(key.slice(gapEnv.length + 1)) ?? null;
+    if (!key.startsWith(`${groupEnv}:`)) return null;
+    return gapTimes.get(key.slice(groupEnv.length + 1)) ?? null;
   }
   function decorateGaps() {
     const on = settings.timeGaps;
@@ -4206,6 +5408,7 @@
       try {
         syncMadeHost();
         madePass(D, settings.footerMade, madeSession);
+        enhanceMadeLists(D, { group: settings.footerMadeGroup, ownAttr: OWN });
       } catch (e) {
         noteError("footer", e);
       }
@@ -4260,14 +5463,382 @@
     }, () => {});
   }
 
+  // ---------- Floating browser mini-viewer overlay & ⌥-click handler ----------
+  let floatSeq = 0;
+  let floatHideTimer = 0;
+  let floatBtn = null;
+  let floatActive = null; // { target, madeEl, row, anchor }
+  let activeFloatCancel = null;
+  let floatQueue = Promise.resolve();
+  let cachedMiniStores = null;
+  function cancelPendingFloat() {
+    floatSeq++;
+    const fn = activeFloatCancel;
+    activeFloatCancel = null;
+    if (fn) {
+      try { fn(); } catch {}
+    }
+  }
+  async function getMiniPlayerStores() {
+    if (cachedMiniStores?.miniPlayerStore) return cachedMiniStores;
+    const found = await findMiniPlayerStores({ doc: D, baseHref: location.href });
+    if (found.miniPlayerStore) cachedMiniStores = found;
+    return found;
+  }
+  function hideMadeFloat() {
+    clearTimeout(floatHideTimer);
+    floatHideTimer = 0;
+    if (floatActive?.row) floatActive.row.classList.remove("t3x-made-hover");
+    floatActive = null;
+    if (floatBtn) floatBtn.hidden = true;
+  }
+  function scheduleHideMadeFloat() {
+    clearTimeout(floatHideTimer);
+    floatHideTimer = setTimeout(guarded("made-float-hide", () => {
+      floatHideTimer = 0;
+      if (floatBtn && floatBtn.matches(":hover")) return;
+      hideMadeFloat();
+    }), 140);
+  }
+  function waitForBrowserSurface(surfaceStore, threadRef, tabId, seq, expectedEpoch) {
+    if (!isBrowserSurfaceStore(surfaceStore) || disposed || seq !== floatSeq) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      let done = false;
+      let t = 0;
+      let raf1 = 0;
+      let raf2 = 0;
+      let unsub = null;
+      const finish = (ok) => {
+        if (done) return;
+        done = true;
+        if (activeFloatCancel === cancel) activeFloatCancel = null;
+        if (t) { clearTimeout(t); timers.delete(t); t = 0; }
+        if (raf1 && typeof cancelAnimationFrame === "function") { cancelAnimationFrame(raf1); raf1 = 0; }
+        if (raf2 && typeof cancelAnimationFrame === "function") { cancelAnimationFrame(raf2); raf2 = 0; }
+        if (typeof unsub === "function") { try { unsub(); } catch {} unsub = null; }
+        resolve(ok);
+      };
+      const cancel = () => finish(false);
+      activeFloatCancel = cancel;
+      const isReady = () => hasMeasuredBrowserSurface(surfaceStore, threadRef, tabId, expectedEpoch);
+      const scheduleFinish = () => {
+        if (done || raf1 || raf2) return;
+        if (typeof requestAnimationFrame !== "function") return finish(isReady());
+        raf1 = requestAnimationFrame(() => {
+          raf1 = 0;
+          if (done || disposed || seq !== floatSeq) return finish(false);
+          if (!isReady()) return; // measurement vanished before raf1 — stay subscribed until re-measured or deadline
+          raf2 = requestAnimationFrame(() => {
+            raf2 = 0;
+            if (done || disposed || seq !== floatSeq) return finish(false);
+            if (isReady()) finish(true);
+            // measurement vanished between raf1 and raf2 — stay subscribed until re-measured or deadline
+          });
+        });
+      };
+      // Always arm subscription + deadline timer on BOTH already-measured and pending paths so a
+      // throttled background rAF can never hang floatQueue and an unmeasured timeout fails closed.
+      try {
+        unsub = surfaceStore.subscribe(() => {
+          if (done || disposed || seq !== floatSeq) return finish(false);
+          if (isReady()) scheduleFinish();
+        });
+      } catch {
+        return finish(false);
+      }
+      t = setTimeout(() => finish(!disposed && seq === floatSeq && isReady()), 800);
+      timers.add(t);
+      if (isReady()) scheduleFinish();
+    });
+  }
+  function openInFloatingMiniViewer(target) {
+    if (!target || typeof target.open !== "function" || disposed) return Promise.resolve(false);
+    cancelPendingFloat();
+    const seq = floatSeq;
+    const run = async () => {
+      if (disposed || seq !== floatSeq) return false;
+      if (target.kind === "media-lightbox") {
+        try { await target.open(); } catch {}
+        return !disposed && seq === floatSeq;
+      }
+      const threadRef = target.threadRef;
+      if (!threadRef) return false;
+      const preFloatSnap = new Set(listPreviewPanelFloatActions(D, threadRef, null, reactFiber).map((m) => (m.tabId ? `tab:${m.tabId}` : m.btn)));
+      let res;
+      try {
+        res = await target.open();
+      } catch {
+        return false;
+      }
+      if (disposed || seq !== floatSeq) return false;
+      if (res && res._tag === "Failure") return false;
+      const isOk = Boolean(res && res._tag === "Success");
+
+      // 1. Discover T3's live Zustand stores (same-origin real ESM singletons) and resolve tabId.
+      //    Note: T3's openFileInPreview returns Exit.map(res, () => openBrowser(...)) -> { _tag: "Success", value: undefined },
+      //    having synchronously recorded activeSurfaceId: "browser:<tabId>" in rightPanelStore.
+      const stores = await getMiniPlayerStores();
+      if (disposed || seq !== floatSeq) return false;
+      const tabId = (isOk && typeof res.value?.tabId === "string" && res.value.tabId)
+        || (res && typeof res.tabId === "string" && res.tabId)
+        || (isOk ? activeBrowserTabIdFromRightPanel(stores.rightPanelStore, threadRef) : null);
+
+      // Store-first Float path: wait briefly for docked PreviewPanel's browserSurfaceStore rect+content measurement
+      // so Nightly's mini-player inherits the tall docked panel aspect ratio instead of falling back to 1280x800,
+      // then open previewMiniPlayerStore and close rightPanelStore.
+      if (tabId && isMiniPlayerStore(stores.miniPlayerStore)) {
+        if (!isAlreadyFloatingTab(stores.miniPlayerStore, threadRef, tabId) && isBrowserSurfaceStore(stores.browserSurfaceStore)) {
+          const ready = await waitForBrowserSurface(stores.browserSurfaceStore, threadRef, tabId, seq);
+          if (!ready || disposed || seq !== floatSeq) return false;
+        }
+        if (tryFloatViaStores(stores, threadRef, tabId)) return true;
+      }
+
+      // 2. Fallback: committed-DOM PreviewPanel toolbar button bound to exact threadRef (+ exact tabId when known,
+      //    or unique newly-committed preview on Nightly { _tag: "Success", value: undefined } when stores are absent).
+      if (!tabId && !isOk) return false;
+      const tryFloat = () => {
+        if (disposed || seq !== floatSeq) return false;
+        const found = findPreviewPanelFloatAction(D, threadRef, tabId, reactFiber, preFloatSnap);
+        if (!found) return false;
+        if (found.alreadyFloating) return true;
+        if (found.disabled) return false;
+        try { found.invoke(); } catch { return false; }
+        return true;
+      };
+      if (tryFloat()) return true;
+      return await new Promise((resolve) => {
+        let done = false;
+        let raf = 0;
+        let t = 0;
+        const finish = (ok) => {
+          if (done) return;
+          done = true;
+          if (activeFloatCancel === cancel) activeFloatCancel = null;
+          if (t) { clearTimeout(t); timers.delete(t); t = 0; }
+          if (raf && typeof cancelAnimationFrame === "function") { cancelAnimationFrame(raf); raf = 0; }
+          mo.disconnect();
+          resolve(ok);
+        };
+        const cancel = () => finish(false);
+        activeFloatCancel = cancel;
+        const mo = new MutationObserver(() => {
+          if (disposed || seq !== floatSeq) return finish(false);
+          if (tryFloat()) finish(true);
+        });
+        if (D.body) mo.observe(D.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled", "aria-label", "aria-pressed"] });
+        t = setTimeout(() => finish(!disposed && seq === floatSeq && tryFloat()), 1200);
+        timers.add(t);
+        const tick = () => {
+          raf = 0;
+          if (done || disposed || seq !== floatSeq) return finish(false);
+          if (tryFloat()) return finish(true);
+          if (typeof requestAnimationFrame === "function") raf = requestAnimationFrame(tick);
+        };
+        if (typeof requestAnimationFrame === "function") raf = requestAnimationFrame(tick);
+      });
+    };
+    const p = floatQueue.catch(() => false).then(run);
+    floatQueue = p.catch(() => false);
+    return p;
+  }
+  function showMadeFloatFor(anchor, madeEl) {
+    if (disposed || settings.footerMadePreview !== "hover-alt") return hideMadeFloat();
+    const target = resolvePreviewTarget(anchor, reactFiber, location.href);
+    if (!target) return hideMadeFloat();
+    clearTimeout(floatHideTimer);
+    floatHideTimer = 0;
+    if (!floatBtn || !floatBtn.isConnected) {
+      floatBtn = h("button", {
+        type: "button",
+        [OWN]: "made-float",
+        class: "t3x-made-float",
+        title: "Open in floating mini-viewer · ⌥-click",
+        "aria-label": "Open in floating mini-viewer",
+        "aria-keyshortcuts": "Alt+Enter",
+        hidden: true,
+        onpointerenter: () => { clearTimeout(floatHideTimer); floatHideTimer = 0; },
+        onpointerleave: () => scheduleHideMadeFloat(),
+        onclick: (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const cur = floatActive;
+          if (!cur) return;
+          const restoreFocus = D.activeElement === floatBtn && cur.anchor?.isConnected ? cur.anchor : null;
+          if (cur.madeEl && e.isTrusted) holdMadeFromEl(cur.madeEl, madeSession);
+          hideMadeFloat();
+          if (restoreFocus) { try { restoreFocus.focus(); } catch {} }
+          openInFloatingMiniViewer(cur.target);
+        },
+      }, "⧉ Float");
+      D.body.append(floatBtn);
+    }
+    const prevRow = floatActive?.row;
+    const row = madeEl ? anchor.closest("tr") : null;
+    if (prevRow && prevRow !== row) prevRow.classList.remove("t3x-made-hover");
+    floatActive = { target, madeEl, row, anchor };
+    floatBtn.textContent = target.kind === "media-lightbox" ? "⧉ View" : "⧉ Float";
+    floatBtn.hidden = false;
+    const btnW = floatBtn.offsetWidth || 56, btnH = floatBtn.offsetHeight || 20;
+    let pos;
+    if (row && madeEl && row.querySelector('[itemprop~="made-pill"]')) {
+      row.classList.add("t3x-made-hover");
+      const cell = row.querySelector(":is(th, td):nth-child(2)");
+      const col3 = row.querySelector(":is(th, td):nth-child(3)");
+      const when = col3 ? col3.querySelector('[itemprop="made-when"]') : null;
+      const tbl = row.closest("table");
+      let prevWhenRect = null;
+      if (tbl) {
+        const rows = [...tbl.querySelectorAll("thead > tr, tbody > tr")].filter((r) => !r.classList.contains("t3x-made-day"));
+        const idx = rows.indexOf(row);
+        const prevWhen = idx > 0 ? rows[idx - 1].querySelector('[itemprop="made-when"]') : null;
+        if (prevWhen) prevWhenRect = prevWhen.getBoundingClientRect();
+      }
+      const primary = cell ? (cell.querySelector(":scope > a") || anchor) : anchor;
+      const next = primary.nextElementSibling;
+      const tailEl = next && (next.getAttribute("itemprop") || "").split(/\s+/).includes("made-tailnet") ? next : primary;
+      let lastRect;
+      try {
+        const range = D.createRange();
+        range.selectNodeContents(tailEl);
+        const rects = range.getClientRects();
+        lastRect = rects[rects.length - 1] || tailEl.getBoundingClientRect();
+      } catch {
+        lastRect = tailEl.getBoundingClientRect();
+      }
+      const extraRight = tailEl === primary && primary.hasAttribute("data-t3x-tailnet") ? 50 : 0;
+      const wide = laneIsWide(madeEl, styleForLane);
+      const narrow = wide === false || row.getBoundingClientRect().width < 480;
+      pos = computeFloatPos(
+        row.getBoundingClientRect(),
+        (cell || row).getBoundingClientRect(),
+        (col3 || row).getBoundingClientRect(),
+        when ? when.getBoundingClientRect() : null,
+        lastRect, btnW, btnH, narrow, extraRight, innerWidth, innerHeight, prevWhenRect,
+      );
+    } else {
+      const r = anchor.getBoundingClientRect();
+      pos = {
+        left: Math.round(Math.max(4, Math.min(r.right + 6, innerWidth - btnW - 4))),
+        top: Math.round(Math.max(4, Math.min(r.top + (r.height - btnH) / 2, innerHeight - btnH - 4))),
+      };
+    }
+    floatBtn.style.left = `${pos.left}px`;
+    floatBtn.style.top = `${pos.top}px`;
+  }
+  function findHoverTarget(targetEl) {
+    if (!targetEl || targetEl.nodeType !== 1) return null;
+    if (floatBtn && (targetEl === floatBtn || floatBtn.contains(targetEl))) return "keep";
+    const madeEl = targetEl.closest ? targetEl.closest(FOOTER_MADE) : null;
+    if (madeEl) {
+      const tr = targetEl.closest("tr");
+      if (!tr || tr.classList.contains("t3x-made-day")) return null;
+      const a = targetEl.closest("a[href]") || tr.querySelector(":is(th, td):nth-child(2) > a[href]") || tr.querySelector('[itemprop="made-desc"] a[href]');
+      return a ? { anchor: a, madeEl } : null;
+    }
+    if (settings.footerMadePreviewAll) {
+      const a = targetEl.closest ? targetEl.closest(".chat-markdown a[href]") : null;
+      if (a) return { anchor: a, madeEl: null };
+    }
+    return null;
+  }
+  listen(D, "pointerover", (e) => {
+    if (disposed || settings.footerMadePreview !== "hover-alt") return;
+    const hit = findHoverTarget(e.target);
+    if (hit === "keep") return;
+    if (!hit) { if (floatActive) scheduleHideMadeFloat(); return; }
+    showMadeFloatFor(hit.anchor, hit.madeEl);
+  });
+  listen(D, "focusin", (e) => {
+    if (disposed || settings.footerMadePreview !== "hover-alt") return;
+    const hit = findHoverTarget(e.target);
+    if (hit === "keep") return;
+    if (!hit) { hideMadeFloat(); return; }
+    showMadeFloatFor(hit.anchor, hit.madeEl);
+  });
+  listen(D, "scroll", () => { if (floatActive) hideMadeFloat(); }, true);
+  listen(W, "resize", () => { if (floatActive) hideMadeFloat(); });
+  // Capture-phase ⌥-click and Direct-click interception (blocks Chromium Alt-download and Electron openExternal)
+  listen(D, "click", (e) => {
+    if (disposed || settings.footerMadePreview === "off") return;
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    const a = e.target && e.target.closest ? e.target.closest(".chat-markdown a[href]") : null;
+    if (!a) return;
+    const madeEl = a.closest(FOOTER_MADE);
+    if (!madeEl && !settings.footerMadePreviewAll) return;
+    if (madeEl && madeSummary(madeEl)?.contains(a)) return;
+    const isAlt = Boolean(e.altKey);
+    const isDirect = !isAlt && settings.footerMadePreview === "direct";
+    if (!isAlt && !isDirect) return;
+    const target = resolvePreviewTarget(a, reactFiber, location.href);
+    if (!target) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (madeEl && e.isTrusted) holdMadeFromEl(madeEl, madeSession);
+    hideMadeFloat();
+    openInFloatingMiniViewer(target);
+  }, true);
+  function nextFocusableAfter(anchor) {
+    const sel = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const all = [...D.querySelectorAll(sel)].filter((el) => el !== floatBtn && !el.hidden && el.offsetParent !== null);
+    const idx = all.indexOf(anchor);
+    return idx >= 0 && idx + 1 < all.length ? all[idx + 1] : null;
+  }
+  listen(D, "keydown", (e) => {
+    if (disposed) return;
+    if (e.key === "Escape" && floatActive) {
+      const back = D.activeElement === floatBtn && floatActive.anchor?.isConnected ? floatActive.anchor : null;
+      hideMadeFloat();
+      if (back) { try { back.focus(); } catch {} }
+      return;
+    }
+    // Natural Tab-order bridge to/from the shared body-level Float button (without mutating React DOM).
+    if (e.key === "Tab" && !e.altKey && !e.ctrlKey && !e.metaKey && floatBtn && !floatBtn.hidden && floatActive?.anchor?.isConnected) {
+      if (!e.shiftKey && e.target === floatActive.anchor) {
+        e.preventDefault();
+        floatBtn.focus();
+        return;
+      }
+      if (e.target === floatBtn) {
+        if (e.shiftKey) {
+          e.preventDefault();
+          floatActive.anchor.focus();
+          return;
+        }
+        const next = nextFocusableAfter(floatActive.anchor);
+        if (next) {
+          e.preventDefault();
+          hideMadeFloat();
+          next.focus();
+          return;
+        }
+      }
+    }
+    if (settings.footerMadePreview === "off" || !e.altKey || e.key !== "Enter") return;
+    const a = e.target && e.target.closest ? e.target.closest(".chat-markdown a[href]") : null;
+    if (!a) return;
+    const madeEl = a.closest(FOOTER_MADE);
+    if (!madeEl && !settings.footerMadePreviewAll) return;
+    if (madeEl && madeSummary(madeEl)?.contains(a)) return;
+    const target = resolvePreviewTarget(a, reactFiber, location.href);
+    if (!target) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (madeEl && e.isTrusted) holdMadeFromEl(madeEl, madeSession);
+    hideMadeFloat();
+    openInFloatingMiniViewer(target);
+  }, true);
+  cleanups.push(() => { cancelPendingFloat(); cachedMiniStores = null; hideMadeFloat(); });
+
   const ORDER = ["panel", "bars", "header", "composer", "older"];
   const insertCounts = {};
-  function ensure() {
+  function ensure(opts) {
     if (paused || disposed) return;
     try {
       footerPass(D, settings.footerTeam, footerSeen);
       syncMadeHost();
       madePass(D, settings.footerMade, madeSession);
+      enhanceMadeLists(D, { group: settings.footerMadeGroup, ownAttr: OWN });
       watchMadeLanes(D);
     } catch (e) {
       noteError("footer", e);
@@ -4305,6 +5876,11 @@
       }
     }
     try {
+      syncShelfLimits(opts);
+    } catch (e) {
+      noteError("shelves", e);
+    }
+    try {
       decorateBurn();
     } catch (e) {
       noteError("burn", e);
@@ -4324,9 +5900,9 @@
     for (const k of Object.keys(insertCounts)) insertCounts[k] = Math.max(0, insertCounts[k] - 60);
   });
 
-  function render() {
+  function render(opts) {
     if (paused || disposed) return;
-    ensure();
+    ensure(opts);
     checkUI();
     if (pop?.kind === "usage" || pop?.kind === "chain") fillPopover();
   }
@@ -4663,7 +6239,13 @@
     } finally {
       if (!disposed && typeof syncFontWorkspace === "function") syncFontWorkspace();
       // the ✦ panel's font names switch to their face once it loads
-      if (!disposed && typeof pop === "object" && pop?.kind === "panel" && typeof fillPopover === "function") fillPopover();
+      if (!disposed && typeof pop === "object" && pop?.kind === "panel" && typeof fillPopover === "function" && !(typeof fontSelectOpen === "function" && fontSelectOpen())) {
+        if (typeof panelPointerDown === "boolean" && panelPointerDown) {
+          if (typeof panelRebuildPending === "boolean") panelRebuildPending = true;
+        } else if (!(typeof panelRebuildPending === "boolean" && panelRebuildPending)) {
+          fillPopover();
+        }
+      }
     }
   }
   async function applyRoleNow(role, token) {
@@ -4786,6 +6368,175 @@
   }
 
   // ---------- add-ons panel ----------
+
+  let panelPointerDown = false, panelPointerTarget = null, panelRebuildPending = false;
+  listen(D, "pointerdown", (e) => {
+    if (pop?.kind === "panel" && e.target?.closest?.(".t3x-pop") && !e.target.closest(".t3x-shelf-input")) {
+      panelPointerDown = true;
+      panelPointerTarget = e.target;
+    }
+  }, true);
+  const finishPanelPointer = () => {
+    if (!panelPointerDown) return;
+    panelPointerDown = false;
+    panelPointerTarget = null;
+    if (panelRebuildPending) {
+      // Wait one tick so the browser's click event lands on the pressed button before any rebuild.
+      later(0, () => {
+        if (disposed || !panelRebuildPending || panelPointerDown) return;
+        panelRebuildPending = false;
+        if (pop?.kind === "panel" && !fontSelectOpen()) fillPopover();
+      });
+    }
+  };
+  listen(W, "pointerup", finishPanelPointer, true);
+  listen(W, "pointercancel", finishPanelPointer, true);
+
+  function applyShelfRule(shelf, nextRule, focusTarget, { deferFill = false, preferForward = false, allowOpen = true } = {}) {
+    const cfg = SHELF_LIMITS[shelf];
+    const prevRule = settings[cfg.key];
+    const normalized = normalizeShelfRule(nextRule, null, null, shelf);
+    const changed = !shelfRuleEqual(prevRule, normalized);
+    if (changed) shelfExpandedAll[shelf] = false;
+    panelRebuildPending = false;
+    change({ [cfg.key]: normalized }, { deferFill, focusOverride: focusTarget, preferForward });
+    if (changed && allowOpen) {
+      const beforeFocus = D.activeElement;
+      const opened = openShelfIfCollapsed(shelf);
+      if (opened) {
+        if (focusTarget) restorePanelFocus(focusTarget, preferForward);
+        else if (beforeFocus && beforeFocus.isConnected && D.activeElement !== beforeFocus && !beforeFocus.closest?.(".t3x-pop")) {
+          beforeFocus.focus?.({ preventScroll: true });
+        }
+      }
+    }
+  }
+  function commitShelfInput(shelf, input, fromEnter, blurEvent) {
+    if (disposed || suppressShelfCommit || input.dataset.t3xCommitted || !input.isConnected) return;
+    const cfg = SHELF_LIMITS[shelf];
+    const cur = settings[cfg.key];
+    if (!cur || cur.unit === "all") return;
+    const rel = blurEvent?.relatedTarget;
+    // Reset defaults discards any unsaved draft and never auto-opens a closed shelf.
+    if (!fromEnter && (panelPointerTarget?.closest?.('[data-focus="reset"]') || rel?.closest?.('[data-focus="reset"]'))) {
+      input.value = String(cur.value);
+      return;
+    }
+    const parsed = parseShelfInput(input.value, shelf, cur.unit);
+    if (parsed === null || parsed === cur.value) {
+      input.value = String(cur.value);
+      return;
+    }
+    input.dataset.t3xCommitted = "1";
+    const nextRule = { ...cur, value: parsed, last: { ...cur.last, [cur.unit]: parsed } };
+    // If the user edited the field and clicked a different unit chip for this same shelf,
+    // save the draft under the previous unit's memory without triggering a premature rebuild or open;
+    // the chip's click handler immediately switches to the new unit and opens the shelf if needed.
+    const chipEl = !fromEnter ? panelPointerTarget?.closest?.(`[data-focus^="shelf-unit-${shelf}-"]`) : null;
+    const clickedOtherUnit = Boolean(chipEl && chipEl.getAttribute("data-focus") !== `shelf-unit-${shelf}-${cur.unit}`);
+    if (clickedOtherUnit) {
+      applyShelfRule(shelf, nextRule, null, { deferFill: true, allowOpen: false });
+      return;
+    }
+    const tabFocusKey = !fromEnter && rel?.closest?.(".t3x-pop") ? rel.getAttribute("data-focus") : null;
+    const focusTarget = fromEnter ? `shelf-input-${shelf}` : (panelPointerDown ? null : tabFocusKey);
+    applyShelfRule(shelf, nextRule, focusTarget, {
+      deferFill: !fromEnter && panelPointerDown,
+      preferForward: !fromEnter && Boolean(tabFocusKey),
+    });
+  }
+  function shelfLimitRow(shelf, label, clockHint) {
+    const cfg = SHELF_LIMITS[shelf];
+    const rule = settings[cfg.key];
+    const isAll = rule.unit === "all";
+    const activeUnit = isAll ? rule.lastUnit : rule.unit;
+    const uCfg = cfg.units[activeUnit];
+    const shown = isAll ? rule.last[activeUnit] : rule.value;
+    const input = h("input", {
+      type: "text",
+      inputmode: "numeric",
+      class: "t3x-shelf-input",
+      value: String(shown),
+      disabled: isAll ? true : null,
+      "data-focus": `shelf-input-${shelf}`,
+      "aria-label": `${label} (${uCfg.min} to ${uCfg.max} ${activeUnit})`,
+      onkeydown: (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commitShelfInput(shelf, input, true, null);
+        } else if (e.key === "Escape") {
+          const live = settings[cfg.key];
+          input.value = String(live.unit === "all" ? live.last[live.lastUnit] : live.value);
+        }
+      },
+      onblur: (e) => commitShelfInput(shelf, input, false, e),
+    });
+    const unitChips = [
+      ["rows", "rows", `Show first N ${cfg.label.toLowerCase()} rows`],
+      ["min", "min", shelf === "snoozed" ? "Waking in less than N minutes" : "Settled less than N minutes ago"],
+      ["hours", "hours", shelf === "snoozed" ? "Waking in less than N hours" : "Settled less than N hours ago"],
+      ["days", "days", shelf === "snoozed" ? "Waking in less than N days" : "Settled less than N days ago"],
+      ["all", "No limit", `Show all mounted ${cfg.label.toLowerCase()} rows`],
+    ];
+    return h("div", { class: "t3x-set t3x-shelf-set", "data-shelf-setting": shelf },
+      h("div", { class: "t3x-shelf-head" },
+        h("span", { class: "t3x-set-label", text: label }),
+        h("span", { class: "t3x-shelf-clock", text: clockHint })),
+      h("div", { class: "t3x-shelf-summary", "data-shelf-summary": shelf, text: shelfRuleSummary(shelf, rule, shelfLiveCount[shelf]) }),
+      h("div", { class: "t3x-stepper t3x-shelf-stepper" },
+        h("button", {
+          type: "button",
+          class: "t3x-btn t3x-step",
+          "data-focus": `shelf-minus-${shelf}`,
+          "aria-label": `Decrease ${cfg.label.toLowerCase()} limit`,
+          disabled: isAll || shown <= uCfg.min ? true : null,
+          onclick: () => {
+            const cur = settings[cfg.key];
+            if (cur.unit === "all") return;
+            const uc = cfg.units[cur.unit];
+            const nextVal = Math.max(uc.min, cur.value - 1);
+            applyShelfRule(shelf, { ...cur, value: nextVal, last: { ...cur.last, [cur.unit]: nextVal } }, `shelf-minus-${shelf}`);
+          },
+        }, "\u2212"),
+        input,
+        h("button", {
+          type: "button",
+          class: "t3x-btn t3x-step",
+          "data-focus": `shelf-plus-${shelf}`,
+          "aria-label": `Increase ${cfg.label.toLowerCase()} limit`,
+          disabled: isAll || shown >= uCfg.max ? true : null,
+          onclick: () => {
+            const cur = settings[cfg.key];
+            if (cur.unit === "all") return;
+            const uc = cfg.units[cur.unit];
+            const nextVal = Math.min(uc.max, cur.value + 1);
+            applyShelfRule(shelf, { ...cur, value: nextVal, last: { ...cur.last, [cur.unit]: nextVal } }, `shelf-plus-${shelf}`);
+          },
+        }, "+")),
+      h("div", { class: "t3x-chips t3x-shelf-units", role: "group", "aria-label": `${label} unit` },
+        unitChips.map(([u, text, tip]) => h("button", {
+          type: "button",
+          class: "t3x-chipbtn t3x-shelf-unit",
+          "aria-pressed": String(rule.unit === u),
+          "data-focus": `shelf-unit-${shelf}-${u}`,
+          title: tip,
+          onclick: () => {
+            const cur = settings[cfg.key];
+            if (u === "all") {
+              if (cur.unit === "all") {
+                const backUnit = cur.lastUnit;
+                const backVal = cur.last[backUnit];
+                applyShelfRule(shelf, { ...cur, unit: backUnit, value: backVal }, `shelf-unit-${shelf}-all`);
+              } else {
+                applyShelfRule(shelf, { ...cur, unit: "all", lastUnit: cur.unit, value: cur.value, last: { ...cur.last, [cur.unit]: cur.value } }, `shelf-unit-${shelf}-all`);
+              }
+            } else if (cur.unit !== u) {
+              const nextVal = cur.last[u];
+              applyShelfRule(shelf, { ...cur, unit: u, value: nextVal, lastUnit: u }, `shelf-unit-${shelf}-${u}`);
+            }
+          },
+        }, text))));
+  }
 
   function sw(label, key, note) {
     const on = settings[key];
@@ -5554,7 +7305,10 @@
           sw("Model icon beside the title", "inlineIcon", "Only on rows whose last line held nothing else."),
           sw("Project name in full", "projectFull", "Wraps instead of ending in \u2026; the status stays on the right."),
         ],
-        sw("Stronger Working divider", "workingHeader", "The Working header in T3's working colour, bold, with a thicker line."),
+        sw("Stronger section headers", "workingHeader", "Working in blue with tinted threads, Snoozed in amber, Settled with a firm grey line."),
+        shelfLimitRow("snoozed", "Snoozed when open", "rows, or waking within"),
+        shelfLimitRow("settled", "Settled when open", "rows, or settled within"),
+        h("div", { class: "t3x-note t3x-note-flush", text: "Applies while a shelf is open (click its header to open or close). Time limits filter Snoozed by time until wake and Settled by when it was settled. Changing a setting opens that shelf once so you can see the result. Settled starts with T3\u2019s first 10 rows; Show 25 more loads older pages." }),
         sw("Auto-hide in narrow windows", "narrowAutoHide", "T3's own behaviour: under 768 px wide, the sidebar hides and opens over the chat. Off: it stays beside the chat, narrowed to keep 640 px for the chat."),
         h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: addonSettingLabel("marker") }),
           h("div", { class: "t3x-radios", role: "radiogroup", "aria-label": addonSettingLabel("marker") },
@@ -5567,7 +7321,19 @@
             FOOTER_TEAM.map(([value, label]) => radio("footerTeam", value, settings.footerTeam, label, (v) => change({ footerTeam: v }))))),
         h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: "Footer Made so far list" }),
           h("div", { class: "t3x-radios t3x-col t3x-indent", role: "radiogroup", "aria-label": "Footer Made so far list" },
-            FOOTER_MADE_MODES.map(([value, label]) => radio("footerMade", value, settings.footerMade, label, (v) => change({ footerMade: v })))))),
+            FOOTER_MADE_MODES.map(([value, label]) => radio("footerMade", value, settings.footerMade, label, (v) => change({ footerMade: v })))),
+          h("details", { class: "t3x-made-more", open: settings.footerMadeMoreOpen, ontoggle: (e) => { if (e.currentTarget.open !== settings.footerMadeMoreOpen) { settings = readSettings(JSON.stringify({ ...settings, footerMadeMoreOpen: e.currentTarget.open })); saveSettings(); } } },
+            h("summary", {}, h("span", { text: "Display & mini-viewer" })),
+            h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: "Grouping" }),
+              h("div", { class: "t3x-radios t3x-indent", role: "radiogroup", "aria-label": "Made so far grouping" },
+                FOOTER_MADE_GROUPS.map(([value, label]) => radio("footerMadeGroup", value, settings.footerMadeGroup, label, (v) => change({ footerMadeGroup: v }))))),
+            h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: "Type badges" }),
+              h("div", { class: "t3x-radios t3x-indent", role: "radiogroup", "aria-label": "Made so far type badges" },
+                FOOTER_MADE_BADGES.map(([value, label]) => radio("footerMadeBadges", value, settings.footerMadeBadges, label, (v) => change({ footerMadeBadges: v }))))),
+            h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: "Floating mini-viewer" }),
+              h("div", { class: "t3x-radios t3x-col t3x-indent", role: "radiogroup", "aria-label": "Made so far floating mini-viewer" },
+                FOOTER_MADE_PREVIEWS.map(([value, label]) => radio("footerMadePreview", value, settings.footerMadePreview, label, (v) => change({ footerMadePreview: v }))))),
+            sw("Also enable on all reply links", "footerMadePreviewAll", "Opt-in: hover Float button and ⌥-click on links outside Made so far too.")))),
       h("section", {}, h("h3", { text: "Popups" }),
         sw("Move popups out of the way", "popMove", "Drag a popup by its top bar (⠿); it reopens there. Double-click the bar, or press Home on ⠿, to put it back. Fonts stops dimming the screen and gets a Small card button.")),
       h("section", {}, h("h3", { text: "Fonts on screen" }),
@@ -5586,9 +7352,23 @@
   function openPanel(btn) {
     openPopover(btn, "panel", panelBody, { width: 360 });
   }
-  function change(patch) {
+  function patchTouchesFonts(patch) {
+    if (patch === null) return true;
+    for (const k of Object.keys(patch)) {
+      if (k.startsWith("font") || k === "printOnly" || k === "showPartly" || k === "showHidden" || k === "hiddenFonts") return true;
+    }
+    return false;
+  }
+  function change(patch, opts = {}) {
     const wasTeam = settings.footerTeam;
+    const prevSnoozed = settings.snoozedRule, prevSettled = settings.settledRule;
     settings = patch === null ? readSettings("{}") : readSettings(JSON.stringify({ ...settings, ...patch }));
+    if (patch === null || !shelfRuleEqual(prevSnoozed, settings.snoozedRule)) shelfExpandedAll.snoozed = false;
+    if (patch === null || !shelfRuleEqual(prevSettled, settings.settledRule)) {
+      shelfExpandedAll.settled = false;
+      shelfPendingNativeMoreFocus = false;
+      clearShelfNativeMorePending();
+    }
     pruneSizeBack();
     if (settings.footerTeam === "always-show" && wasTeam !== "always-show") {
       try {
@@ -5599,13 +7379,22 @@
     }
     saveSettings();
     applyRootAttrs();
-    applyFonts();
+    try { enhanceMadeLists(D, { group: settings.footerMadeGroup, ownAttr: OWN }); } catch {}
+    if (settings.footerMadePreview !== "hover-alt") hideMadeFloat();
+    if (patchTouchesFonts(patch)) applyFonts();
     if (settings.burnTells) fetchBurn();
     else burnData = null;
-    render();
+    render({ user: true });
     // Rebuilding the panel throws away an open font menu. The pill has already updated that row; the
     // menu's blur applies the rebuild once it has closed.
-    if (pop?.kind === "panel" && !fontSelectOpen()) fillPopover();
+    if (pop?.kind === "panel" && !fontSelectOpen()) {
+      if (opts.deferFill) panelRebuildPending = true;
+      else {
+        panelRebuildPending = false;
+        suppressShelfCommit = true;
+        try { fillPopover(opts.focusOverride, Boolean(opts.preferForward)); } finally { suppressShelfCommit = false; }
+      }
+    }
     if (pop && patch && Object.prototype.hasOwnProperty.call(patch, "popMove")) place();
     if (patch && Object.prototype.hasOwnProperty.call(patch, "narrowAutoHide")) refreshNarrowSidebar(D, reactFiber);
     syncFontWorkspace();
@@ -6588,14 +8377,28 @@
   listen(W, "storage", (e) => {
     if (e.key === SETTINGS_KEY) {
       checkCancel("options");
+      const prevSnoozed = settings.snoozedRule, prevSettled = settings.settledRule;
       settings = readSettings(e.newValue);
+      if (!shelfRuleEqual(prevSnoozed, settings.snoozedRule)) shelfExpandedAll.snoozed = false;
+      if (!shelfRuleEqual(prevSettled, settings.settledRule)) {
+        shelfExpandedAll.settled = false;
+        shelfPendingNativeMoreFocus = false;
+        clearShelfNativeMorePending();
+      }
       checkVersionReady.then(() => checkWake(true));
       pruneSizeBack();
       applyRootAttrs();
+      try { enhanceMadeLists(D, { group: settings.footerMadeGroup, ownAttr: OWN }); } catch {}
+      if (settings.footerMadePreview !== "hover-alt") hideMadeFloat();
       applyFonts();
-      if (pop?.kind === "panel") fillPopover();
+      if (pop?.kind === "panel" && !panelPointerDown) {
+        suppressShelfCommit = true;
+        try { fillPopover(); } finally { suppressShelfCommit = false; }
+      } else if (pop?.kind === "panel") {
+        panelRebuildPending = true;
+      }
       syncFontWorkspace();
-      render();
+      render({ user: true });
     }
   });
 
@@ -6653,6 +8456,24 @@
   madeAttrObserver.observe(D.body, { subtree: true, attributes: true, attributeFilter: ["data-markdown-details-open"] });
   cleanups.push(() => madeAttrObserver.disconnect());
 
+  const shelfAttrObserver = new MutationObserver((records) => {
+    if (paused || disposed) return;
+    for (const r of records) {
+      const t = r.target;
+      if (!t || t.nodeType !== 1 || isOwned(t)) continue;
+      if (r.attributeName === "aria-expanded" && t.matches?.('[data-testid="sidebar-snoozed-shelf-toggle"], [data-testid="sidebar-settled-shelf-toggle"]')) {
+        scheduleShelfSync({ user: true });
+        return;
+      }
+      if (r.attributeName === "aria-current" && t.closest?.("li[data-thread-item]")) {
+        scheduleShelfSync();
+        return;
+      }
+    }
+  });
+  shelfAttrObserver.observe(D.body, { subtree: true, attributes: true, attributeFilter: ["aria-expanded", "aria-current"] });
+  cleanups.push(() => shelfAttrObserver.disconnect());
+
   // Theme changes: recompute the marker colour (attributes on <html> only, cheap).
   const themeObserver = new MutationObserver(guarded("theme", () => later(50, updateMarkColor)));
   themeObserver.observe(D.documentElement, { attributes: true, attributeFilter: ["class", "data-theme-id", "data-theme-selected", "style"] });
@@ -6676,7 +8497,7 @@
   listen(D, "visibilitychange", () => { checkCancel("focus"); if (D.visibilityState === "visible") checkWake(); });
   // A pair begun while fonts were loading can never be read; start again once they finish.
   listen(D.fonts, "loadingdone", () => { if (checkPair !== null && !checkPairFonts) checkCancel("fonts"); checkVersionReady.then(() => checkWake()); });
-  every(30e3, () => render()); // ages and "stale" marks move on even without new data
+  every(30e3, () => render({ fromClockTick: true })); // ages, time-limit shelves, and "stale" marks move on even without new data
   listen(D, "visibilitychange", () => {
     if (D.visibilityState === "visible") {
       fetchState();
@@ -6774,6 +8595,7 @@
 
   W.t3xTeardown = () => {
     footerControlsActive = false;
+    suppressShelfCommit = true;
     teardownVisualization();
     disposed = true;
     routeToken++; // any response still on its way belongs to a torn-down copy
@@ -6800,6 +8622,14 @@
     D.querySelectorAll(`[${OWN}]`).forEach((n) => n.remove());
     for (const a of ROOT_ATTRS) D.documentElement.removeAttribute(a);
     for (const el of D.querySelectorAll("[data-t3x-usage-page]")) el.removeAttribute("data-t3x-usage-page");
+    for (const el of D.querySelectorAll("[data-t3x-shelf-folded]")) el.removeAttribute("data-t3x-shelf-folded");
+    for (const el of D.querySelectorAll("[data-t3x-settled-folded]")) el.removeAttribute("data-t3x-settled-folded");
+    for (const el of D.querySelectorAll("[data-t3x-older]")) el.removeAttribute("data-t3x-older");
+    for (const el of D.querySelectorAll("[data-t3x-tailnet]")) el.removeAttribute("data-t3x-tailnet");
+    for (const el of D.querySelectorAll("[data-t3x-clock]")) el.removeAttribute("data-t3x-clock");
+    for (const el of D.querySelectorAll("table")) madeDayCache.delete(el);
+    for (const el of D.querySelectorAll('[data-t3x-title="1"]')) { el.removeAttribute("title"); el.removeAttribute("data-t3x-title"); }
+    for (const el of D.querySelectorAll(".t3x-made-hover")) el.classList.remove("t3x-made-hover");
     for (const role of Object.keys(ROLE)) {
       D.documentElement.removeAttribute(ROLE[role].attr);
       if (roleFaces[role]) D.fonts.delete(roleFaces[role].face);
