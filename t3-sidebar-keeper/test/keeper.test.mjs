@@ -71,9 +71,21 @@ function bundleOf(target, file = asar) {
 }
 const binCliOf = (file = asar) => bundleOf("binCli", file);
 
-// The Antigravity limits probe: in the runtime bundle up to 12 Nov, in the server bundle from 13 Nov.
+// The Antigravity limits probe: in the runtime bundle up to 12 Nov and from 21 Nov, in the server bundle 13–20 Nov.
 const UA_MARK = "`antigravity/hub/";
-const probeTarget = (file = asar) => ["binCli", "delegatedTitles"].filter((t) => bundleOf(t, file).includes(UA_MARK));
+const probeTarget = (file = asar) => {
+  const fd = fs.openSync(file, "r");
+  try {
+    const layout = K.readLayout(fd);
+    const t = K.findTargets(fd, layout);
+    if (!t.geminiProbe) return [];
+    if (t.geminiProbe === t.binCli) return ["binCli"];
+    if (t.geminiProbe === t.delegatedTitles) return ["delegatedTitles"];
+    return ["geminiProbe"];
+  } finally {
+    fs.closeSync(fd);
+  }
+};
 
 function orchestrationSections(text) {
   const ast = acorn.parse(text, { ecmaVersion: "latest", sourceType: "module" });
@@ -206,7 +218,8 @@ test("titleGuide refuses ambiguous arrays and reports an exhausted byte budget",
 test("an already-patched v9 archive upgrades fit and titleGuide in place and is idempotent", async () => {
   fresh();
   const before = binCliOf();
-  const legacy = legacyFit(K.unitRule(before).text);
+  const withRule = before.includes("- 3-8 words, fewer than 40 characters.") ? K.unitRule(before).text : before;
+  const legacy = legacyFit(withRule);
   K.apply({ reason: "v9 fixture" }); // patch the other units in the isolated archive
   const fd = fs.openSync(asar, "r+");
   try {
@@ -228,7 +241,7 @@ test("an already-patched v9 archive upgrades fit and titleGuide in place and is 
   assert.equal(sections.at(-1), K.TITLE_GUIDE);
   assert.equal(sections.filter((s) => s.startsWith("## Titles\n")).length, 1);
   assert.ok(Buffer.byteLength(sections.at(-1)) < 4000);
-  assert.equal(titleFunctions(after).subagentThreadTitle({ title: "/root/reminders_warm_final_gate", ordinal: 1, parentTitle: "Parent" }), "Reminders warm final gate");
+  assert.equal(titleFunctionsFromAsar(asar).subagentThreadTitle({ title: "/root/reminders_warm_final_gate", ordinal: 1, parentTitle: "Parent" }), "Reminders warm final gate");
   const R = await import("../reminders.mjs");
   const pending = R.readStateFile(path.join(process.env.T3_KEEPER_HOME, "reminders.json")).state.pending;
   assert.deepEqual(pending.reasons, ["fit", "titleGuide"]);
@@ -551,29 +564,39 @@ test("nothing is written once T3 for the checked build has stopped", () => {
 
 // ---------- titles through the real patched functions (Astra round 2: "titles") ----------
 
-function patchedTitleFunctions() {
-  fresh();
-  return titleFunctions(K.unitFit(binCliOf()).text);
+// Load each wrapper strictly from its own balanced bundle with THAT bundle's own t3KeeperFitTitle,
+// so a compact helper in ProviderEventLoggers cannot accidentally execute against runtimeLayer's helper.
+function loadBundleFunction(source, fnName) {
+  const ast = acorn.parse(source, { ecmaVersion: "latest", allowHashBang: true, sourceType: "module" });
+  const want = new Set(["t3KeeperFitTitle", fnName, `${fnName}$t3orig`]);
+  // T3's own trim helper, which subagentThreadTitle calls: the bundler names it trimmed or trimmed$N.
+  const helper = /^trimmed(?:\$\d+)?$/;
+  const code = ast.body
+    .filter((n) => n.type === "FunctionDeclaration" && (want.has(n.id.name) || (fnName === "subagentThreadTitle" && helper.test(n.id.name))))
+    .map((n) => source.slice(n.start, n.end))
+    .join("\n");
+  let stubs = "";
+  if (fnName === "sanitizeThreadTitle") {
+    const capDecl = ast.body.find((n) => n.type === "VariableDeclaration" && n.declarations.some((d) => d.id.type === "Identifier" && d.id.name === "MAX_THREAD_TITLE_CHARS"));
+    assert.ok(capDecl, "MAX_THREAD_TITLE_CHARS declaration missing from sanitizer bundle");
+    stubs = `${source.slice(capDecl.start, capDecl.end)}\nconst isSome = (o) => o?._tag === 'Some'; function decodeJsonThreadTitle(raw) { try { const v = JSON.parse(raw); return typeof v?.title === 'string' ? { _tag: 'Some', value: v } : { _tag: 'None' }; } catch { return { _tag: 'None' }; } }\n`;
+  }
+  return vm.runInNewContext(`${stubs}${code}\n(${fnName})`, { Intl });
 }
 
-function titleFunctions(patched) {
-  if (!patched.includes("function threadTitle(")) {
-    const fd = fs.openSync(pristine, "r");
-    try {
-      const layout = K.readLayout(fd), target = K.findTargets(fd, layout).delegatedTitles;
-      const child = K.unitFit(K.readEntry(fd, layout, target).toString(), { wrappers: [["threadTitle", 42, true]] }).text;
-      const childAst = acorn.parse(child, { ecmaVersion: "latest", sourceType: "module" });
-      patched += "\n" + childAst.body.filter((n) => n.type === "FunctionDeclaration" && ["threadTitle", "threadTitle$t3orig"].includes(n.id.name)).map((n) => child.slice(n.start, n.end)).join("\n");
-    } finally { fs.closeSync(fd); }
-  }
-  const ast = acorn.parse(patched, { ecmaVersion: "latest", sourceType: "module" });
-  const names = ["t3KeeperFitTitle", "subagentThreadTitle", "subagentThreadTitle$t3orig", "threadTitle", "threadTitle$t3orig", "sanitizeThreadTitle", "sanitizeThreadTitle$t3orig"];
-  // T3's own trim helper, which subagentThreadTitle calls: the bundler names it trimmed or trimmed$N, changing between builds.
-  const helper = /^trimmed(?:\$\d+)?$/;
-  const code = ast.body.filter((n) => n.type === "FunctionDeclaration" && (names.includes(n.id.name) || helper.test(n.id.name))).map((n) => patched.slice(n.start, n.end)).join("\n");
-  const maxDecl = patched.match(/^const MAX_THREAD_TITLE_CHARS = [^;]+;$/m)[0]; // the patched value
-  const stubs = maxDecl + " const isSome = (o) => o?._tag === 'Some'; function decodeJsonThreadTitle(raw) { try { const v = JSON.parse(raw); return typeof v?.title === 'string' ? { _tag: 'Some', value: v } : { _tag: 'None' }; } catch { return { _tag: 'None' }; } }\n";
-  return vm.runInNewContext(`${stubs}${code}\n({ subagentThreadTitle, threadTitle, sanitizeThreadTitle })`, { Intl });
+function titleFunctionsFromAsar(file = asar) {
+  return {
+    sanitizeThreadTitle: loadBundleFunction(bundleOf("sanitizeTitles", file), "sanitizeThreadTitle"),
+    subagentThreadTitle: loadBundleFunction(bundleOf("binCli", file), "subagentThreadTitle"),
+    threadTitle: loadBundleFunction(bundleOf("delegatedTitles", file), "threadTitle"),
+  };
+}
+
+function patchedTitleFunctions() {
+  fresh();
+  const out = K.apply({ reason: "test" });
+  assert.equal(out.results.fit.state, "patched");
+  return titleFunctionsFromAsar(asar);
 }
 
 test("only subagent title inputs wordify recognised native agent IDs", () => {
@@ -929,25 +952,38 @@ test("server byte balancing preserves templates, line breaks and exact fitter on
   assert.equal(out.split('\n').length, added.split('\n').length);
 });
 
-test("split fit patches and disables both title bundles together", () => {
+test("split fit patches and disables all title bundles together", () => {
   fresh();
   const before = K.inspect(asar);
   assert.ok(before.targets.delegatedTitles, 'current nightly has a split delegate title bundle');
+  assert.ok(before.targets.sanitizeTitles, 'current nightly has a sanitizer title bundle');
   const out = K.apply({ reason: 'split fitter' });
   assert.equal(out.results.fit.state, 'patched');
   const fd = fs.openSync(asar, 'r');
   try {
     const layout = K.readLayout(fd);
     const child = K.readEntry(fd, layout, before.targets.delegatedTitles).toString();
-    const T = titleFunctions(binCliOf());
+    const san = K.readEntry(fd, layout, before.targets.sanitizeTitles).toString();
+    const rt = K.readEntry(fd, layout, before.targets.binCli).toString();
+    const T = titleFunctionsFromAsar(asar);
     assert.ok(child.includes('function threadTitle$t3orig('));
     assert.ok(child.includes(K.FIT_TITLE));
+    assert.ok(rt.includes('function subagentThreadTitle$t3orig('));
+    assert.ok(rt.includes(K.FIT_TITLE));
+    assert.ok(san.includes('function sanitizeThreadTitle$t3orig('));
+    assert.ok(san.includes(K.FIT_TITLE) || san.includes(K.FIT_TITLE_COMPACT));
+    if (before.targets.sanitizeTitles !== before.targets.binCli) {
+      assert.ok(san.includes(K.FIT_TITLE_COMPACT), 'small sanitizer chunk uses compact helper');
+    }
     assert.equal(T.threadTitle({title: 'a '.repeat(100) + '(Grok)', parentTitle: 'Parent', index: 0}).endsWith('(Grok)'), true);
+    assert.equal(T.sanitizeThreadTitle('😀'.repeat(130)).length > 0, true);
   } finally { fs.closeSync(fd); }
   fresh(); setDisabled(['fit']);
   const disabled = K.inspect(asar);
   assert.equal(disabled.results.fit.state, 'disabled');
-  assert.ok(!disabled.files.delegatedTitles || !disabled.files.delegatedTitles.buf.toString().includes('function t3KeeperFitTitle('));
+  for (const slot of ['binCli', 'delegatedTitles', 'sanitizeTitles']) {
+    assert.ok(!disabled.files[slot] || !disabled.files[slot].buf.toString().includes('function t3KeeperFitTitle('), `leaked fitter into ${slot}`);
+  }
 });
 
 test("split fit refuses a missing delegate formatter without publishing half a fitter", () => {
@@ -962,15 +998,239 @@ test("split fit refuses a missing delegate formatter without publishing half a f
   } finally { fs.closeSync(fd); }
   const out = K.inspect(asar);
   assert.equal(out.results.fit.state, 'failed');
-  assert.ok(!out.files.delegatedTitles || !out.files.delegatedTitles.buf.toString().includes('function t3KeeperFitTitle('));
-  assert.ok(!out.files.binCli.buf.toString().includes('function t3KeeperFitTitle('));
+  for (const slot of ['binCli', 'delegatedTitles', 'sanitizeTitles']) {
+    assert.ok(!out.files[slot] || !out.files[slot].buf.toString().includes('function t3KeeperFitTitle('), `leaked fitter into ${slot}`);
+  }
 });
 
-test("shared minimum ignores string scaffolds and rejects suffix identifiers", () => {
+test("shared minimum ignores string scaffolds, handles brace-terminated 4838+ clamp, and rejects suffix identifiers", () => {
   const source = 'var a=`chat_thread_sidebar_width`,b=256,c=208;function d(e){return Math.max(c,Math.ceil(e))}function f(e,t=c){return Math.max(t,Math.floor(e)-640)}function g(e,t){return Math.min(e===null?b:Math.max(c,e),f(t))}';
   const fixture = 'const fixture=' + JSON.stringify(source) + ';\n';
   assert.equal(K.unitMinWidth(fixture + source).text, fixture + source.replace('c=208', 'c=140'));
   assert.throws(() => K.unitMinWidth('const abc=208;' + source.replace('t=c)', 't=abc)')), /changed shape/);
   const fakeClamp = 'const fixture="function f(e,t=c){return Math.max(t,Math.floor(e)-640)}";';
   assert.throws(() => K.unitMinWidth(source.replace('function f(e,t=c){return Math.max(t,Math.floor(e)-640)}', fakeClamp)), /changed shape/);
+  // Nightly 4838–5051 factored the clamp helper out so the third clamp closes with "}" instead of ",".
+  const braceSource = 'var fG=`chat_thread_sidebar_width`,pG=256,mG=208;function hG(e){return Math.max(mG,Math.ceil(e))}function gG(e,t=mG){return Math.max(t,Math.floor(e)-640)}function _G(e,t,n){return Math.min(n,Math.max(t,e))}function vG(e){return e===null?pG:Math.max(mG,e)}';
+  const braceOut = K.unitMinWidth(braceSource);
+  assert.equal(braceOut.state, 'patched');
+  assert.equal(braceOut.text, braceSource.replace('mG=208', 'mG=140'));
+  assert.equal(K.unitMinWidth(braceOut.text).state, 'already');
+  assert.throws(() => K.unitMinWidth(braceSource.replace('Math.max(mG,e)', 'Math.max(208,e)')), /changed shape/);
+});
+
+function synthServerAsar(entries) {
+  let offset = 0;
+  const archiveEntries = {};
+  for (const [name, source] of Object.entries(entries)) {
+    const size = Buffer.byteLength(source);
+    archiveEntries[name] = { size, offset: String(offset) };
+    offset += size;
+  }
+  const json = Buffer.from(JSON.stringify({
+    files: { apps: { files: { server: { files: { dist: { files: archiveEntries } } } } } },
+  }));
+  const header = Buffer.alloc(16 + Math.ceil(json.length / 4) * 4);
+  [4, header.length - 8, header.length - 12, json.length].forEach((v, i) => header.writeUInt32LE(v, i * 4));
+  json.copy(header, 16);
+  const outPath = path.join(tmp, `synth-v19-${crypto.randomUUID()}.asar`);
+  fs.writeFileSync(outPath, Buffer.concat([header, ...Object.values(entries).map((s) => Buffer.from(s))]));
+  return outPath;
+}
+
+test("FIT_TITLE_COMPACT matches FIT_TITLE on every case", () => {
+  const fullBox = vm.createContext({ Intl });
+  const compactBox = vm.createContext({ Intl });
+  vm.runInContext(K.FIT_TITLE, fullBox);
+  vm.runInContext(K.FIT_TITLE_COMPACT, compactBox);
+  const full = (t, m, u, a) => fullBox.t3KeeperFitTitle(t, m, u, a);
+  const compact = (t, m, u, a) => compactBox.t3KeeperFitTitle(t, m, u, a);
+  const heavy = "a" + "\u0301".repeat(100);
+  const cases = [
+    [undefined, 40, undefined, false],
+    [null, 40, undefined, false],
+    ["Short title", 40, undefined, false],
+    ["a".repeat(31) + "😀" + "b".repeat(20), 32, undefined, false],
+    ["Family 👨‍👩‍👧 trip planning and booking all the things", 20, undefined, false],
+    ["Cafe\u0301 au lait and many other drinks to try out", 12, undefined, false],
+    ["x".repeat(80) + " (audit)", 42, undefined, false],
+    ["abc\uD83D", 40, undefined, false],
+    ["\uDC00abc", 40, undefined, false],
+    ["😀".repeat(40), 42, 64, false],
+    ["😀".repeat(40) + " (audit)", 42, 64, false],
+    [heavy + " (audit)", 42, 64, false],
+    ["Code review 3: footer redesign (GPT-6.1-Sol)", 42, 64, false],
+    ["Code review 100: authentication flow for the sidebar keeper (GPT-6.1-Sol)", 42, 64, false],
+    ["/root/reminders_warm_final_gate", 42, 64, true],
+    ["/root/reminders_warm_final_gate", 42, 64, false],
+    ["/root/review_footer_rules_3\n", 42, 64, true],
+    ["Wrap side-panel thread titles and keep them wrapped forever subagent 3", 42, 64, false],
+    ["Technical & Adversarial Review: sidebar persistence keeper installer (GPT-6.1-Sol)", 42, 64, false],
+  ];
+  for (const [t, m, u, a] of cases) {
+    assert.strictEqual(compact(t, m, u, a), full(t, m, u, a), JSON.stringify([t, m, u, a]));
+  }
+});
+
+test("unitFit locates MAX_THREAD_TITLE_CHARS via AST across compacted declarations and verifies cap on already", () => {
+  const compacted = 'const MAX_THREAD_TITLE_CHARS=120;function sanitizeThreadTitle(r){return r.length<=MAX_THREAD_TITLE_CHARS?r:r.slice(0,117);}';
+  const first = K.unitFit(compacted, { wrappers: [["sanitizeThreadTitle", 40, false]], compact: true });
+  assert.equal(first.state, "patched");
+  assert.ok(first.text.includes("const MAX_THREAD_TITLE_CHARS=Number.MAX_SAFE_INTEGER;"));
+  assert.equal(K.unitFit(first.text, { wrappers: [["sanitizeThreadTitle", 40, false]], compact: true }).state, "already");
+  // Half-patched cap (helper present, numeric cap still intact) must refuse rather than claim already
+  const halfPatched = first.text.replace("Number.MAX_SAFE_INTEGER", "120");
+  assert.throws(() => K.unitFit(halfPatched, { wrappers: [["sanitizeThreadTitle", 40, false]] }), /MAX_THREAD_TITLE_CHARS was not patched/);
+  // Async and generator title functions cannot be wrapped synchronously (fresh, already, and v9-upgrade paths)
+  assert.throws(() => K.unitFit('const MAX_THREAD_TITLE_CHARS=120;async function sanitizeThreadTitle(x){return x.slice(0,MAX_THREAD_TITLE_CHARS);}'), /async or a generator/);
+  assert.throws(() => K.unitFit('const MAX_THREAD_TITLE_CHARS=120;function* sanitizeThreadTitle(x){yield x.slice(0,MAX_THREAD_TITLE_CHARS);}'), /async or a generator/);
+  assert.throws(() => K.unitFit(first.text.replace('function sanitizeThreadTitle(', 'async function sanitizeThreadTitle('), { wrappers: [["sanitizeThreadTitle", 40, false]] }), /async or a generator/);
+  const subCurrent = K.unitFit('function subagentThreadTitle(x){return x.title;}').text;
+  assert.throws(() => K.unitFit(subCurrent.replace('function subagentThreadTitle(input)', 'async function subagentThreadTitle(input)')), /async or a generator/);
+  const asyncV9 = subCurrent
+    .replace(K.FIT_TITLE, K.FIT_TITLE_V9)
+    .replace('input.title, 42, 64, true', 'input.title, 42, 64')
+    .replace('function subagentThreadTitle$t3orig', 'async function subagentThreadTitle$t3orig');
+  assert.throws(() => K.unitFit(asyncV9), /async or a generator/);
+  // Non-sanitizer wrapper group never touches an unrelated MAX_THREAD_TITLE_CHARS declaration
+  const nonSan = 'const MAX_THREAD_TITLE_CHARS = 120; function subagentThreadTitle(x){return x;}';
+  const nonSanOut = K.unitFit(nonSan, { wrappers: [["subagentThreadTitle", 42, true]] });
+  assert.equal(nonSanOut.state, "patched");
+  assert.ok(nonSanOut.text.includes("const MAX_THREAD_TITLE_CHARS = 120;"));
+});
+
+test("geminiQuota refuses stale 1.0.0 probe outside runtime bundle and findTargets fails closed on duplicate markers", () => {
+  const pad = (n) => `/*\n${" ".repeat(n)}*/`;
+  const staleProbe = uaLine("1.0.0");
+  // Astra condition 1: sanitizer + stale probe with NO subagentThreadTitle must NEVER treat sanitizer as binCli
+  const noSubagent = synthServerAsar({
+    "ProviderEventLoggers-x.mjs": `const MAX_THREAD_TITLE_CHARS = 120;\nfunction sanitizeThreadTitle(r){return r.slice(0,MAX_THREAD_TITLE_CHARS);}\n${staleProbe}\n${pad(4000)}`,
+  });
+  const out1 = K.inspect(noSubagent);
+  assert.equal(out1.targets.binCli, null);
+  assert.equal(out1.targets.geminiProbe, "apps/server/dist/ProviderEventLoggers-x.mjs");
+  assert.equal(out1.results.geminiQuota.state, "failed");
+  assert.match(out1.results.geminiQuota.error, /server bundle sends the old version/);
+  assert.equal(out1.files.geminiProbe, undefined);
+  assert.equal(out1.files.sanitizeTitles, undefined);
+
+  // Stale 1.0.0 probe in server-*.mjs alongside a valid runtimeLayer-*.mjs must also refuse
+  const serverStale = synthServerAsar({
+    "runtimeLayer-x.mjs": `function subagentThreadTitle(x){return x;}\n${pad(4000)}`,
+    "server-x.mjs": `function threadTitle(x){return x;}\n${staleProbe}\n${pad(4000)}`,
+  });
+  const out2 = K.inspect(serverStale);
+  assert.equal(out2.results.geminiQuota.state, "failed");
+  assert.match(out2.results.geminiQuota.error, /server bundle sends the old version/);
+  assert.ok(!out2.files.delegatedTitles || !out2.files.delegatedTitles.buf.toString().includes("2.24.0"));
+
+  // Duplicate subagentThreadTitle (inline comment, Unicode escape, or inline export) stays ambiguous
+  // and refuses a stale 1.0.0 probe even when it lives in the ordinary-looking primary bundle.
+  // Parenthesized array initializer for T3_CODE_ORCHESTRATION_SECTIONS is still discovered via AST.
+  for (const dupDecl of [
+    `function /* kept */ subagentThreadTitle(x){return x;}`,
+    String.raw`function subagent\u0054hreadTitle(x){return x;}`,
+    `export function subagentThreadTitle(x){return x;}`,
+  ]) {
+    const dupPrimary = synthServerAsar({
+      "runtimeLayer-a.mjs": `function subagentThreadTitle(x){return x;}\nconst T3_CODE_ORCHESTRATION_SECTIONS=(["First"]);\n${staleProbe}\n${pad(4000)}`,
+      "runtimeLayer-b.mjs": `${dupDecl}\n${pad(4000)}`,
+      "ProviderEventLoggers-x.mjs": `const MAX_THREAD_TITLE_CHARS = 120;\nfunction sanitizeThreadTitle(r){return r.slice(0,MAX_THREAD_TITLE_CHARS);}\n${pad(4000)}`,
+    });
+    const out3 = K.inspect(dupPrimary);
+    assert.equal(out3.targets.binCli, null, dupDecl);
+    assert.equal(out3.targets.titleGuideFile, "apps/server/dist/runtimeLayer-a.mjs", dupDecl);
+    assert.equal(out3.results.fit.state, "failed", dupDecl);
+    assert.equal(out3.results.geminiQuota.state, "failed", dupDecl);
+    assert.match(out3.results.geminiQuota.error, /server bundle sends the old version/, dupDecl);
+    assert.ok(!out3.files.titleGuideFile || !out3.files.titleGuideFile.buf.toString().includes("2.24.0"), dupDecl);
+  }
+
+  // Unrelated unpacked .mjs entry in apps/server/dist/ must not abort findTargets
+  const rawFile = path.join(tmp, `unpacked-${crypto.randomUUID()}.raw`);
+  const rtSrc = `function subagentThreadTitle(x){return x.title;}`;
+  fs.writeFileSync(rawFile, rtSrc);
+  const rawFd = fs.openSync(rawFile, "r");
+  try {
+    const layout = {
+      dataOffset: 0,
+      header: {
+        files: {
+          apps: {
+            files: {
+              server: {
+                files: {
+                  dist: {
+                    files: {
+                      "runtimeLayer-a.mjs": { size: Buffer.byteLength(rtSrc), offset: "0" },
+                      "unrelated-unpacked.mjs": { size: 12, unpacked: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    assert.equal(K.findTargets(rawFd, layout).binCli, "apps/server/dist/runtimeLayer-a.mjs");
+  } finally {
+    fs.closeSync(rawFd);
+  }
+});
+
+test("3-way split atomic rollback preserves rule/titleGuide/antigravityQuestions when sanitizer chunk overflows", () => {
+  const pad = (n) => `/*\n${" ".repeat(n)}*/`;
+  const archive = synthServerAsar({
+    // Zero reclaimable room for fit, but rule is 0-byte delta and must still succeed!
+    "ProviderEventLoggers-x.mjs": 'const MAX_THREAD_TITLE_CHARS=120;function sanitizeThreadTitle(r){return r.slice(0,MAX_THREAD_TITLE_CHARS);}const R="- 3-8 words, fewer than 40 characters.";',
+    "runtimeLayer-x.mjs": `const T3_CODE_ORCHESTRATION_SECTIONS = ["First"];\nfunction subagentThreadTitle(x){return x;}\n${uaLine("2.24.0")}\n${pad(12000)}`,
+    "server-x.mjs": `function threadTitle(x){return x;}\nfunction makeAntigravityAcpAdapterFlavor(){return {driver:1,extractPermissionQuestion:f};}\n${pad(16000)}`,
+  });
+  const res = K.inspect(archive);
+  assert.equal(res.results.fit.state, "failed");
+  assert.equal(res.results.rule.state, "patched");
+  assert.equal(res.results.titleGuide.state, "patched");
+  assert.equal(res.results.geminiQuota.state, "already");
+  assert.equal(res.results.antigravityQuestions.state, "patched");
+  for (const [slot, file] of Object.entries(res.files)) {
+    assert.ok(!file.buf.toString("utf8").includes("function t3KeeperFitTitle("), `leaked fitter into ${slot}`);
+  }
+  assert.ok(res.files.sanitizeTitles.buf.toString("utf8").includes("- 2-5 words, fewer than 36 characters."));
+});
+
+test("finishBinCli progressively reclaims horizontal whitespace and safe // comments without breaking shebang, sourcemap, regexes, or tokens", async () => {
+  const lines = [
+    "#!/usr/bin/env node",
+    "// ../../packages/provider-core/src/server/veryLongSyntheticSourcePathCommentOne.ts",
+    "// ../../packages/provider-core/src/server/veryLongSyntheticSourcePathCommentTwo.ts",
+    "const tmpl = `keep = { spaces : inside } template`;",
+    ...Array.from({ length: 128 }, (_, i) => `const v${i} = { a : ${i}, b : ( ${i} + 1 ) };`),
+    "//# sourceMappingURL=fake.mjs.map",
+    "",
+  ];
+  const original = lines.join("\n");
+  const patched = original.replace("const tmpl", K.FIT_TITLE_COMPACT + "const tmpl");
+  const out = K.finishBinCli(patched, Buffer.byteLength(original), false);
+  assert.equal(Buffer.byteLength(out), Buffer.byteLength(original));
+  assert.ok(out.includes(K.FIT_TITLE_COMPACT));
+  assert.ok(out.startsWith("#!/usr/bin/env node\n"));
+  assert.ok(out.includes("//# sourceMappingURL=fake.mjs.map"));
+  assert.ok(out.includes("`keep = { spaces : inside } template`"));
+  assert.ok(!out.includes("veryLongSyntheticSourcePathCommentOne.ts"), "used whole-line // strip when WS alone was short");
+
+  // Legacy V8 //@ sourceURL= directives must never be stripped (fail closed if budget cannot absorb without dropping them).
+  const sourceUrlSrc = '0;\nthrow Error("x");\n//@ sourceURL=keeper-review.mjs\n';
+  assert.throws(() => K.finishBinCli(sourceUrlSrc, Buffer.byteLength(sourceUrlSrc) - 2, false), /no comment block could absorb/);
+  const sourceUrlWithRoom = 'const a = 1, b = 2;\nthrow Error("x");\n//@ sourceURL=keeper-review.mjs\n';
+  const shrunkUrl = K.finishBinCli(sourceUrlWithRoom, Buffer.byteLength(sourceUrlWithRoom) - 2, false);
+  assert.equal(Buffer.byteLength(shrunkUrl), Buffer.byteLength(sourceUrlWithRoom) - 2);
+  assert.ok(shrunkUrl.includes('//@ sourceURL=keeper-review.mjs'));
+
+  // Parser-produced tokens must preserve regex literals after `for await (...)` without collapsing spaces inside /a = b/.
+  const forAwaitSrc = 'async function f(){let hit=false;for await (const x of [1]) /a = b/.test("a = b") && (hit=true);return hit};f();';
+  const shrunk = K.finishBinCli(forAwaitSrc, Buffer.byteLength(forAwaitSrc) - 1, false);
+  assert.equal(Buffer.byteLength(shrunk), Buffer.byteLength(forAwaitSrc) - 1);
+  assert.ok(shrunk.includes('/a = b/'), 'regex literal spaces were altered');
+  assert.equal(await vm.runInNewContext(shrunk), true);
 });

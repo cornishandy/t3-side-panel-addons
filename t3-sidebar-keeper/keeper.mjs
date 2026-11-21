@@ -6,13 +6,13 @@
  * Units (each applies fully or not at all; every file keeps its byte length):
  *   wrap      client/index.html   unlayered <style> so sidebar titles word-wrap
  *   minWidth  main-*.js           sidebar drag minimum 208px -> 140px
- *   rule      binCli-*.mjs        title prompt asks for 2-5 words, under 36 chars
- *   fit       binCli-*.mjs        generated titles <= 40 chars, child titles <= 42; readable native ids
- *   titleGuide binCli-*.mjs       one compact Titles section in every provider's instructions
- *   geminiQuota binCli-*.mjs      Antigravity limits probe sends a current version, so Google
+ *   rule      server dist *.mjs   title prompt asks for 2-5 words, under 36 chars
+ *   fit       server dist *.mjs   generated titles <= 40 chars, child titles <= 42; readable native ids
+ *   titleGuide server dist *.mjs  one compact Titles section in every provider's instructions
+ *   geminiQuota server dist *.mjs Antigravity limits probe sends a current version, so Google
  *                                 returns the Gemini quota rows (server: next T3 launch); builds
  *                                 that already send 2.24.0 or newer are left as they are
- *   antigravityQuestions server-*.mjs
+ *   antigravityQuestions server dist *.mjs
  *                                 adds extractElicitationForm to Antigravity's ACP flavor so
  *                                 ask_question folds qN + qN_other, unlocks custom answers, and
  *                                 splits Claude-style headers/option descriptions (server: next
@@ -94,7 +94,7 @@ const USER_DATA = process.env.T3_USER_DATA_DIR || path.join(os.homedir(), "Libra
 const FRAMEWORK = path.join(APP, "Contents/Frameworks/Electron Framework.framework/Electron Framework");
 const STYLE_ID = "t3-keeper-sidebar-2"; // bump the number when WRAP_CSS changes
 const KEEP_BACKUPS = 3;
-const KEEPER_VERSION = 18; // bump when units change so --auto re-checks an already-handled build
+const KEEPER_VERSION = 19; // bump when units change so --auto re-checks an already-handled build
 const MIN_FREE_BYTES = 1024 ** 3;
 const TMP_PREFIX = ".app.asar.t3-keeper-";
 const PARSE = { ecmaVersion: "latest", allowHashBang: true };
@@ -269,6 +269,10 @@ const FIT_TITLE = String.raw`function t3KeeperFitTitle(title, max, units = Infin
 	}
 	return out;
 }
+`;
+// Identical semantics to FIT_TITLE in compact pure-ASCII form for small split server chunks
+// (such as ProviderEventLoggers-*.mjs, ~34 KB with no multi-line block comments).
+const FIT_TITLE_COMPACT = String.raw`function t3KeeperFitTitle(t,m,u=Infinity,a=false){/*t3-keeper-fit-2c*/if(typeof t!=="string")return t;if(a&&t===t.trim()&&/^\/?(?:root\/)?[a-z0-9]+(?:[_/][a-z0-9]+)+$/.test(t)){t=t.replace(/^\/?(?:root\/)?/,"").replace(/[_/]/g," ");t=t.charAt(0).toUpperCase()+t.slice(1);}const s=t.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g,"").replace(/\s+/g," ").trim();const g=(x)=>Array.from(new Intl.Segmenter(undefined,{granularity:"grapheme"}).segment(x),(v)=>v.segment);const f=(l)=>{if(g(s).length<=l)return s;const r=s.match(/\s(\([^()]{1,24}\)|(?:subagent|thread) \d+)$/u);const e=r?" "+r[1]:"";const b=Math.max(1,l-g(e).length-3);let d=r?s.slice(0,r.index):s;const c=d.indexOf(": ");if(c>0&&g(d).length>b){const q=d.slice(c+2),w=d.slice(0,c).split(" "),p=w.length>1&&/^\d+$/.test(w.at(-1))?[w.slice(-2).join(" "),w.at(-1)]:[w.at(-1)];let n=q;for(const k of p){const o=k.charAt(0).toUpperCase()+k.slice(1);if(g(o+": "+q.split(" ")[0]).length<=b){n=o+": "+q;break;}}d=n;}if(g(d).length+g(e).length<=l)return d+e;const y=g(d);let h=y.slice(0,b).join("");if(y[b]!==" "){const i=h.lastIndexOf(" ");if(i>=Math.floor(h.length/2))h=h.slice(0,i);}return h.replace(/[\s:;,&-]+$/u,"")+"..."+e;};let l=m,o=f(l);while(o.length>u&&l>1)o=f(--l);if(o.length>u){const r=s.match(/\s(\([^()]{1,24}\)|(?:subagent|thread) \d+)$/u);const e=r&&r[1].length+5<=u?" "+r[1]:"";let k="";for(const v of g(r&&e?s.slice(0,r.index):s)){if(k.length+v.length>u-3-e.length)break;k+=v;}o=k.trimEnd()+"..."+e;}return o;}
 `;
 // [function, max graphemes, shorten input.title/input.prompt first, to under 64 UTF-16 units, so
 //  upstream's own cut at 72/80 units never fires (it can split an emoji and drop a "(tag)")]
@@ -684,10 +688,16 @@ function launchedByT3(identity) {
 
 // ---------- parsing ----------
 
+function parseTokens(src, sourceType) {
+  const tokens = [];
+  acorn.parse(src, { ...PARSE, sourceType, onToken: tokens });
+  return tokens;
+}
+
 function tokenSignature(src, sourceType) {
   const out = [];
   let prevEnd = 0;
-  for (const t of acorn.tokenizer(src, { ...PARSE, sourceType })) {
+  for (const t of parseTokens(src, sourceType)) {
     const v = t.type.label === "regexp" ? `${t.value.pattern}/${t.value.flags}` : String(t.value ?? "");
     const newline = /[\n\r\u2028\u2029]/.test(src.slice(prevEnd, t.start)); // what ASI sees
     out.push(`${t.type.label}\u0000${v}\u0000${newline}`);
@@ -852,7 +862,7 @@ function unitMinWidth(text) {
     const checks = [
       new RegExp(`Math\\.max\\(${name},Math\\.ceil\\([\\w$]+\\)\\)`),
       new RegExp(`=${name}\\)\\{return Math\\.max\\([\\w$]+,Math\\.floor\\([\\w$]+\\)-640\\)`),
-      new RegExp(`:Math\\.max\\(${name},[\\w$]+\\),`),
+      new RegExp(`:Math\\.max\\(${name},[\\w$]+\\)[,}]`),
     ];
     const tokenStarts = new Set(regionTokens.map((t) => t.start));
     if (!checks.every((re) => {
@@ -905,37 +915,113 @@ function fitWrapper(name, max, preFit, nativeAgent = false) {
   return `function ${name}(input) {\n\treturn t3KeeperFitTitle(${call}, ${max});\n}\n`;
 }
 
-/** fit: wrap the three server title functions, upgrading the exact v9 helper in place. */
-function unitFit(text, ctx = {}) {
-  const legacy = text.includes("function t3KeeperFitTitle(");
-  const applied = text.includes(FIT_TITLE) && (text.includes(fitWrapper("subagentThreadTitle", 42, true, true)) || (ctx.wrappers?.length === 1 && text.includes(fitWrapper("threadTitle", 42, true))));
-  if (ctx.disabled?.has("fit")) return (applied || legacy) ? { state: "retained", text } : { state: "disabled", text };
-  if (text.includes("function t3KeeperFitTitle(")) {
-    if (text.split("function t3KeeperFitTitle(").length !== 2) throw new Error("title fitter declared more than once");
-    const oldWrapper = fitWrapper("subagentThreadTitle", 42, true);
-    const nextWrapper = ctx.wrappers?.length === 1 ? fitWrapper("threadTitle", 42, true) : fitWrapper("subagentThreadTitle", 42, true, true);
-    if (text.includes(FIT_TITLE) && text.includes(nextWrapper)) return { state: "already", text };
-    if (!text.includes(FIT_TITLE_V9) || text.split(oldWrapper).length !== 2) {
-      throw new Error("title fitter is not the exact supported v9 helper and wrapper");
-    }
-    return { state: "patched", text: text.replace(FIT_TITLE_V9, () => FIT_TITLE).replace(oldWrapper, () => nextWrapper) };
-  }
-  const wrappers = ctx.wrappers ?? (hasTopLevelFunction(text, "threadTitle") ? FIT_WRAPPERS : FIT_WRAPPERS.slice(0, 2));
-  // sanitizeThreadTitle would cut at 117 UTF-16 units (can split an emoji) before our fitter sees it.
-  const maxDecl = /^const MAX_THREAD_TITLE_CHARS = \d+;$/gm;
-  if (wrappers.some(([n]) => n === "sanitizeThreadTitle") && ([...text.matchAll(maxDecl)].length !== 1 || text.split("MAX_THREAD_TITLE_CHARS").length !== 3)) {
+function findMaxTitleCharsDecl(ast) {
+  const decls = ast.body
+    .filter((n) => n.type === "VariableDeclaration" && n.kind === "const")
+    .flatMap((n) => n.declarations)
+    .filter((d) => d.id.type === "Identifier" && d.id.name === "MAX_THREAD_TITLE_CHARS");
+  if (decls.length !== 1 || countIdentifiers(ast, "MAX_THREAD_TITLE_CHARS") !== 2) {
     throw new Error("MAX_THREAD_TITLE_CHARS is not declared once and used once");
   }
-  let next = text.replace(maxDecl, "const MAX_THREAD_TITLE_CHARS = Number.MAX_SAFE_INTEGER;");
-  for (const [name, max, preFit] of wrappers) {
-    const hits = [...next.matchAll(new RegExp(`^function ${name}\\(`, "gm"))];
+  const init = decls[0].init;
+  const isPatched = Boolean(
+    init?.type === "MemberExpression" && !init.computed &&
+    init.object.type === "Identifier" && init.object.name === "Number" &&
+    init.property.type === "Identifier" && init.property.name === "MAX_SAFE_INTEGER",
+  );
+  const isNumeric = Boolean(init?.type === "Literal" && typeof init.value === "number");
+  if (!isPatched && !isNumeric) throw new Error("MAX_THREAD_TITLE_CHARS initializer changed shape");
+  return { init, isPatched };
+}
+
+/** fit: wrap the server title functions, upgrading the exact v9 helper in place. */
+function unitFit(text, ctx = {}) {
+  const ast = acorn.parse(text, { ...PARSE, sourceType: "module" });
+  const topFns = ast.body.filter((n) => n.type === "FunctionDeclaration" && n.id?.name);
+  const topFnNames = new Set(topFns.map((n) => n.id.name));
+  const legacy = topFnNames.has("t3KeeperFitTitle") || text.includes("function t3KeeperFitTitle(");
+  if (ctx.disabled?.has("fit")) return legacy ? { state: "retained", text } : { state: "disabled", text };
+  const wrappers = ctx.wrappers ?? FIT_WRAPPERS.filter(([n]) => topFnNames.has(n) || topFnNames.has(`${n}$t3orig`));
+  if (wrappers.length === 0) throw new Error("no title wrapper target found");
+  const needsCap = wrappers.some(([n]) => n === "sanitizeThreadTitle");
+  const helper = ctx.compact ? FIT_TITLE_COMPACT : FIT_TITLE;
+  const expectedWrapperFor = ([n, max, preFit]) => fitWrapper(n, max, preFit, n === "subagentThreadTitle").trimEnd();
+  if (legacy) {
+    const helperFns = topFns.filter((n) => n.id.name === "t3KeeperFitTitle");
+    if (text.split("function t3KeeperFitTitle(").length !== 2 || helperFns.length !== 1) {
+      throw new Error("title fitter declared more than once");
+    }
+    const helperFn = helperFns[0];
+    if (helperFn.async || helperFn.generator) throw new Error("t3KeeperFitTitle is async or a generator");
+    const helperSrc = text.slice(helperFn.start, helperFn.end);
+    const hasCurrentHelper = helperSrc === FIT_TITLE.trimEnd() || helperSrc === FIT_TITLE_COMPACT.trimEnd();
+    const wrapperNodes = wrappers.map((w) => {
+      const [name] = w;
+      const pubs = topFns.filter((n) => n.id.name === name);
+      const origs = topFns.filter((n) => n.id.name === `${name}$t3orig`);
+      return { w, name, pub: pubs.length === 1 ? pubs[0] : null, orig: origs.length === 1 ? origs[0] : null };
+    });
+    const allCurrentWrappers = wrapperNodes.every(({ w, pub, orig }) =>
+      pub && orig &&
+      !pub.async && !pub.generator && !orig.async && !orig.generator &&
+      text.slice(pub.start, pub.end) === expectedWrapperFor(w),
+    );
+    if (hasCurrentHelper && allCurrentWrappers) {
+      if (needsCap && !findMaxTitleCharsDecl(ast).isPatched) {
+        throw new Error("MAX_THREAD_TITLE_CHARS was not patched");
+      }
+      return { state: "already", text };
+    }
+    // Check whether an already-current helper failed only because a wrapper or original is async/generator.
+    for (const { name, pub, orig } of wrapperNodes) {
+      if (pub && (pub.async || pub.generator)) throw new Error(`${name} is async or a generator`);
+      if (orig && (orig.async || orig.generator)) throw new Error(`${name} is async or a generator`);
+    }
+    const subNode = wrapperNodes.find(({ name }) => name === "subagentThreadTitle");
+    const oldWrapper = fitWrapper("subagentThreadTitle", 42, true).trimEnd();
+    const nextWrapper = fitWrapper("subagentThreadTitle", 42, true, true).trimEnd();
+    const validV9Others = wrapperNodes
+      .filter(({ name }) => name !== "subagentThreadTitle")
+      .every(({ w, pub, orig }) => pub && orig && text.slice(pub.start, pub.end) === expectedWrapperFor(w));
+    if (
+      !subNode?.pub || !subNode.orig || !validV9Others ||
+      helperSrc !== FIT_TITLE_V9.trimEnd() ||
+      text.slice(subNode.pub.start, subNode.pub.end) !== oldWrapper
+    ) {
+      throw new Error("title fitter is not the exact supported v9 helper and wrapper");
+    }
+    if (needsCap && !findMaxTitleCharsDecl(ast).isPatched) {
+      throw new Error("MAX_THREAD_TITLE_CHARS was not patched");
+    }
+    const upgradeEdits = [
+      { start: helperFn.start, end: helperFn.end, replacement: helper.trimEnd() },
+      { start: subNode.pub.start, end: subNode.pub.end, replacement: nextWrapper },
+    ];
+    let upgraded = text;
+    for (const e of upgradeEdits.sort((a, b) => b.start - a.start)) {
+      upgraded = upgraded.slice(0, e.start) + e.replacement + upgraded.slice(e.end);
+    }
+    return { state: "patched", text: upgraded };
+  }
+  const edits = [];
+  // sanitizeThreadTitle would cut at 117 UTF-16 units (can split an emoji) before our fitter sees it.
+  if (needsCap) {
+    const cap = findMaxTitleCharsDecl(ast);
+    if (!cap.isPatched) edits.push({ start: cap.init.start, end: cap.init.end, replacement: "Number.MAX_SAFE_INTEGER" });
+  }
+  for (let i = 0; i < wrappers.length; i++) {
+    const [name, max, preFit] = wrappers[i];
+    const hits = topFns.filter((n) => n.id.name === name);
     if (hits.length !== 1) throw new Error(`${name} declared ${hits.length} times`);
-    if (next.includes(`${name}$t3orig`)) throw new Error(`${name}$t3orig already exists`);
-    const wrapper =
-      (name === wrappers[0][0] ? FIT_TITLE : "") +
-      fitWrapper(name, max, preFit, name === "subagentThreadTitle");
-    const at = hits[0].index;
-    next = next.slice(0, at) + wrapper + `function ${name}$t3orig(` + next.slice(at + hits[0][0].length);
+    if (hits[0].async || hits[0].generator) throw new Error(`${name} is async or a generator`);
+    if (text.includes(`${name}$t3orig`)) throw new Error(`${name}$t3orig already exists`);
+    const wrapper = (i === 0 ? helper : "") + fitWrapper(name, max, preFit, name === "subagentThreadTitle");
+    edits.push({ start: hits[0].id.start, end: hits[0].id.end, replacement: `${name}$t3orig` });
+    edits.push({ start: hits[0].start, end: hits[0].start, replacement: wrapper });
+  }
+  let next = text;
+  for (const e of edits.sort((a, b) => b.start - a.start || b.end - a.end)) {
+    next = next.slice(0, e.start) + e.replacement + next.slice(e.end);
   }
   return { state: "patched", text: next };
 }
@@ -1006,6 +1092,64 @@ function findNamedFunctions(node, names, out = []) {
   return out;
 }
 
+function reclaimServerWhitespace(src, mode, protectedRanges) {
+  let kept = "", end = 0;
+  for (const token of parseTokens(src, "module")) {
+    const gap = src.slice(end, token.start);
+    const protectedGap = protectedRanges.some((n) => end >= n.start && token.start <= n.end);
+    if (!protectedGap && /^[\t\r\n ]*$/.test(gap)) {
+      if (mode === "indent") {
+        kept += gap.replace(/\n[\t ]+/g, "\n");
+      } else if (/[\r\n]/.test(gap)) {
+        kept += gap.replace(/[^\r\n]+/g, "");
+      } else if (gap.length > 0 && end > 0) {
+        const a = src[end - 1], b = src[token.start];
+        const safeA = /[,;()[\]{}]/.test(a);
+        const safeB = /[,;()[\]{}]/.test(b);
+        const opA = /[=:]/.test(a) && !/[=<>!]/.test(b);
+        const opB = /[=:]/.test(b) && !/[=<>!+/*%&|^?-]/.test(a);
+        kept += (safeA || safeB || opA || opB) ? "" : " ";
+      } else {
+        kept += gap;
+      }
+    } else {
+      kept += gap;
+    }
+    kept += src.slice(token.start, token.end);
+    end = token.end;
+  }
+  const tail = src.slice(end);
+  kept += /^[\r\n \t]*$/.test(tail) ? tail.replace(/[ \t]+/g, "") : tail;
+  return kept;
+}
+
+function stripSafeServerLineComments(src, protectedRanges) {
+  const comments = [];
+  acorn.parse(src, { ...PARSE, sourceType: "module", onComment: comments });
+  let kept = src;
+  for (const c of comments.slice().reverse()) {
+    if (c.type !== "Line") continue;
+    // Only reclaim bundler source-path banners (never shebangs, //# or //@ V8 directives, or arbitrary comments).
+    if (!/^ (?:\.\.\/|src\/|packages\/|apps\/|node_modules\/)[^\r\n]+\.(?:[cm]?[jt]sx?)$/.test(c.value)) continue;
+    if (protectedRanges.some((n) => c.start >= n.start && c.end <= n.end)) continue;
+    const lineStart = kept.lastIndexOf("\n", c.start - 1) + 1;
+    if (lineStart === 0) continue; // keep line-1 newline signature stable
+    const lineEnd = kept.indexOf("\n", c.end);
+    if (lineEnd < 0 || kept.slice(lineStart, c.start).trim() || kept.slice(c.end, lineEnd).trim()) continue;
+    kept = kept.slice(0, lineStart) + kept.slice(lineEnd + 1);
+  }
+  return kept;
+}
+
+function protectedServerFunctions(src, ast = null) {
+  const tree = ast ?? acorn.parse(src, { ...PARSE, sourceType: "module" });
+  const protectedTopNames = ["t3KeeperFitTitle", ...FIT_WRAPPERS.map(([name]) => name)];
+  return [
+    ...tree.body.filter((n) => n.type === "FunctionDeclaration" && protectedTopNames.includes(n.id.name)),
+    ...findNamedFunctions(tree, [ANTIGRAVITY_QUESTIONS_FN]),
+  ];
+}
+
 function finishBinCli(text, targetBytes, fitApplied, extraTopFunctions = []) {
   const comments = [];
   const ast = acorn.parse(text, { ...PARSE, sourceType: "module", onComment: comments });
@@ -1025,28 +1169,26 @@ function finishBinCli(text, targetBytes, fitApplied, extraTopFunctions = []) {
   try { return absorb(text, targetBytes, "module", comments); }
   catch (error) {
     if (!/no comment block could absorb/.test(error.message)) throw error;
-    // Bundles without large comments: reclaim only whitespace between tokens.
-    // Keep newlines (ASI) and every token/comment byte intact, then pad EOF.
-    const protectedTopNames = ["t3KeeperFitTitle", ...FIT_WRAPPERS.map(([name]) => name)];
-    const protectedFunctions = [
-      ...ast.body.filter((n) => n.type === "FunctionDeclaration" && protectedTopNames.includes(n.id.name)),
-      ...findNamedFunctions(ast, [ANTIGRAVITY_QUESTIONS_FN]),
-    ];
-    let kept = "", end = 0;
-    for (const token of acorn.tokenizer(text, { ...PARSE, sourceType: "module" })) {
-      const gap = text.slice(end, token.start);
-      const protectedGap = protectedFunctions.some((n) => end >= n.start && token.start <= n.end);
-      kept += !protectedGap && /^[\t\r\n ]*$/.test(gap) ? gap.replace(/\n[\t ]+/g, "\n") : gap;
-      kept += text.slice(token.start, token.end);
-      end = token.end;
+    // Bundles without large comments: progressively reclaim safe whitespace (and whole-line //
+    // path comments only if still short), keeping newlines (ASI), tokens and protected helpers.
+    const protectedFunctions = protectedServerFunctions(text, ast);
+    const tryCandidate = (kept) => {
+      const room = targetBytes - Buffer.byteLength(kept);
+      if (room < 0) return null;
+      if (!sameTokens(text, kept, "module")) throw new Error("server indentation reclaim changed tokens");
+      acorn.parse(kept, { ...PARSE, sourceType: "module" });
+      return kept + " ".repeat(room);
+    };
+    for (const mode of ["indent", "horizontal"]) {
+      const out = tryCandidate(reclaimServerWhitespace(text, mode, protectedFunctions));
+      if (out !== null) return out;
     }
-    const tail = text.slice(end);
-    kept += /^[\r\n \t]*$/.test(tail) ? tail.replace(/[ \t]+/g, "") : tail;
-    const room = targetBytes - Buffer.byteLength(kept);
-    if (room < 0) throw error;
-    if (!sameTokens(text, kept, "module")) throw new Error("server indentation reclaim changed tokens");
-    acorn.parse(kept, { ...PARSE, sourceType: "module" });
-    return kept + " ".repeat(room);
+    const stripped = stripSafeServerLineComments(text, protectedFunctions);
+    if (stripped !== text) {
+      const out = tryCandidate(reclaimServerWhitespace(stripped, "horizontal", protectedServerFunctions(stripped)));
+      if (out !== null) return out;
+    }
+    throw error;
   }
 }
 
@@ -1425,14 +1567,38 @@ function countIdentifiers(node, name) {
   return total;
 }
 
-function hasTopLevelFunction(text, name) {
-  if (!text.includes(name)) return false;
+function parseTopModule(text) {
   try {
-    const ast = acorn.parse(text, { ...PARSE, sourceType: "module" });
-    return ast.body.some((n) => n.type === "FunctionDeclaration" && n.id?.name === name);
+    return acorn.parse(text, { ...PARSE, sourceType: "module" });
   } catch {
-    return false;
+    return null;
   }
+}
+
+function topLevelDecls(ast) {
+  const out = [];
+  for (const n of ast?.body ?? []) {
+    if (n.type === "FunctionDeclaration" || n.type === "VariableDeclaration") out.push(n);
+    else if ((n.type === "ExportNamedDeclaration" || n.type === "ExportDefaultDeclaration") && n.declaration) {
+      if (n.declaration.type === "FunctionDeclaration" || n.declaration.type === "VariableDeclaration") out.push(n.declaration);
+    }
+  }
+  return out;
+}
+
+function hasTopLevelFunction(text, name, getAst = null) {
+  if (!text.includes(name) && !text.includes("\\u")) return false;
+  const ast = getAst ? getAst() : parseTopModule(text);
+  return topLevelDecls(ast).some((n) => n.type === "FunctionDeclaration" && n.id?.name === name);
+}
+
+function hasTopLevelArrayVar(text, name, getAst = null) {
+  if (!text.includes(name) && !text.includes("\\u")) return false;
+  const ast = getAst ? getAst() : parseTopModule(text);
+  return topLevelDecls(ast)
+    .filter((n) => n.type === "VariableDeclaration")
+    .flatMap((n) => n.declarations)
+    .some((d) => d.id.type === "Identifier" && d.id.name === name && d.init?.type === "ArrayExpression");
 }
 
 /**
@@ -1505,10 +1671,10 @@ function unitAntigravityQuestions(text) {
 const UNITS = [
   { name: "wrap", file: "index", run: unitWrap },
   { name: "minWidth", file: "mainJs", run: unitMinWidth },
-  { name: "rule", file: "binCli", run: unitRule },
+  { name: "rule", file: "ruleFile", run: unitRule },
   { name: "fit", file: "binCli", run: unitFit },
-  { name: "titleGuide", file: "binCli", run: unitTitleGuide },
-  { name: "geminiQuota", file: "binCli", run: unitGeminiQuota },
+  { name: "titleGuide", file: "titleGuideFile", run: unitTitleGuide },
+  { name: "geminiQuota", file: "geminiProbe", run: unitGeminiQuota },
   { name: "antigravityQuestions", file: "antigravityFlavor", run: unitAntigravityQuestions },
   { name: "extras", file: "index", run: unitExtras }, // after wrap: it takes wrap's padding
   { name: "firstClick", file: "desktopMain", run: unitFirstClick },
@@ -1533,19 +1699,38 @@ const SERVER = "apps/server/dist";
 const DESKTOP_MAIN = "apps/desktop/dist-electron/main.cjs";
 
 function findTargets(fd, layout) {
-  const pick = (dir, nameRe, matches) => {
+  const cache = new Map();
+  const astCache = new Map();
+  const readCached = (rel) => {
+    if (!cache.has(rel)) cache.set(rel, readEntry(fd, layout, rel).toString("utf8"));
+    return cache.get(rel);
+  };
+  const astFor = (rel) => () => {
+    if (!astCache.has(rel)) astCache.set(rel, parseTopModule(readCached(rel)));
+    return astCache.get(rel);
+  };
+  // Fail closed on 0 or >1 matches so an ambiguous duplicate marker never silently picks one file.
+  // Skip unpacked or non-file archive entries so an unrelated unpacked .mjs cannot abort discovery.
+  const pickUnique = (dir, nameRe, matches) => {
+    const hits = [];
     for (const name of listDir(layout.header, dir).filter((n) => nameRe.test(n))) {
       const rel = `${dir}/${name}`;
-      if (matches(readEntry(fd, layout, rel).toString("utf8"))) return rel;
+      const entry = entryAt(layout.header, rel);
+      if (!entry || entry.unpacked || typeof entry.size !== "number") continue;
+      if (matches(readCached(rel), astFor(rel))) hits.push(rel);
     }
-    return null;
+    return hits.length === 1 ? hits[0] : null;
   };
   return {
     index: entryAt(layout.header, `${CLIENT}/index.html`) ? `${CLIENT}/index.html` : null,
-    mainJs: pick(ASSETS, /^main-[\w-]+\.js$/, (t) => t.includes("chat_thread_sidebar_width")),
-    binCli: pick(SERVER, /^(?:binCli|runtimeLayer)-[\w-]+\.mjs$/, (t) => hasTopLevelFunction(t, "sanitizeThreadTitle")),
-    delegatedTitles: pick(SERVER, /^server-[\w-]+\.mjs$/, (t) => hasTopLevelFunction(t, "threadTitle")),
-    antigravityFlavor: pick(SERVER, /^(?:server|binCli|runtimeLayer)-[\w-]+\.mjs$/, (t) => hasTopLevelFunction(t, "makeAntigravityAcpAdapterFlavor")),
+    mainJs: pickUnique(ASSETS, /^main-[\w-]+\.js$/, (t) => t.includes("chat_thread_sidebar_width")),
+    binCli: pickUnique(SERVER, /\.mjs$/, (t, ast) => hasTopLevelFunction(t, "subagentThreadTitle", ast)),
+    sanitizeTitles: pickUnique(SERVER, /\.mjs$/, (t, ast) => hasTopLevelFunction(t, "sanitizeThreadTitle", ast)),
+    ruleFile: pickUnique(SERVER, /\.mjs$/, (t) => t.includes(RULE_FROM) || t.includes(RULE_TO)),
+    titleGuideFile: pickUnique(SERVER, /\.mjs$/, (t, ast) => hasTopLevelArrayVar(t, "T3_CODE_ORCHESTRATION_SECTIONS", ast)),
+    delegatedTitles: pickUnique(SERVER, /\.mjs$/, (t, ast) => hasTopLevelFunction(t, "threadTitle", ast)),
+    geminiProbe: pickUnique(SERVER, /\.mjs$/, (t) => t.includes(ANTIGRAVITY_UA_MARK)),
+    antigravityFlavor: pickUnique(SERVER, /\.mjs$/, (t, ast) => hasTopLevelFunction(t, "makeAntigravityAcpAdapterFlavor", ast)),
     desktopMain: entryAt(layout.header, DESKTOP_MAIN) ? DESKTOP_MAIN : null,
   };
 }
@@ -1561,12 +1746,15 @@ function plan(fd, layout, targets) {
   const results = {};
   const texts = {};
   const fileSteps = {};
+  const serverSlots = ["binCli", "delegatedTitles", "sanitizeTitles", "ruleFile", "titleGuideFile", "geminiProbe", "antigravityFlavor"];
+  const isServerSlot = (file) => serverSlots.includes(file);
   const resolveSlot = (fileKey) => {
     const rel = targets[fileKey];
     if (!rel) return null;
-    if (fileKey === "antigravityFlavor") {
-      if (rel === targets.delegatedTitles) return "delegatedTitles";
-      if (rel === targets.binCli) return "binCli";
+    if (isServerSlot(fileKey)) {
+      for (const slot of serverSlots) {
+        if (targets[slot] === rel) return slot;
+      }
     }
     return fileKey;
   };
@@ -1577,8 +1765,52 @@ function plan(fd, layout, targets) {
   const recordStep = (file, name, applyFn) => {
     (fileSteps[file] ??= []).push({ name, apply: applyFn });
   };
-  let splitFitPatched = false;
+  const fitSlots = new Set();
   for (const unit of UNITS) {
+    if (unit.name === "fit") {
+      try {
+        const wrapperTargets = [
+          [FIT_WRAPPERS[0], resolveSlot("sanitizeTitles"), "sanitizeThreadTitle bundle not found in this build"],
+          [FIT_WRAPPERS[1], resolveSlot("binCli"), "binCli not found in this build"],
+          [FIT_WRAPPERS[2], resolveSlot("delegatedTitles"), "delegated threadTitle bundle not found in this build"],
+        ];
+        const grouped = new Map();
+        for (const [wrapper, slot, missingError] of wrapperTargets) {
+          if (!slot) {
+            if (ctx.disabled.has("fit")) continue;
+            throw new Error(missingError);
+          }
+          if (!grouped.has(slot)) grouped.set(slot, []);
+          grouped.get(slot).push(wrapper);
+        }
+        if (grouped.size === 0) {
+          results.fit = ctx.disabled.has("fit")
+            ? { state: "disabled" }
+            : { state: "failed", error: "binCli not found in this build" };
+          continue;
+        }
+        const staged = new Map();
+        for (const [slot, wrappers] of grouped) {
+          const opts = { ...ctx, wrappers };
+          staged.set(slot, { opts, out: unitFit(readTarget(slot), opts) });
+        }
+        let fitState = ctx.disabled.has("fit") ? "disabled" : "already";
+        for (const [slot, { opts, out }] of staged) {
+          texts[slot] = out.text;
+          if (out.state === "patched") {
+            fitState = "patched";
+            fitSlots.add(slot);
+            recordStep(slot, "fit", (src, extra = {}) => unitFit(src, { ...opts, ...extra }).text);
+          } else if (out.state === "retained" && fitState === "disabled") {
+            fitState = "retained";
+          }
+        }
+        results.fit = { state: fitState };
+      } catch (error) {
+        results.fit = { state: "failed", error: error.message };
+      }
+      continue;
+    }
     const targetFile = resolveSlot(unit.file);
     if (!targetFile) {
       results[unit.name] = { state: "failed", error: `${unit.file} not found in this build` };
@@ -1587,34 +1819,21 @@ function plan(fd, layout, targets) {
     const before = readTarget(targetFile);
     try {
       let out;
-      const runtimeHasThreadTitle = unit.name === "fit" && hasTopLevelFunction(before, "threadTitle");
-      if (unit.name === "fit" && !runtimeHasThreadTitle && !targets.delegatedTitles && !ctx.disabled.has("fit")) {
-        throw new Error("delegated threadTitle bundle not found in this build");
-      }
-      if (unit.name === "fit" && targets.delegatedTitles && !runtimeHasThreadTitle) {
-        const childBefore = readTarget("delegatedTitles");
-        const rtOpts = { ...ctx, wrappers: FIT_WRAPPERS.slice(0, 2) };
-        const chOpts = { ...ctx, wrappers: FIT_WRAPPERS.slice(2) };
-        out = unitFit(before, rtOpts);
-        const child = unitFit(childBefore, chOpts);
-        const rtPatched = out.state === "patched";
-        if (child.state === "patched") out.state = "patched";
-        else if (child.state === "retained" && out.state === "disabled") out.state = "retained";
-        texts.delegatedTitles = child.text;
-        if (child.state === "patched") {
-          recordStep("delegatedTitles", "fit", (src) => unitFit(src, chOpts).text);
-          splitFitPatched = true;
+      if (unit.name === "geminiQuota") {
+        // Only rewrite the known-bad 1.0.0 probe inside the primary runtime bundle (binCli/runtimeLayer).
+        // Any build that already sends 2.24.0+ succeeds ("already") whichever server chunk holds it.
+        const probeRel = targets.geminiProbe;
+        const probeBase = probeRel ? probeRel.split("/").pop() : "";
+        const isRuntimeProbe = Boolean(targets.binCli && probeRel === targets.binCli && /^(?:binCli|runtimeLayer)-[\w-]+\.mjs$/.test(probeBase));
+        const probeOut = unitGeminiQuota(before);
+        if (probeOut.state === "already") {
+          out = probeOut;
+        } else if (!isRuntimeProbe) {
+          throw new Error("Antigravity probe in the server bundle sends the old version; this keeper only rewrites it in the runtime bundle");
+        } else {
+          out = probeOut;
+          recordStep(targetFile, "geminiQuota", (src) => unitGeminiQuota(src).text);
         }
-        if (rtPatched) {
-          recordStep(targetFile, "fit", (src) => unitFit(src, rtOpts).text);
-          splitFitPatched = true;
-        }
-      } else if (unit.name === "geminiQuota" && targets.delegatedTitles && !before.includes(ANTIGRAVITY_UA_MARK)) {
-        // 13 Nov nightly: the probe moved to the server bundle, which sends T3's own corrected
-        // version. Recognise it there; the old-version rewrite stays in the runtime bundle.
-        const server = readTarget("delegatedTitles");
-        if (unitGeminiQuota(server).state !== "already") throw new Error("Antigravity probe in the server bundle sends the old version; this keeper only rewrites it in the runtime bundle");
-        out = { state: "already", text: before };
       } else {
         out = unit.run(before, ctx);
         if (out.state === "patched") recordStep(targetFile, unit.name, (src) => unit.run(src, ctx).text);
@@ -1625,7 +1844,6 @@ function plan(fd, layout, targets) {
       results[unit.name] = { state: "failed", error: error.message };
     }
   }
-  const isServerSlot = (file) => file === "binCli" || file === "delegatedTitles" || file === "antigravityFlavor";
   const balanceFile = (file, text, patchedSet) => {
     const original = originals[file];
     if (text === original.toString("utf8")) return null;
@@ -1640,6 +1858,15 @@ function plan(fd, layout, targets) {
     // desktop main process have already loaded theirs.
     return { rel: targets[file], buf, original, live: file === "index" || file === "mainJs" };
   };
+  const replayAll = (file, steps, extraForFit) => {
+    let cur = originals[file].toString("utf8");
+    const patchedSet = new Set();
+    for (const step of steps) {
+      cur = step.name === "fit" ? step.apply(cur, extraForFit) : step.apply(cur);
+      patchedSet.add(step.name);
+    }
+    return { built: balanceFile(file, cur, patchedSet), patchedSet };
+  };
   // If multiple server units together overflow a file's byte budget, replay them incrementally
   // in UNITS order so earlier units (like fit) survive while only overflowing units fail.
   const rebuildIncremental = (file, steps, { restoreFailed = false } = {}) => {
@@ -1647,14 +1874,27 @@ function plan(fd, layout, targets) {
     const kept = new Set();
     let built = null;
     for (const step of steps) {
+      const candidateSet = new Set([...kept, step.name]);
       try {
         const next = step.apply(cur);
-        const candidateSet = new Set([...kept, step.name]);
         built = balanceFile(file, next, candidateSet);
         cur = next;
         kept.add(step.name);
         if (restoreFailed) results[step.name] = { state: "patched" };
       } catch (error) {
+        if (step.name === "fit" && /no comment block could absorb/.test(error.message)) {
+          try {
+            const compactNext = step.apply(cur, { compact: true });
+            built = balanceFile(file, compactNext, candidateSet);
+            cur = compactNext;
+            kept.add(step.name);
+            if (restoreFailed) results[step.name] = { state: "patched" };
+            continue;
+          } catch (compactError) {
+            results[step.name] = { state: "failed", error: compactError.message };
+            continue;
+          }
+        }
         results[step.name] = { state: "failed", error: error.message };
       }
     }
@@ -1672,6 +1912,16 @@ function plan(fd, layout, targets) {
         publishedUnits[file] = patchedSet;
       }
     } catch (error) {
+      if (patchedSet.has("fit") && /no comment block could absorb/.test(error.message)) {
+        try {
+          const compact = replayAll(file, steps, { compact: true });
+          if (compact.built) {
+            files[file] = compact.built;
+            publishedUnits[file] = compact.patchedSet;
+          }
+          continue;
+        } catch {}
+      }
       if (steps.length > 1) {
         const { built, kept } = rebuildIncremental(file, steps);
         if (built) {
@@ -1685,8 +1935,8 @@ function plan(fd, layout, targets) {
       }
     }
   }
-  if (splitFitPatched && results.fit?.state === "failed") {
-    for (const file of ["binCli", "delegatedTitles"]) {
+  if (fitSlots.size > 0 && results.fit?.state === "failed") {
+    for (const file of fitSlots) {
       if (!files[file] || !publishedUnits[file]?.has("fit")) continue;
       const remaining = (fileSteps[file] ?? []).filter((s) => s.name !== "fit");
       delete files[file];
@@ -1847,21 +2097,11 @@ function saveBackup(version, identity, items, producedByUs = false) {
 
 function reminderPlanFrom(results, files) {
   const startupReasons = [];
-  if (files.binCli) {
-    if (results.rule?.state === "patched") startupReasons.push("rule");
-    if (results.fit?.state === "patched") startupReasons.push("fit");
-    if (results.titleGuide?.state === "patched") startupReasons.push("titleGuide");
-    if (results.geminiQuota?.state === "patched") startupReasons.push("geminiQuota");
-    if (results.antigravityQuestions?.state === "patched") startupReasons.push("antigravityQuestions");
-    if (startupReasons.length === 0) startupReasons.push("server");
-  }
-  if (files.delegatedTitles) {
-    if (results.fit?.state === "patched" && !startupReasons.includes("fit")) startupReasons.push("fit");
-    if (results.antigravityQuestions?.state === "patched" && !startupReasons.includes("antigravityQuestions")) startupReasons.push("antigravityQuestions");
-    if (startupReasons.length === 0) startupReasons.push("server");
-  }
-  if (files.antigravityFlavor) {
-    if (results.antigravityQuestions?.state === "patched" && !startupReasons.includes("antigravityQuestions")) startupReasons.push("antigravityQuestions");
+  const serverFiles = Object.keys(files).filter((k) => k !== "index" && k !== "mainJs" && k !== "desktopMain");
+  if (serverFiles.length > 0) {
+    for (const unit of ["rule", "fit", "titleGuide", "geminiQuota", "antigravityQuestions"]) {
+      if (results[unit]?.state === "patched") startupReasons.push(unit);
+    }
     if (startupReasons.length === 0) startupReasons.push("server");
   }
   if (files.desktopMain) startupReasons.push(results.firstClick?.state === "patched" ? "firstClick" : "desktop-main");
@@ -2099,7 +2339,7 @@ function cmdAuto() {
 
 // For test/keeper.test.mjs.
 export {
-  unitWrap, unitMinWidth, unitRule, unitFit, unitTitleGuide, unitGeminiQuota, unitAntigravityQuestions, unitExtras, unitFirstClick, finishBinCli, absorb, FIT_TITLE, FIT_TITLE_V9, TITLE_GUIDE, ANTIGRAVITY_QUESTIONS_HELPER, WRAP_CSS, TMP_PREFIX,
+  unitWrap, unitMinWidth, unitRule, unitFit, unitTitleGuide, unitGeminiQuota, unitAntigravityQuestions, unitExtras, unitFirstClick, finishBinCli, absorb, FIT_TITLE, FIT_TITLE_COMPACT, FIT_TITLE_V9, TITLE_GUIDE, ANTIGRAVITY_QUESTIONS_HELPER, WRAP_CSS, TMP_PREFIX,
   extrasBoot, EXTRAS_ID, STYLE_ID, cspAllowsLoader,
   readLayout, readEntry, writeEntries, findTargets, inspect, apply, asarIdentity, sha, removeStaleTemps, launchedByT3,
 };
