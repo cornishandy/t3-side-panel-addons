@@ -755,6 +755,7 @@ function startupReasonsFromKeeper(keeper) {
   if (results.antigravitySteer?.state === "patched") reasons.push("antigravitySteer");
   if (results.antigravityQuotaOutcome?.state === "patched") reasons.push("antigravityQuotaOutcome");
   if (results.firstClick?.state === "patched") reasons.push("firstClick");
+  if (["patched", "removed"].includes(results.extrasOrigin?.state)) reasons.push("extrasOrigin");
   return reasons;
 }
 

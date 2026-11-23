@@ -31,6 +31,9 @@
  *                                 its bytes come out of wrap's <style> padding
  *   firstClick desktop main.cjs   acceptFirstMouse on the Mac window, so the first click on an
  *                                 inactive T3 window also clicks (starts at T3's next launch)
+ *   extrasOrigin desktop main.cjs keeps the Origin header on the main window's requests to the
+ *                                 add-ons service only (127.0.0.1:8793); from Nightly 5138 T3
+ *                                 strips it from every request (starts at T3's next launch)
  *
  * Usage:
  *   keeper.mjs --status        what is patched in the installed build
@@ -104,7 +107,7 @@ const USER_DATA = process.env.T3_USER_DATA_DIR || path.join(os.homedir(), "Libra
 const FRAMEWORK = path.join(APP, "Contents/Frameworks/Electron Framework.framework/Electron Framework");
 const STYLE_ID = "t3-keeper-sidebar-2"; // bump the number when WRAP_CSS changes
 const KEEP_BACKUPS = 3;
-const KEEPER_VERSION = 20; // bump when units change so --auto re-checks an already-handled build
+const KEEPER_VERSION = 21; // bump when units change so --auto re-checks an already-handled build
 const MIN_FREE_BYTES = 1024 ** 3;
 const TMP_PREFIX = ".app.asar.t3-keeper-";
 const PARSE = { ecmaVersion: "latest", allowHashBang: true };
@@ -1301,6 +1304,65 @@ function unitFirstClick(text) {
   if (mentions > 0) throw new Error("T3 now sets acceptFirstMouse itself; check whether this unit is still needed");
   const at = ret.argument.start + 1; // just inside the "{"
   return { state: "patched", text: text.slice(0, at) + FIRST_CLICK + text.slice(at) };
+}
+
+/**
+ * extrasOrigin: from Nightly 0.1.12-nightly.20261123.5138, T3's desktop main strips the
+ * `Origin: t3code://app` header (and Sec-Fetch-*) from every http(s)/ws(s) request the main
+ * window makes, keeping it only for Clerk and, in development, loopback
+ * (installMainWindowRemoteRequestHeaderPolicy). The add-ons service answers only requests
+ * that carry that Origin, so the keeper's loader was refused and no add-on loaded. This makes
+ * shouldPreserveOriginHeader keep it for the service's one origin, plain http://127.0.0.1:8793
+ * (not https/ws/wss), as every earlier build sent it; every other request is stripped as T3
+ * intends. It opens only while the add-ons loader can be applied (extras on, loader key valid),
+ * and is taken back out otherwise. A build without the policy needs nothing ("already").
+ * Main-process code, so it starts at T3's next launch. Byte balance is done in plan().
+ */
+const EXTRAS_ORIGIN = "http://127.0.0.1:8793";
+const ORIGIN_POLICY_MARKS = ["stripDesktopOriginHeaders", "installMainWindowRemoteRequestHeaderPolicy"];
+function unitExtrasOrigin(text, ctx = {}) {
+  // Same test as unitExtras: no usable loader key means no loader, so no exception either.
+  let loader = false;
+  try {
+    loader = Boolean(ctx.loaderKey && extrasBoot(ctx.loaderKey));
+  } catch {
+    loader = false;
+  }
+  const off = ctx.disabled?.has("extras") ? { state: "disabled" } : !loader ? { state: "blocked", error: "install t3-extras first" } : null;
+  // Loader off and no exception of ours in the file: nothing to put back, so T3 may reshape its policy freely.
+  if (off && !text.includes(JSON.stringify(EXTRAS_ORIGIN))) return { ...off, text };
+  const mentioned = ORIGIN_POLICY_MARKS.some((m) => text.includes(m));
+  const ast = acorn.parse(text, { ...PARSE, sourceType: "script" });
+  const fns = ast.body.filter((n) => n.type === "FunctionDeclaration" && n.id?.name === "shouldPreserveOriginHeader");
+  if (fns.length === 0) {
+    // No policy: this build still sends the Origin. A policy without this function moved somewhere this unit can't see.
+    if (mentioned) throw new Error("T3 strips the Origin header but shouldPreserveOriginHeader is gone");
+    return { state: "already", text };
+  }
+  if (fns.length !== 1) throw new Error(`shouldPreserveOriginHeader declared ${fns.length} times`);
+  const fn = fns[0];
+  const [policy, url] = fn.params;
+  if (fn.params.length !== 2 || policy.type !== "Identifier" || url.type !== "Identifier") throw new Error("shouldPreserveOriginHeader's parameters changed shape");
+  // The production branch: if (!policy.isDevelopment) return <false | url.origin === "http://127.0.0.1:8793">;
+  const isProdTest = (t) => t.type === "UnaryExpression" && t.operator === "!" && t.argument.type === "MemberExpression" &&
+    !t.argument.computed && t.argument.object.type === "Identifier" && t.argument.object.name === policy.name &&
+    t.argument.property.name === "isDevelopment";
+  const branches = fn.body.body.filter((s) => s.type === "IfStatement" && !s.alternate && isProdTest(s.test));
+  if (branches.length !== 1) throw new Error("shouldPreserveOriginHeader's production branch changed shape");
+  let ret = branches[0].consequent;
+  if (ret.type === "BlockStatement" && ret.body.length === 1) ret = ret.body[0];
+  if (ret.type !== "ReturnStatement" || !ret.argument) throw new Error("shouldPreserveOriginHeader's production branch no longer returns");
+  const ours = `${url.name}.origin === ${JSON.stringify(EXTRAS_ORIGIN)}`;
+  const arg = ret.argument;
+  const current = text.slice(arg.start, arg.end);
+  const isOurs = current === ours;
+  const isFalse = arg.type === "Literal" && arg.value === false;
+  if (!isOurs && !isFalse) throw new Error("shouldPreserveOriginHeader's production branch now returns something else");
+  if (off) {
+    return isOurs ? { ...off, state: off.state === "disabled" ? "removed" : "blocked", text: text.slice(0, arg.start) + "false" + text.slice(arg.end) } : { ...off, text };
+  }
+  if (isOurs) return { state: "already", text };
+  return { state: "patched", text: text.slice(0, arg.start) + ours + text.slice(arg.end) };
 }
 
 const ANTIGRAVITY_QUESTIONS_FN = "t3KeeperAntigravityElicitationForm";
@@ -2893,6 +2955,7 @@ const UNITS = [
   { name: "antigravityQuotaOutcome", file: "antigravityOutcome", run: unitAntigravityQuotaOutcome },
   { name: "extras", file: "index", run: unitExtras }, // after wrap: it takes wrap's padding
   { name: "firstClick", file: "desktopMain", run: unitFirstClick },
+  { name: "extrasOrigin", file: "desktopMain", run: unitExtrasOrigin },
 ];
 
 // Units that can be switched off on their own. rule, fit and titleGuide are personal
@@ -3096,7 +3159,9 @@ function plan(fd, layout, targets) {
         }
       } else {
         out = unit.run(before, ctx);
-        if (out.state === "patched") recordStep(targetFile, unit.name, (src) => unit.run(src, ctx).text);
+        // A desktopMain unit can also change the file while taking its patch back out (extrasOrigin
+        // "removed"/"blocked"); record that as a step so a failed byte balance is reported, not dropped.
+        if (out.state === "patched" || (targetFile === "desktopMain" && out.text !== before)) recordStep(targetFile, unit.name, (src) => unit.run(src, ctx).text);
       }
       results[unit.name] = { state: out.state, ...(out.error ? { error: out.error } : {}) };
       texts[targetFile] = out.text;
@@ -3196,7 +3261,7 @@ function plan(fd, layout, targets) {
         }
       } else {
         for (const name of patchedSet) {
-          if (results[name]?.state === "patched") markFailed(name, error);
+          if (["patched", "removed", "blocked"].includes(results[name]?.state)) markFailed(name, error);
         }
       }
     }
@@ -3380,7 +3445,10 @@ function reminderPlanFrom(results, files) {
     }
     if (startupReasons.length === 0) startupReasons.push("server");
   }
-  if (files.desktopMain) startupReasons.push(results.firstClick?.state === "patched" ? "firstClick" : "desktop-main");
+  if (files.desktopMain) {
+    const desktopUnits = ["firstClick", "extrasOrigin"].filter((unit) => ["patched", "removed"].includes(results[unit]?.state));
+    startupReasons.push(...(desktopUnits.length ? desktopUnits : ["desktop-main"]));
+  }
   return { startupReasons, uiChanged: Boolean(files.index || files.mainJs) };
 }
 
@@ -3615,7 +3683,7 @@ function cmdAuto() {
 
 // For test/keeper.test.mjs.
 export {
-  unitWrap, unitMinWidth, unitRule, unitFit, unitTitleGuide, unitGeminiQuota, unitAntigravityQuestions, unitAntigravitySteer, unitAntigravityQuotaOutcome, unitExtras, unitFirstClick, finishBinCli, absorb, FIT_TITLE, FIT_TITLE_COMPACT, FIT_TITLE_V9, TITLE_GUIDE, ANTIGRAVITY_QUESTIONS_HELPER, WRAP_CSS, TMP_PREFIX,
+  unitWrap, unitMinWidth, unitRule, unitFit, unitTitleGuide, unitGeminiQuota, unitAntigravityQuestions, unitAntigravitySteer, unitAntigravityQuotaOutcome, unitExtras, unitFirstClick, unitExtrasOrigin, finishBinCli, absorb, FIT_TITLE, FIT_TITLE_COMPACT, FIT_TITLE_V9, TITLE_GUIDE, ANTIGRAVITY_QUESTIONS_HELPER, WRAP_CSS, TMP_PREFIX,
   extrasBoot, EXTRAS_ID, STYLE_ID, cspAllowsLoader,
   readLayout, readEntry, writeEntries, findTargets, inspect, apply, asarIdentity, sha, removeStaleTemps, launchedByT3,
 };

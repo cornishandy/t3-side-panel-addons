@@ -105,7 +105,7 @@ function legacyFit(text) {
 }
 
 const statesOf = (out) => Object.fromEntries(Object.entries(out.results).map(([name, r]) => [name, r.state]));
-const freshStates = { wrap: "patched", minWidth: "patched", rule: "patched", fit: "patched", titleGuide: "patched", geminiQuota: bundleOf(probeTarget(pristine)[0], pristine).includes(`${UA_MARK}1.0.0 `) ? "patched" : "already", antigravityQuestions: "patched", antigravitySteer: "patched", antigravityQuotaOutcome: "patched", extras: "patched", firstClick: "patched" };
+const freshStates = { wrap: "patched", minWidth: "patched", rule: "patched", fit: "patched", titleGuide: "patched", geminiQuota: bundleOf(probeTarget(pristine)[0], pristine).includes(`${UA_MARK}1.0.0 `) ? "patched" : "already", antigravityQuestions: "patched", antigravitySteer: "patched", antigravityQuotaOutcome: "patched", extras: "patched", firstClick: "patched", extrasOrigin: bundleOf("desktopMain", pristine).includes("function shouldPreserveOriginHeader(") ? "patched" : "already" };
 
 // ---------- parser-based room making (Astra round 1 fixtures) ----------
 
@@ -232,7 +232,7 @@ test("an already-patched v9 archive upgrades fit and titleGuide in place and is 
   const archiveBytes = fs.statSync(asar).size;
   const result = K.apply({ reason: "v9 upgrade" });
   const steerOnBinCli = K.inspect(pristine).targets.acpSteer === K.inspect(pristine).targets.binCli;
-  assert.deepEqual(statesOf(result), { wrap: "already", minWidth: "already", rule: "already", fit: "patched", titleGuide: "patched", geminiQuota: "already", antigravityQuestions: "already", antigravitySteer: steerOnBinCli ? "patched" : "already", antigravityQuotaOutcome: "already", extras: "already", firstClick: "already" });
+  assert.deepEqual(statesOf(result), { wrap: "already", minWidth: "already", rule: "already", fit: "patched", titleGuide: "patched", geminiQuota: "already", antigravityQuestions: "already", antigravitySteer: steerOnBinCli ? "patched" : "already", antigravityQuotaOutcome: "already", extras: "already", firstClick: "already", extrasOrigin: "already" });
   const after = binCliOf();
   assert.equal(Buffer.byteLength(after), Buffer.byteLength(legacy));
   assert.equal(fs.statSync(asar).size, archiveBytes);
@@ -852,6 +852,106 @@ test("apply reports the identity of the file it wrote, not whatever is at the pa
 });
 
 // These exercise the real archive transaction hooks, in the existing isolated
+// ---------- unit extrasOrigin (keep Origin for the add-ons service) ----------
+
+// T3's own header policy, run from the patched main.cjs: which requests keep Origin: t3code://app?
+function originPolicyOf(main) {
+  const ast = acorn.parse(main, { ecmaVersion: "latest", sourceType: "script" });
+  const names = ["normalizeHostname", "toHttpOrigin", "isSubframe", "hasExactDesktopOriginHeader", "shouldPreserveOriginHeader", "stripDesktopOriginHeaders"];
+  const src = names.map((name) => {
+    const fn = ast.body.find((n) => n.type === "FunctionDeclaration" && n.id.name === name);
+    assert.ok(fn, name);
+    return main.slice(fn.start, fn.end);
+  }).join("\n");
+  const box = { URL, isLoopbackHostname$1: (h) => h === "127.0.0.1" || h === "localhost" || h === "::1" };
+  vm.runInNewContext(`${src}\nstrip = stripDesktopOriginHeaders;`, box);
+  const policy = { mainWebContentsId: 1, desktopOrigin: "t3code://app", isDevelopment: false };
+  return (url) => box.strip(policy, { webContentsId: 1, frame: { parent: null }, url, requestHeaders: { Origin: "t3code://app", "Sec-Fetch-Mode": "cors", Accept: "*/*" } }) === undefined;
+}
+
+test("extrasOrigin keeps the Origin header for the add-ons service only, keeping main.cjs's length", (t) => {
+  fresh();
+  const before = desktopMainOf(asar);
+  if (!before.includes("function shouldPreserveOriginHeader(")) {
+    assert.equal(K.apply({ reason: "test" }).results.extrasOrigin.state, "already");
+    return t.skip("this build does not strip the Origin header");
+  }
+  const kept = originPolicyOf(before);
+  assert.equal(kept("http://127.0.0.1:8793/version"), false, "T3 strips it before the patch");
+  assert.equal(K.apply({ reason: "test" }).results.extrasOrigin.state, "patched");
+  const after = desktopMainOf(asar);
+  assert.equal(Buffer.byteLength(after), Buffer.byteLength(before));
+  const keptAfter = originPolicyOf(after);
+  for (const url of ["http://127.0.0.1:8793/version", "http://127.0.0.1:8793/extras.js", "http://127.0.0.1:8793/state?since=1", "http://0x7f.1:8793/version"]) assert.equal(keptAfter(url), true, url);
+  for (const url of ["http://localhost:8793/version", "http://127.0.0.1:3773/api/info", "http://127.0.0.1:8794/", "https://example.com/", "http://192.168.1.2:8793/", "https://127.0.0.1:8793/", "ws://127.0.0.1:8793/", "wss://127.0.0.1:8793/", "http://127.0.0.1:8793@example.com/", "http://[::1]:8793/"]) assert.equal(keptAfter(url), false, url);
+  assert.equal(K.unitExtrasOrigin(after, { loaderKey: LOADER_SPKI }).state, "already");
+  const again = K.apply({ reason: "test" });
+  assert.equal(again.results.extrasOrigin.state, "already");
+  assert.equal(desktopMainOf(asar), after);
+  // No usable loader key (extras blocked): the exception comes back out.
+  const blocked = K.unitExtrasOrigin(after, {});
+  assert.equal(blocked.state, "blocked");
+  assert.equal(originPolicyOf(blocked.text)("http://127.0.0.1:8793/version"), false);
+  assert.equal(K.unitExtrasOrigin(before, { loaderKey: "not a key" }).state, "blocked");
+  // Switching the add-ons off puts T3's own line back.
+  setDisabled(["extras"]);
+  assert.equal(K.apply({ reason: "test" }).results.extrasOrigin.state, "removed");
+  const off = desktopMainOf(asar);
+  assert.equal(Buffer.byteLength(off), Buffer.byteLength(before));
+  assert.equal(originPolicyOf(off)("http://127.0.0.1:8793/version"), false);
+  assert.equal(K.unitExtrasOrigin(off, { disabled: new Set(["extras"]), loaderKey: LOADER_SPKI }).state, "disabled");
+  setDisabled([]);
+  assert.equal(K.apply({ reason: "test" }).results.extrasOrigin.state, "patched");
+  assert.equal(desktopMainOf(asar), after, "switching the add-ons off and on again gives the same bytes");
+});
+
+test("extrasOrigin: taking the exception out is reported as failed when main.cjs can't keep its length", () => {
+  // A desktop main with the exception in it and no block comment to pad: the removal must not be dropped silently.
+  const main = Buffer.from('function shouldPreserveOriginHeader(p, u) {\n\tif (!p.isDevelopment) return u.origin === "http://127.0.0.1:8793";\n\treturn true;\n}\nfunction stripDesktopOriginHeaders() {}\n');
+  const header = Buffer.from(JSON.stringify({ files: { apps: { files: { desktop: { files: { "dist-electron": { files: { "main.cjs": { size: main.length, offset: "0" } } } } } } } } }));
+  const aligned = (header.length + 3) & ~3, head = Buffer.alloc(16 + aligned);
+  head.writeUInt32LE(4, 0); head.writeUInt32LE(8 + aligned, 4); head.writeUInt32LE(4 + aligned, 8); head.writeUInt32LE(header.length, 12); header.copy(head, 16);
+  const file = path.join(tmp, "no-comments.asar");
+  fs.writeFileSync(file, Buffer.concat([head, main]));
+  setDisabled(["extras"]);
+  try {
+    const out = K.inspect(file);
+    assert.equal(out.results.extrasOrigin.state, "failed");
+    assert.match(out.results.extrasOrigin.error, /no comment block could absorb/);
+    assert.equal(out.files.desktopMain, undefined);
+  } finally {
+    fs.rmSync(DISABLED, { force: true });
+    fs.rmSync(file, { force: true });
+  }
+});
+
+test("extrasOrigin leaves builds without the policy alone and refuses a changed policy", () => {
+  const fn = (body) => `function shouldPreserveOriginHeader(policy, url) {\n\tconst hostname = url.hostname;\n${body}\n\treturn false;\n}\nfunction stripDesktopOriginHeaders(policy, details) {}\n`;
+  const prod = "\tif (!policy.isDevelopment) return false;";
+  const on = { loaderKey: LOADER_SPKI };
+  assert.equal(K.unitExtrasOrigin("function other() {}\n", on).state, "already");
+  const patched = K.unitExtrasOrigin(fn(prod), on);
+  assert.equal(patched.state, "patched");
+  assert.ok(patched.text.includes('if (!policy.isDevelopment) return url.origin === "http://127.0.0.1:8793";'));
+  assert.equal(K.unitExtrasOrigin(patched.text, on).state, "already");
+  assert.equal(K.unitExtrasOrigin(patched.text, {}).state, "blocked");
+  assert.equal(K.unitExtrasOrigin(fn("\tif (!policy.isDevelopment) {\n\t\treturn false;\n\t}"), on).state, "patched");
+  assert.equal(K.unitExtrasOrigin(fn(prod).replace(/policy, url/, "p, u").replace("policy.isDevelopment", "p.isDevelopment"), on).text.includes('return u.origin === "http://127.0.0.1:8793"'), true);
+  assert.throws(() => K.unitExtrasOrigin("function stripDesktopOriginHeaders(policy, details) {}\n", on), /shouldPreserveOriginHeader is gone/);
+  assert.throws(() => K.unitExtrasOrigin(fn("\tif (!policy.isDevelopment) return true;"), on), /returns something else/);
+  assert.throws(() => K.unitExtrasOrigin(fn(""), on), /production branch changed shape/);
+  assert.throws(() => K.unitExtrasOrigin(fn(prod).replace("(policy, url)", "({ policy, url })"), on), /parameters changed shape/);
+  assert.throws(() => K.unitExtrasOrigin(fn(prod) + fn(prod), on), /declared 2 times/);
+  assert.throws(() => K.unitExtrasOrigin(fn("\tif (!policy.isDevelopment) return false;\n\telse return true;"), on), /production branch changed shape/);
+  assert.throws(() => K.unitExtrasOrigin(fn('\tif (!policy["isDevelopment"]) return false;'), on), /production branch changed shape/);
+  assert.throws(() => K.unitExtrasOrigin(fn("\tif (!policy.isDevelopment) return;"), on), /no longer returns/);
+  // With the add-ons off and no exception in the file, T3 may reshape its policy without any alert.
+  assert.deepEqual(K.unitExtrasOrigin("function stripDesktopOriginHeaders() {}\n", { disabled: new Set(["extras"]) }).state, "disabled");
+  assert.deepEqual(K.unitExtrasOrigin(fn("\tif (!policy.isDevelopment) return true;"), {}).state, "blocked");
+  // ...but an exception of ours that can't be found again is still reported.
+  assert.throws(() => K.unitExtrasOrigin('const x = "http://127.0.0.1:8793";\nfunction stripDesktopOriginHeaders() {}\n', {}), /shouldPreserveOriginHeader is gone/);
+});
+
 // APFS fixture. No real app is modified and T3_KEEPER_QUIET stays enabled.
 for (const boundary of ['afterArchiveRename', 'beforeReminderFinalize']) {
   test(`restart journal recovers exactly one requirement after crash at ${boundary}`, async () => {

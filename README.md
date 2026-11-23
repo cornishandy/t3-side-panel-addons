@@ -5,7 +5,7 @@
 Personal customizations for the sidebar (side panel) of **T3 Code (Nightly)** on macOS. Two parts, kept together because each needs the other:
 
 - **[`t3-extras/`](t3-extras/README.md)** — the add-ons themselves, behind a **✦** button in the sidebar's bottom row: usage meters for each AI lab (Claude, Codex, Gemini, Grok), thread "burn" tells, a Prepare handover button and handover chain pill, compact thread rows and other sidebar polish, an 18-area Fonts workspace, and the reply-footer card styling. Each add-on has its own switch. A small Node server on `127.0.0.1:8793` (loopback only, every request must come from T3's own `t3code://app` origin) serves them.
-- **[`t3-sidebar-keeper/`](t3-sidebar-keeper/README.md)** — a LaunchAgent that re-applies small patches to T3's `app.asar` after every nightly update: wrapping sidebar titles, a 140 px minimum sidebar width, shorter generated titles, the tiny loader that pulls in the add-ons, first-click click-through, and a Gemini quota fix.
+- **[`t3-sidebar-keeper/`](t3-sidebar-keeper/README.md)** — a LaunchAgent that re-applies small patches to T3's `app.asar` after every nightly update: wrapping sidebar titles, a 140 px minimum sidebar width, shorter generated titles, the tiny loader that pulls in the add-ons (and, from Nightly 5138, the one exception to T3's header stripping that lets it reach them), first-click click-through, and a Gemini quota fix.
 
 These are built for one person's Mac and T3 Nightly builds. They patch an Electron app in place, so read both READMEs before installing; nothing here is supported by the T3 Code project.
 
@@ -44,6 +44,7 @@ Quit and reopen T3 after `--restore`. The keeper's uninstall only removes its ba
 
 ## Known issues
 
+- Nightly `0.1.12-nightly.20261123.5138` started stripping the `Origin` header from every request T3's window makes, so the add-ons service refused the loader and no add-on appeared (23 Nov 2026). Keeper v21's `extrasOrigin` unit keeps the header for plain `http://127.0.0.1:8793` only, and only while the add-ons loader is installed. It lives in T3's desktop start-up code, so after each nightly update the add-ons appear once T3 has been quit and reopened after the keeper patched it; Shift-Cmd-R alone isn't enough on those builds.
 - Older keeper builds failed to patch `minWidth` on T3 0.1.3 and Nightly `0.1.11-nightly.20261117.4838`–`0.1.12-nightly.20261121.5051` after the sidebar width clamp changed shape (`}` instead of `,` on the third clamp). Keeper v19 supports all three clamp shapes; committed tests cover them. A failed width patch leaves that build’s original width unchanged; update the keeper for supported builds.
 - Nightly `0.1.12-nightly.20261121.5024`–`5051` split T3's server bundles three ways, moving `sanitizeThreadTitle` and the title-length rule into the small (~35 KB) `ProviderEventLoggers-*.mjs` chunk while keeping `subagentThreadTitle`, `T3_CODE_ORCHESTRATION_SECTIONS`, and the Antigravity quota probe in `runtimeLayer-*.mjs` and `threadTitle` in `server-*.mjs`. Keeper v19 discovers each server marker independently across `apps/server/dist/*.mjs`, patches all three `fit` chunks atomically, and uses a compact `t3KeeperFitTitle` helper plus Acorn-verified whitespace reclaim for small comment-poor chunks.
 - `geminiQuota` retains the workaround for pingdotgg/t3code#22876 on older builds. Nightly `0.1.8-nightly.20261106.4247` already sends `2.24.0`, so this unit reports `already` without rewriting it. Nightly `0.1.10-nightly.20261113.4643` moved the probe to another server bundle, which keeper v14 could not find (`cannot patch: Antigravity probe User-Agent found 0 times`; harmless, since that build needs no patch); keeper v15 finds it in either bundle.
@@ -63,7 +64,7 @@ Quit and reopen T3 after `--restore`. The keeper's uninstall only removes its ba
 - [x] Compact threads, sidebar polish, Fonts workspace with T3's own fonts
 - [x] Sidebar sections: a "Pinned" label and line, older threads folded under one header, one-row titles that keep a trailing (N) — each with its own switch
 - [x] Older threads section: threads last active more than 2 days ago (12 hours to 1 week, or Auto, in the ✦ panel) fold under one "Older than 2 days" header
-- [x] Keeper units: wrap, minWidth, rule, fit, titleGuide, extras, firstClick, geminiQuota
+- [x] Keeper units: wrap, minWidth, rule, fit, titleGuide, extras, firstClick, extrasOrigin, geminiQuota
 - [x] Keeper `minWidth` supports nightly `0.1.8-nightly.20261106.4247`; older keeper/build combinations can still fail to apply the width patch
 - [x] Compact sidebar usage in a short window (under 800 px tall)
 - [x] Sidebar stays docked in a narrow window (under 768 px wide), with a switch to put T3's own auto-hide back (15 Nov 2026)
