@@ -1463,6 +1463,29 @@ button.t3x-fs-def { cursor: pointer; }
 .t3x-made-float:hover { background: var(--accent); color: var(--accent-foreground, var(--foreground)); }
 .t3x-made-float:focus-visible { outline: 2px solid var(--ring, var(--primary)); outline-offset: 1px; }
 
+/* ---------- Thread details float and lock (Andy, 24 Nov 2026, design v3) ---------- */
+/* Float over the chat: the chat keeps its full lane while T3 docks one card that extras.js found (T3's own layout while its floating browser preview is open, and when the add-on can't tell which card, e.g. split panes). */
+html[data-t3x-details-float][data-t3x-details-docked]:not(:has([data-preview-mini-player])) [data-chat-canvas]:has(> [data-thread-details-panel="inline"]) { --chat-lane-inset-start: 0px !important; --chat-lane-inset-end: 0px !important; }
+html[data-t3x-details-float][data-t3x-details-docked] [data-chat-canvas] > [data-thread-details-panel="inline"] { z-index: 30; }
+html[data-t3x-details-float][data-t3x-details-docked] [data-chat-canvas] > [data-thread-details-panel="inline"] [data-thread-details-card] { background: var(--popover) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border: 1px solid var(--border); box-shadow: 0 12px 32px rgb(0 0 0 / .35); }
+/* Auto-hide: tucked = faded, slid 16 px, hidden and inert (set by extras.js); the lined-paper button keeps T3's pressed fill and only its icon dims. */
+html[data-t3x-details-float][data-t3x-details-mode="auto"][data-t3x-details-docked] [data-chat-canvas] > [data-thread-details-panel="inline"] { transition: opacity .18s ease, transform .18s ease, visibility 0s; }
+html[data-t3x-details-float][data-t3x-details-mode="auto"][data-t3x-details-docked]:not([data-t3x-details-shown]) [data-chat-canvas] > [data-thread-details-panel="inline"] { opacity: 0; transform: translateX(16px); pointer-events: none; visibility: hidden; transition: opacity .18s ease, transform .18s ease, visibility 0s linear .18s; }
+html[data-t3x-details-float][data-t3x-details-mode="auto"][data-t3x-details-docked]:not([data-t3x-details-shown]) [data-thread-panel-toggle] > [aria-label="Toggle thread details panel"][aria-pressed="true"] { color: var(--muted-foreground); }
+@media (prefers-reduced-motion: reduce) {
+  html[data-t3x-details-float][data-t3x-details-mode="auto"][data-t3x-details-docked] [data-chat-canvas] > [data-thread-details-panel="inline"] { transform: none !important; transition: opacity .18s ease, visibility 0s; }
+  html[data-t3x-details-float][data-t3x-details-mode="auto"][data-t3x-details-docked]:not([data-t3x-details-shown]) [data-chat-canvas] > [data-thread-details-panel="inline"] { transition: opacity .18s ease, visibility 0s linear .18s; }
+}
+/* The padlock: a 24 x 28 target whose 14 px glyph sits close to the lined-paper button (T3's 4 px row gap, then a 4 px overlap it stacks above). */
+.t3x-details-lock { flex: none; display: inline-grid; place-items: center; justify-items: end; box-sizing: border-box; width: 24px; height: 28px; margin: 0; margin-inline-end: -8px; padding: 0; padding-inline-end: 3px; border: 0; border-radius: 6px; background: transparent; color: var(--foreground); position: relative; z-index: 1; cursor: pointer; outline: none; -webkit-app-region: no-drag; }
+.t3x-details-lock[aria-pressed="false"] { color: var(--muted-foreground); }
+.t3x-details-lock:hover { background: var(--accent); color: var(--foreground); }
+.t3x-details-lock:focus-visible { box-shadow: inset 0 0 0 2px var(--ring); }
+.t3x-details-lock svg { width: 14px; height: 14px; pointer-events: none; }
+/* ✦ panel: Locked / Auto-hide greyed while the card doesn't float. */
+.t3x-set:has(.t3x-radio[disabled]) { opacity: .65; }
+.t3x-radio:disabled { cursor: default; }
+
 /* ---------- reply footer card ----------
  * Round 11 (approved by Andy 19 Oct 2026).
  * The footer agents write for Andy (rule "End every reply to Andy with a footer" in ~/.claude/CLAUDE.md):

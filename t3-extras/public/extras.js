@@ -114,10 +114,13 @@
     footerMadePreview: "hover-alt", // Made so far floating mini-viewer: hover-alt | direct | alt-only | off
     footerMadePreviewAll: false, // opt-in: also enable floating mini-viewer on links outside Made so far
     footerMadeMoreOpen: false, // ✦ panel "Display & mini-viewer" disclosure state
+    detailsFloat: true, // T3's docked thread details card floats over the chat instead of pushing the text left
+    detailsMode: "locked", // DETAILS_MODES: while floating, "locked" keeps the card shown, "auto" tucks it until pointed at
     fontTargets: Object.freeze({ composer: true, quotes: true, projects: true, pills: true, headings: true, replies: true, mine: true, ...Object.fromEntries(INTERFACE_TARGETS.map(([key]) => [key, false])) }),
   });
-  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "narrowAutoHide", "printOnly", "showPartly", "showHidden", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen", "popMove", "footerMadePreviewAll", "footerMadeMoreOpen"];
+  const BOOL_KEYS = ["usageHeader", "usageComposer", "usageSidebar", "usageSidebarShort", "burnTells", "handoverButton", "chainPill", "tighter", "inlineIcon", "projectFull", "workingHeader", "compactThreads", "pinnedLabel", "foldOlder", "olderOpen", "oneRowTitles", "timeGaps", "narrowAutoHide", "printOnly", "showPartly", "showHidden", "interfaceFontsOpen", "settingsOpen", "fontPicker", "fontPickDock", "fontPickLabels", "fontShowOnScreen", "popMove", "footerMadePreviewAll", "footerMadeMoreOpen", "detailsFloat"];
   const MARKERS = ["bar", "outline", "off"];
+  const DETAILS_MODES = ["locked", "auto"];
   const TITLE_LINES = Object.freeze([2, 3, "unlimited"]);
   // The Older section's choices: value, hours (null = by gaps, olderCutoff), panel label, header words.
   const OLDER_AFTER = Object.freeze([
@@ -414,6 +417,7 @@
     const out = { ...DEFAULTS, fontHead: { ...DEFAULTS.fontHead }, fontBody: { ...DEFAULTS.fontBody }, fontMain: fontPick(s.fontMain), fontTargets: { ...DEFAULTS.fontTargets } };
     for (const k of BOOL_KEYS) if (typeof s[k] === "boolean") out[k] = s[k];
     if (MARKERS.includes(s.marker)) out.marker = s.marker;
+    if (DETAILS_MODES.includes(s.detailsMode)) out.detailsMode = s.detailsMode;
     if (FOOTER_TEAM.some(([v]) => v === s.footerTeam)) out.footerTeam = s.footerTeam;
     if (FOOTER_MADE_MODES.some(([v]) => v === s.footerMade)) out.footerMade = s.footerMade;
     if (FOOTER_MADE_GROUPS.some(([v]) => v === s.footerMadeGroup)) out.footerMadeGroup = s.footerMadeGroup;
@@ -2893,10 +2897,19 @@
       "data-t3x-footer-made-group": st.footerMadeGroup,
       "data-t3x-footer-made-badges": st.footerMadeBadges,
       "data-t3x-footer-made-preview": st.footerMadePreview,
+      "data-t3x-details-float": st.detailsFloat ? "" : null,
+      "data-t3x-details-mode": st.detailsFloat ? st.detailsMode : null,
     };
     for (const t of TARGETS) out[`data-t3x-ft-${t}`] = st.fontTargets[t] ? "" : null;
     return out;
   }
+
+  /** Thread details: the strip from the header buttons down to the card's top edge (null when the card starts above them). */
+  function detailsCorridor(buttons, card) {
+    if (!buttons || !card || !(card.top > buttons.bottom)) return null;
+    return { left: Math.min(buttons.left, card.left), right: Math.max(buttons.right, card.right), top: buttons.bottom, bottom: card.top };
+  }
+  const inRect = (r, x, y) => Boolean(r) && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
 
   /** When the service's lab-usage numbers count as failed (a failed refresh, or no answer). */
   function labUsageFailedSince(usage, transportFailedAt) {
@@ -3125,6 +3138,7 @@
     effectiveFontPick, resolveFontGraph, fontLinkWouldCycle, FONT_SIMILAR_GROUPS, similarFontAreas, usagePageHash, usageContainerMatches,
     FOOTER_TEAM, FOOTER_MADE_MODES, FOOTER_MADE_GROUPS, FOOTER_MADE_BADGES, FOOTER_MADE_PREVIEWS, FOOTER_CARD, FOOTER_MADE, FOOTER_DETAILS, footerPass, madePass, madeCount, holdMadeFromEl, isTailnetUrl, dayHeadingFor, computeFloatPos, isMiniPlayerStore, isRightPanelStore, isBrowserSurfaceStore, findMiniPlayerStores, hasMeasuredBrowserSurface, isAlreadyFloatingTab, activeBrowserTabIdFromRightPanel, tryFloatViaStores, findMarkdownPreviewCtx, resolvePreviewTarget, findPreviewPanelFloatAction, enhanceMadeLists, newestAssistantId, timelineFromFiber, readHostTimeline, hostNewestId, laneIsWide, macAppOn, readMacPlatform, rootAttrs, parseThreadItem, burnView, burnTargets, gateLabel, windowBounds, paceOf, projectT3Config, labsFromT3, mergeLabs, labView, views, visibleLabs, mostConstrained, composerSummary, compactLabel, bTooltip, bGeometry,
     forecast, seriesSegments, mergeSeries, dGeometry, fmtClock, lowRefills, compactParts, composerLabel, labUsageFailedSince, toolGates, labsForMerge, labFailure, handoverGate, HANDOVER_REQUEST, chainLabel, contrast, STALE_MS, T3_STALE_MS,
+    DETAILS_MODES, detailsCorridor, inRect,
     wrapMatchMedia, refreshNarrowSidebar, sidebarCands, lineCands, lineGroups, lineLayout, fitParts, plain, forecastBlocks, fableForecast, fableLegend, scopedRowText, spokenUsage, shortBarText, scopedModelOf, resetsTogether, stopLeftOf, lowScoped,
   };
   if (W.__T3X_TEST__) {
@@ -7334,6 +7348,16 @@
               h("div", { class: "t3x-radios t3x-col t3x-indent", role: "radiogroup", "aria-label": "Made so far floating mini-viewer" },
                 FOOTER_MADE_PREVIEWS.map(([value, label]) => radio("footerMadePreview", value, settings.footerMadePreview, label, (v) => change({ footerMadePreview: v }))))),
             sw("Also enable on all reply links", "footerMadePreviewAll", "Opt-in: hover Float button and ⌥-click on links outside Made so far too.")))),
+      h("section", {}, h("h3", { text: "Thread details" }),
+        sw("Float over the chat", "detailsFloat", "The docked card sits over the chat instead of pushing the text left. Off: T3’s own layout."),
+        h("div", { class: "t3x-set" }, h("div", { class: "t3x-set-label", text: "When open" }),
+          h("div", { class: "t3x-radios", role: "radiogroup", "aria-label": "Thread details when open" },
+            [["locked", "Locked"], ["auto", "Auto-hide"]].map(([value, label]) => {
+              const r = radio("detailsMode", value, settings.detailsMode, label, (v) => change({ detailsMode: v }));
+              r.disabled = !settings.detailsFloat; // greyed while the card doesn't float; the saved choice stays
+              return r;
+            }))),
+        h("div", { class: "t3x-note t3x-note-flush", text: "Locked: the card stays over the top-right of the chat. Auto-hide: it tucks away and shows while you point at the lined-paper button, the padlock or the card, or press ↓ on the lined-paper button." })),
       h("section", {}, h("h3", { text: "Popups" }),
         sw("Move popups out of the way", "popMove", "Drag a popup by its top bar (⠿); it reopens there. Double-click the bar, or press Home on ⠿, to put it back. Fonts stops dimming the screen and gets a Small card button.")),
       h("section", {}, h("h3", { text: "Fonts on screen" }),
@@ -8401,6 +8425,304 @@
       render({ user: true });
     }
   });
+
+  // ---------- thread details: float over the chat, Locked / Auto-hide (Andy, 24 Nov 2026, design v3) ----------
+  // While "Float over the chat" is on and T3 docks its thread details card, extras.css gives the chat its
+  // full lane back and makes the card opaque. A padlock beside the lined-paper button switches the one
+  // global mode. Locked: the card shows whenever T3 has it open. Auto-hide: it tucks away (inert) and
+  // shows while the pointer rests on the padlock or the lined-paper button (after DETAILS_HOVER_MS), at
+  // once on keyboard focus there, and stays while the pointer is on the card or in the corridor between
+  // (worked out from the pointer position, never a layer over the chat), while keyboard focus is in the card or
+  // one of its menus is open; it tucks DETAILS_TUCK_MS after all of those end. T3's own click, Enter and
+  // Space on the lined-paper button are never intercepted. Every handler does nothing unless exactly one
+  // docked card and one lined-paper button are found (split panes and T3's narrow-window popover: T3 as is).
+  const DETAILS_TOGGLE = 'button[aria-label="Toggle thread details panel"]';
+  const DETAILS_TOGGLE_IN_ROW = `[data-panel-layout-controls] > [data-thread-panel-toggle] > ${DETAILS_TOGGLE}`;
+  const DETAILS_ASIDE = '[data-chat-canvas] > [data-thread-details-panel="inline"]';
+  const DETAILS_REL = `[data-thread-details-panel], [data-thread-panel-toggle], [data-panel-layout-controls], [data-chat-canvas], ${DETAILS_TOGGLE}`;
+  const DETAILS_MENU_OPEN = '[aria-haspopup][aria-expanded="true"]'; // a menu opened from the card (its popup may be portaled)
+  const DETAILS_FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const DETAILS_EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
+  const DETAILS_DESC = "Press Down Arrow to move into the thread details card.";
+  const DETAILS_HOVER_MS = 120;
+  const DETAILS_TUCK_MS = 500;
+  const DETAILS_OPEN_MS = 1500; // how long a click's "opened" mark waits for T3 to dock the card
+  const det = {
+    on: false, active: false, mode: null, aside: null, toggle: null, lock: null, shown: false,
+    pt: null, revealTimer: 0, tuckTimer: 0, suppressHover: false, suppressFocus: false,
+    openedAt: 0, lastPressed: null, lastHref: "", inerted: null, described: null, lockFocused: false, obs: null,
+  };
+  const detailsAuto = () => det.active && settings.detailsMode === "auto";
+  function detailsStop(id) {
+    if (!id) return 0;
+    clearTimeout(id);
+    timers.delete(id);
+    return 0;
+  }
+  function detailsClearTimers() {
+    det.revealTimer = detailsStop(det.revealTimer);
+    det.tuckTimer = detailsStop(det.tuckTimer);
+  }
+  function detailsResolve() {
+    const asides = [...D.querySelectorAll(DETAILS_ASIDE)];
+    const toggles = [...D.querySelectorAll(DETAILS_TOGGLE_IN_ROW)];
+    if (asides.length > 1 || toggles.length > 1) return { aside: null, toggle: toggles.length === 1 ? toggles[0] : null, why: "ambiguous" };
+    return { aside: asides[0] ?? null, toggle: toggles[0] ?? null, why: asides.length && toggles.length ? "on" : "missing" };
+  }
+  const detailsLockSvg = (closed) => s("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true" },
+    s("rect", { x: 4, y: 11, width: 16, height: 10, rx: 2 }), s("path", { d: closed ? "M8 11V7a4 4 0 0 1 8 0v4" : "M8 11V7a4 4 0 0 1 7.5-2" }));
+  /** The padlock: one node for the page's life, updated in place, so keyboard focus survives a mode change. */
+  function detailsLock() {
+    det.lock ??= h("button", { type: "button", class: "t3x-details-lock", [OWN]: "details-lock", "aria-label": "Keep thread details visible",
+      onclick: () => {
+        change({ detailsMode: settings.detailsMode === "auto" ? "locked" : "auto" });
+        detailsSync();
+      } });
+    return det.lock;
+  }
+  function detailsApply() {
+    const H = D.documentElement;
+    const auto = detailsAuto();
+    const attr = (name, on) => (on ? (H.hasAttribute(name) || H.setAttribute(name, "")) : H.hasAttribute(name) && H.removeAttribute(name));
+    attr("data-t3x-details-docked", det.active);
+    attr("data-t3x-details-shown", auto && det.shown);
+    // Tucked = inert. Only an inert this feature added is ever taken off again.
+    const wantInert = auto && !det.shown ? det.aside : null;
+    if (det.inerted && det.inerted !== wantInert) {
+      det.inerted.inert = false;
+      det.inerted = null;
+    }
+    if (wantInert && !wantInert.inert) {
+      wantInert.inert = true;
+      det.inerted = wantInert;
+    }
+    if (det.described && det.described !== (det.active ? det.toggle : null)) {
+      det.described.removeAttribute("aria-description");
+      det.described = null;
+    }
+    if (!det.active) {
+      det.lockFocused = false; // we took the padlock out: a later mount must not pull focus back to it
+      if (det.lock?.isConnected) det.lock.remove();
+      return;
+    }
+    if (det.toggle.getAttribute("aria-description") !== DETAILS_DESC) det.toggle.setAttribute("aria-description", DETAILS_DESC);
+    det.described = det.toggle;
+    const lock = detailsLock();
+    const locked = settings.detailsMode !== "auto";
+    if (lock._t3xLocked !== locked) {
+      lock._t3xLocked = locked;
+      lock.setAttribute("aria-pressed", String(locked));
+      lock.title = locked ? "Thread details: locked open (click to auto-hide)" : "Thread details: auto-hide (click to lock open)";
+      lock.replaceChildren(detailsLockSvg(locked));
+    }
+    const span = det.toggle.parentElement;
+    if (lock.parentElement !== span.parentElement || lock.nextElementSibling !== span) {
+      const refocus = det.lockFocused && (D.activeElement === lock || D.activeElement === D.body || !D.activeElement);
+      span.parentElement.insertBefore(lock, span);
+      if (refocus) lock.focus({ preventScroll: true });
+    }
+  }
+  function detailsSetShown(v) {
+    det.shown = v;
+    detailsApply();
+  }
+  function detailsZones() {
+    if (!det.pt || !det.active) return { onButtons: false, onCard: false, inCorridor: false };
+    const { x, y } = det.pt;
+    const t = det.toggle.getBoundingClientRect();
+    const l = det.lock?.isConnected ? det.lock.getBoundingClientRect() : t;
+    const buttons = { left: Math.min(t.left, l.left), right: Math.max(t.right, l.right), top: Math.min(t.top, l.top), bottom: Math.max(t.bottom, l.bottom) };
+    const card = det.aside.getBoundingClientRect();
+    return { onButtons: inRect(buttons, x, y), onCard: inRect(card, x, y), inCorridor: inRect(detailsCorridor(buttons, card), x, y) };
+  }
+  /** Auto-hide's one decision: show now, start or keep the hover delay, or start the tuck. */
+  function detailsEvaluate(due = null) {
+    if (disposed || !detailsAuto()) {
+      detailsClearTimers();
+      return;
+    }
+    const z = detailsZones();
+    // Escape's hover suppression ends once the pointer is off the buttons (and off a shown card and its corridor).
+    if (!(z.onButtons || (det.shown && (z.onCard || z.inCorridor)))) det.suppressHover = false;
+    const ae = D.activeElement;
+    const focusInCard = Boolean(ae && det.aside.contains(ae));
+    if (!(ae === det.lock || ae === det.toggle || focusInCard)) det.suppressFocus = false;
+    const pressed = det.toggle.getAttribute("aria-pressed") === "true";
+    // Keyboard focus only (v2 item 6): T3 itself puts focus in the card when a click opens it, and that
+    // must not hold a card open after the pointer leaves.
+    const focusKeep = !det.suppressFocus && (focusInCard || ae === det.lock || ae === det.toggle) && ae.matches(":focus-visible");
+    const menuOpen = Boolean(det.aside.querySelector(DETAILS_MENU_OPEN));
+    const hover = pressed && !det.suppressHover && (z.onButtons || (det.shown && (z.onCard || z.inCorridor)));
+    if (pressed && (focusKeep || menuOpen)) {
+      detailsClearTimers();
+      if (!det.shown) detailsSetShown(true);
+      return;
+    }
+    if (hover) {
+      det.tuckTimer = detailsStop(det.tuckTimer);
+      if (det.shown) return;
+      if (due === "reveal") return detailsSetShown(true);
+      det.revealTimer ||= later(DETAILS_HOVER_MS, () => {
+        det.revealTimer = 0;
+        detailsEvaluate("reveal");
+      });
+      return;
+    }
+    det.revealTimer = detailsStop(det.revealTimer);
+    if (!det.shown) return;
+    if (due === "tuck") return detailsSetShown(false);
+    det.tuckTimer ||= later(DETAILS_TUCK_MS, () => {
+      det.tuckTimer = 0;
+      detailsEvaluate("tuck");
+    });
+  }
+  function detailsSync() {
+    if (disposed) return;
+    detailsConnect(Boolean(settings.detailsFloat));
+    // Paused after repeated add-on errors: T3's own layout, nothing stale left behind.
+    const r = det.on && !paused ? detailsResolve() : { aside: null, toggle: null, why: paused ? "paused" : "off" };
+    status.details = r.why;
+    const now = performance.now();
+    const pressed = r.toggle?.getAttribute("aria-pressed") === "true";
+    const href = location.href;
+    if (!pressed || now - det.openedAt > DETAILS_OPEN_MS) det.openedAt = 0;
+    // Opened without a click on the button (a shortcut or a command) on the same thread: show it too.
+    if (pressed && det.lastPressed === false && href === det.lastHref && !det.openedAt) det.openedAt = now;
+    det.lastPressed = r.toggle ? pressed : null;
+    det.lastHref = href;
+    const aside = r.why === "on" ? r.aside : null;
+    if (aside !== det.aside) {
+      // T3 replaced or removed the card (a thread switch, a close): its timers go with it. A card T3
+      // docks just after the button opened it starts shown; any other starts tucked in Auto-hide.
+      detailsClearTimers();
+      det.aside = aside;
+      det.shown = Boolean(aside && det.openedAt);
+      if (aside) det.openedAt = 0;
+    }
+    det.toggle = r.why === "on" ? r.toggle : null;
+    det.active = Boolean(det.on && det.aside && det.toggle);
+    if (det.mode !== settings.detailsMode) {
+      // Switching to Auto-hide from a shown card keeps it shown until the pointer and focus leave.
+      if (settings.detailsMode === "auto" && det.mode) det.shown = true;
+      det.mode = settings.detailsMode;
+      det.suppressHover = det.suppressFocus = false;
+    }
+    if (!det.active) {
+      detailsClearTimers();
+      det.suppressHover = det.suppressFocus = false;
+    }
+    detailsApply();
+    detailsEvaluate();
+  }
+  function detailsRecords(records) {
+    if (disposed) return;
+    if (paused) {
+      if (det.active) detailsSync();
+      return;
+    }
+    for (const r of records) {
+      if (r.type === "attributes") {
+        if (!isOwned(r.target)) return detailsSync();
+        continue;
+      }
+      // Any change in the header row (a new neighbour, the padlock taken out) re-checks the padlock's place.
+      if (det.active && r.target === det.lock?.parentElement) return detailsSync();
+      if (det.active && r.removedNodes.length && [...r.removedNodes].includes(det.lock)) return detailsSync();
+      for (const n of [...r.addedNodes, ...r.removedNodes]) {
+        if (n.nodeType !== 1 || isOwned(n)) continue;
+        if (n.matches(DETAILS_REL) || n.querySelector(DETAILS_REL)) return detailsSync();
+      }
+    }
+  }
+  const onDetailsPointer = guarded("details-pointer", (e) => {
+    if (e.type === "pointerout") {
+      if (e.relatedTarget) return;
+      det.pt = null; // left the window
+    } else det.pt = { x: e.clientX, y: e.clientY };
+    if (detailsAuto()) detailsEvaluate();
+  });
+  const onDetailsFocus = guarded("details-focus", (e) => {
+    if (e.type === "focusin") det.lockFocused = Boolean(det.lock) && e.target === det.lock;
+    else {
+      if (det.lock && e.target === det.lock) queueMicrotask(() => { if (det.lock.isConnected && D.activeElement !== det.lock) det.lockFocused = false; });
+      // Moving between the padlock, the button and the card hasn't left: the focusin that follows decides.
+      const to = e.relatedTarget;
+      if (to && (to === det.lock || to === det.toggle || det.aside?.contains(to))) return;
+    }
+    if (detailsAuto()) queueMicrotask(guarded("details-focus", () => detailsEvaluate()));
+  });
+  // Reads T3's pressed state before T3 handles the click; never stops or changes the click.
+  const onDetailsClick = guarded("details-click", (e) => {
+    const t = e.target?.closest?.(DETAILS_TOGGLE_IN_ROW);
+    if (!t) return;
+    if (t.getAttribute("aria-pressed") === "true") {
+      // Closing: cancel any pending reveal; a parked pointer has nothing to bring back.
+      det.openedAt = 0;
+      if (det.active) detailsClearTimers();
+    } else {
+      // Opening: the card T3 docks next starts shown, Auto-hide included.
+      det.openedAt = performance.now();
+      det.suppressHover = false;
+      det.suppressFocus = false;
+    }
+  });
+  const onDetailsKey = guarded("details-key", (e) => {
+    if (!det.active || e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.key === "ArrowDown" && e.target === det.toggle) {
+      e.preventDefault();
+      det.suppressHover = false;
+      det.suppressFocus = false;
+      detailsClearTimers();
+      detailsSetShown(true); // the shown attribute and the inert removal land before focus() needs them
+      const into = [...det.aside.querySelectorAll(DETAILS_FOCUSABLE)].find((el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility === "visible") ?? det.aside;
+      into.focus();
+      return;
+    }
+    if (e.key !== "Escape") return;
+    const ae = D.activeElement;
+    const inCard = Boolean(ae && det.aside.contains(ae));
+    if (!(inCard || ae === det.toggle || ae === det.lock)) return;
+    if (det.aside.querySelector(DETAILS_MENU_OPEN)) return; // a card menu handles it first
+    if (inCard && ae.matches?.(DETAILS_EDITABLE)) return;
+    if (ae !== det.toggle) det.toggle.focus();
+    if (settings.detailsMode !== "auto") return; // Locked: only focus moves
+    det.suppressFocus = true;
+    det.suppressHover = detailsZones().onButtons; // once tucked, only the buttons could bring it back
+    detailsClearTimers();
+    detailsSetShown(false);
+  });
+  const DETAILS_LISTENERS = [["pointermove", onDetailsPointer, { capture: true, passive: true }], ["pointerout", onDetailsPointer, { capture: true, passive: true }],
+    ["focusin", onDetailsFocus, true], ["focusout", onDetailsFocus, true], ["click", onDetailsClick, true], ["keydown", onDetailsKey, true]];
+  /** The observer and listeners run only while "Float over the chat" is on. */
+  function detailsConnect(on) {
+    if (on === det.on) return;
+    det.on = on;
+    if (on) {
+      det.obs = new MutationObserver(guarded("details-observer", detailsRecords));
+      det.obs.observe(D.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-pressed", "aria-expanded", "data-thread-details-panel"] });
+      for (const [type, fn, opts] of DETAILS_LISTENERS) D.addEventListener(type, fn, opts);
+    } else {
+      det.obs?.disconnect();
+      det.obs = null;
+      det.lockFocused = false;
+      for (const [type, fn, opts] of DETAILS_LISTENERS) D.removeEventListener(type, fn, opts);
+      det.pt = null;
+      det.suppressHover = det.suppressFocus = false;
+    }
+  }
+  // The settings' <html> attributes (✦ panel, padlock, another window's change) are what turn it on or off.
+  const detailsRootObs = new MutationObserver(guarded("details-root", () => detailsSync()));
+  detailsRootObs.observe(D.documentElement, { attributes: true, attributeFilter: ["data-t3x-details-float", "data-t3x-details-mode"] });
+  cleanups.push(() => {
+    detailsRootObs.disconnect();
+    detailsConnect(false);
+    detailsClearTimers();
+    if (det.inerted) det.inerted.inert = false;
+    det.described?.removeAttribute("aria-description");
+    det.lock?.remove();
+    for (const a of ["data-t3x-details-float", "data-t3x-details-mode", "data-t3x-details-docked", "data-t3x-details-shown"]) D.documentElement.removeAttribute(a);
+  });
+  detailsSync();
 
   // ---------- observer, polling, diag ----------
 
