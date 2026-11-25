@@ -5004,6 +5004,10 @@
     if (id === "older" && ((!display && olderDragging(el)) || !pieceVisible.older(el))) return null;
     return el;
   }
+  // Chrome snaps outline widths to whole device pixels, so the marker's 2px outline can read back
+  // thinner: 1.6px at 1.25 device pixels per CSS pixel (Andy's T3 on Nightly 5230, 25 Nov 2026).
+  // Compare in device pixels. w: computed outline width in CSS px; dpr: devicePixelRatio.
+  const markerOutlineWide = (w, dpr) => { const r = dpr > 0 ? dpr : 1; return w > 0 && Math.round(w * r) >= Math.max(1, Math.floor(2 * r)); };
   function checkRead() {
     const out = {};
     // Eligibility is independent of TITLE_SEL. Grouping hides native rows, so it is unchecked.
@@ -5028,7 +5032,7 @@
       }
       if (checkOn("marker")) {
         const selected = rows.map(r => r.querySelector('[aria-current="page"], [data-active="true"]')).filter(checkVisible);
-        if (selected.length) result("marker", selected.length, selected.filter(el => settings.marker === "outline" ? getComputedStyle(el).outlineStyle === "solid" && parseFloat(getComputedStyle(el).outlineWidth) >= 2 : getComputedStyle(el, "::after").content === '""' && parseFloat(getComputedStyle(el, "::after").width) === 3).length);
+        if (selected.length) result("marker", selected.length, selected.filter(el => settings.marker === "outline" ? getComputedStyle(el).outlineStyle === "solid" && markerOutlineWide(parseFloat(getComputedStyle(el).outlineWidth), devicePixelRatio) : getComputedStyle(el, "::after").content === '""' && parseFloat(getComputedStyle(el, "::after").width) === 3).length);
       }
     }
     // Inserted features: eligible only with their existing, unique anchor on screen.

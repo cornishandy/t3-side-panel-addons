@@ -330,13 +330,14 @@ header[data-chat-header]:has([data-t3x="hdr"]) > div:not([data-workspace-titleba
   pointer-events: none;
 }
 
-/* ---------- sidebar polish: selected thread marker ---------- */
+/* ---------- sidebar polish: selected thread marker ----------
+   Nightly 5230 draws threads inside a project folder as data-testid="sidebar-row-folder". */
 
-html[data-t3x-marker] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"], [data-testid="sidebar-draft-row"])[aria-current="page"],
+html[data-t3x-marker] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"], [data-testid="sidebar-row-folder"], [data-testid="sidebar-draft-row"])[aria-current="page"],
 html[data-t3x-marker] [data-slot="sidebar-menu-sub-button"][data-active="true"] {
   position: relative;
 }
-html[data-t3x-marker="bar"] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"], [data-testid="sidebar-draft-row"])[aria-current="page"]::after,
+html[data-t3x-marker="bar"] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"], [data-testid="sidebar-row-folder"], [data-testid="sidebar-draft-row"])[aria-current="page"]::after,
 html[data-t3x-marker="bar"] [data-slot="sidebar-menu-sub-button"][data-active="true"]::after {
   content: "";
   position: absolute;
@@ -350,13 +351,13 @@ html[data-t3x-marker="bar"] [data-slot="sidebar-menu-sub-button"][data-active="t
   pointer-events: none;
 }
 html[data-t3x-marker="bar"] [data-thread-item] [aria-current="page"] span.min-w-0.flex-1.text-start,
-html[data-t3x-marker="bar"] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"])[aria-current="page"] span[aria-hidden].flex-1,
+html[data-t3x-marker="bar"] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"], [data-testid="sidebar-row-folder"])[aria-current="page"] span[aria-hidden].flex-1,
 html[data-t3x-marker="bar"] [data-testid="sidebar-draft-row"][aria-current="page"] .mt-0\.5.truncate,
 html[data-t3x-marker="bar"] [data-slot="sidebar-menu-sub-button"][data-active="true"] [data-testid^="thread-title-"] {
   font-weight: 600;
   color: var(--sidebar-foreground, var(--foreground));
 }
-html[data-t3x-marker="outline"] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"], [data-testid="sidebar-draft-row"])[aria-current="page"],
+html[data-t3x-marker="outline"] :is([data-testid="sidebar-row-card"], [data-testid="sidebar-row-slim"], [data-testid="sidebar-row-folder"], [data-testid="sidebar-draft-row"])[aria-current="page"],
 html[data-t3x-marker="outline"] [data-slot="sidebar-menu-sub-button"][data-active="true"] {
   outline: 2px solid var(--t3x-mark, var(--sidebar-foreground, currentColor));
   outline-offset: -2px;
